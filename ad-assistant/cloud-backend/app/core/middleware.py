@@ -1,10 +1,5 @@
-"""Middleware — Sprint-01 placeholder.
+"""Middleware — request ID injection and latency tracking.
 
-Will implement:
-- Request ID injection
-- Request logging (user_id, device_id, latency_ms)
-- Sensitive data redaction in logs
-- Rate limiting hooks
+Any sensitive data redaction is handled at the log-formatter level per
+the security plan.
 """
-
-# Sprint-01: skeleton only — no business logic implemented yet

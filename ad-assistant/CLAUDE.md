@@ -79,6 +79,19 @@ Claude Code + DeepSeek 不允许自行提交。
 - 风险点
 - 是否触发重大变更
 - 等待 Codex Review，不得自行提交
+
+## 模块完成后的交接规则
+
+每个模块完成后，Claude Code / DeepSeek 只允许等待 Codex Review。
+
+Review 通过并合并到 `main` 后：
+- 不得在原分支继续开发下一个模块。
+- 不得自行创建下一个模块的业务实现。
+- 必须等待 Codex 准备下一任务文档。
+- 必须等待用户开启新会话并切换到新的任务分支。
+
+新模块开发必须使用新的任务分支和新的任务文档。
+
 ## Git 提交规则
 
 Claude Code / DeepSeek 必须遵守以下 Git 规则：

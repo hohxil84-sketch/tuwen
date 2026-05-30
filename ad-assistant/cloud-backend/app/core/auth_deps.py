@@ -1,12 +1,16 @@
-"""Authentication dependencies — Sprint-01 placeholder.
+"""Authentication dependencies — Sprint-01 implementation.
 
-Will implement the 6-step auth chain:
-1. access token validity
-2. user enabled check
-3. device bound check
-4. device banned check
-5. plan validity check
-6. feature permission check (advanced AI extra credit check)
+The 6-step auth chain is implemented in :mod:`app.api.deps`.
+
+This module re-exports the key dependencies for convenience.
 """
 
-# Sprint-01: skeleton only — no business logic implemented yet
+from app.api.deps import (  # noqa: F401
+    get_access_token,
+    get_current_device,
+    get_current_user,
+    get_current_user_payload,
+    get_current_user_with_device,
+    verify_feature,
+    verify_plan,
+)
