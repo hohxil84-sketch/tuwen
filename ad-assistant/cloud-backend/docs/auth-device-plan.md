@@ -109,6 +109,8 @@ Client                          Cloud Backend
 | 存储 | 客户端内存，不落盘 |
 | 传输 | Authorization: Bearer \<token\> |
 
+> ⚠️ **plan claim 仅用于客户端 UI 展示/辅助体验**，不得作为最终权限依据。JWT 签发后可能因套餐变更、退款、封禁等原因失效。**所有权限判断必须以云端实时查询结果为准**（见授权校验链第 5、6 步）。
+
 ### 3.2 refresh_token
 
 | 属性 | 值 |
@@ -149,7 +151,7 @@ Client                          Cloud Backend
 |------|------|
 | 新设备首次登录 | 自动创建 devices 记录，status=active |
 | 已有设备登录 | 更新 last_seen_at |
-| 设备数超限（>N） | 拒绝登录，返回 DEVICE_LIMIT_REACHED |
+| 设备数超限（超过 3 台） | 拒绝登录，返回 DEVICE_LIMIT_REACHED |
 | 设备被管理员禁用 | 拒绝该设备的请求，返回 DEVICE_BANNED |
 
 ### 4.3 设备状态
@@ -171,14 +173,15 @@ Client                          Cloud Backend
 | `REFRESH_INVALID` | 401 | refresh_token 无效或已撤销 |
 | `REFRESH_EXPIRED` | 401 | refresh_token 过期，需重新登录 |
 | `TOKEN_REUSE` | 401 | 检测到 refresh_token 重用，全部 session 撤销 |
-| `USER_NOT_FOUND` | 401 | 账号不存在 |
-| `PASSWORD_WRONG` | 401 | 密码错误 |
+| `INVALID_CREDENTIALS` | 401 | 账号或密码错误（对外统一，防账号枚举） |
 | `USER_DISABLED` | 403 | 用户已禁用 |
 | `DEVICE_NOT_BOUND` | 403 | 设备未绑定到当前用户 |
 | `DEVICE_BANNED` | 403 | 设备已被封禁 |
 | `DEVICE_LIMIT_REACHED` | 403 | 设备数量超限 |
 | `PLAN_INVALID` | 403 | 套餐无效或已过期 |
 | `FEATURE_NOT_ALLOWED` | 403 | 当前套餐不支持该功能 |
+
+> **安全设计**：登录失败对外统一返回 `INVALID_CREDENTIALS`（不区分账号不存在/密码错误），防止账号枚举攻击。真实失败原因（`USER_NOT_FOUND` / `PASSWORD_WRONG`）仅写入 `risk_logs` 内部审计字段 `details`，不在 HTTP 响应体中暴露。
 
 ---
 
@@ -209,8 +212,8 @@ Task-02 **不需要**以下表（属于后续任务）：
 | 测试场景 | 预期结果 |
 |----------|----------|
 | 正确账号密码登录 | 200，返回 token pair + user info |
-| 错误密码登录 | 401 PASSWORD_WRONG |
-| 不存在账号登录 | 401 USER_NOT_FOUND |
+| 错误账号或密码登录 | 401 INVALID_CREDENTIALS（不区分账号不存在/密码错误） |
+| 不存在账号登录 | 401 INVALID_CREDENTIALS（与密码错误返回相同错误码） |
 | 有效 refresh_token 刷新 | 200，返回新 token pair，旧 token 撤销 |
 | 过期 refresh_token 刷新 | 401 REFRESH_EXPIRED |
 | 已撤销 refresh_token 刷新 | 401 REFRESH_INVALID |

@@ -65,8 +65,7 @@
 
 | 错误码 | HTTP | 说明 |
 |--------|------|------|
-| `USER_NOT_FOUND` | 401 | 账号不存在 |
-| `PASSWORD_WRONG` | 401 | 密码错误 |
+| `INVALID_CREDENTIALS` | 401 | 账号或密码错误（对外统一，防账号枚举。真实原因写入 risk_logs） |
 | `USER_DISABLED` | 403 | 用户已被禁用 |
 | `DEVICE_LIMIT_REACHED` | 403 | 设备绑定数超限 |
 | `INVALID_DEVICE` | 400 | 设备指纹格式无效 |
@@ -76,6 +75,8 @@
 
 - 登录成功仅返回一次明文 refresh_token
 - password 不写入任何日志
+- 登录失败对外统一返回 `INVALID_CREDENTIALS`，不区分"账号不存在"与"密码错误"
+- 真实失败原因（USER_NOT_FOUND / PASSWORD_WRONG）仅写入 risk_logs.details
 - 登录失败写入 risk_logs（event_type=LOGIN_FAILED）
 - 同一账号连续失败 5 次后临时锁定 15 分钟
 
