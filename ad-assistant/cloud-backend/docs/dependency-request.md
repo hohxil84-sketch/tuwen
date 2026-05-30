@@ -4,19 +4,19 @@
 
 ---
 
-## 申请 1：python-jose（PyJWT 继任者）
+## 申请 1：PyJWT
 
 | 项目 | 说明 |
 |------|------|
-| **包名** | `python-jose[cryptography]` |
-| **版本** | `>=3.3.0` |
+| **包名** | `PyJWT` |
+| **版本** | `>=2.10.0` |
 | **用途** | JWT（JSON Web Token）签发与验证。access_token 需要 HS256 签名、过期校验、载荷解析 |
 | **许可证** | MIT |
-| **体积** | 约 2MB（含 cryptography 依赖） |
-| **依赖链** | `cryptography`（Rust 编译，预编译 wheel 可用） |
-| **安全风险** | 低。python-jose 是成熟的 JWT 库，被广泛用于 FastAPI 生态 |
-| **替代方案** | 1. `PyJWT`（更轻量，功能覆盖）2. 纯标准库 `hmac` + `hashlib` 手写（不推荐，安全敏感代码不宜自造） |
-| **推荐理由** | 与 FastAPI 生态一致，文档丰富，社区活跃，安全性经审计 |
+| **体积** | 约 0.5MB（纯 Python，无二进制依赖） |
+| **依赖链** | 无强制依赖（可选 `cryptography` 用于 RS256/ES256，本项目只用 HS256 不需要） |
+| **安全风险** | 低。PyJWT 是 JWT 生态最核心的库，被数百万项目使用 |
+| **替代方案** | 1. `python-jose[cryptography]`（更重，依赖链更复杂，HS256 场景没有优势）2. 纯标准库 `hmac` + `hashlib` 手写（不推荐，安全敏感代码不宜自造） |
+| **推荐理由** | 当前只需 HS256 JWT 签发、过期和 claims 校验，PyJWT 更轻、更直接；`python-jose[cryptography]` 依赖链更重，HS256 场景无必要 |
 | **不使用标准库的原因** | JWT 涉及签名算法选择、claims 校验、key 管理，标准库可实现但容易出错，使用成熟库更安全 |
 
 ---
@@ -58,15 +58,18 @@
 
 | 依赖 | 许可证 | 体积 | 风险 | 是否需要确认 |
 |------|--------|------|------|-------------|
-| `python-jose[cryptography]` | MIT | ~2MB | 低 | ✅ 待确认 |
-| `passlib[bcrypt]` | BSD | ~3MB | 低 | ✅ 待确认 |
+| `PyJWT` | MIT | ~0.5MB | 低 | ✅ 批准 |
+| `passlib[bcrypt]` | BSD | ~3MB | 低 | ✅ 批准 |
 
-**总计新增：2 个依赖，约 5MB。**
+**总计新增：2 个依赖，约 3.5MB。**
 
 ---
 
 ## 用户确认项
 
-- [ ] 批准安装 `python-jose[cryptography]`
-- [ ] 批准安装 `passlib[bcrypt]`
-- [ ] 或者：指定替代方案
+- [x] ~~批准安装 `python-jose[cryptography]`~~ → 改为批准 `PyJWT`
+- [x] 批准安装 `passlib[bcrypt]`
+
+**2026-05-30 确认结果：**
+- `PyJWT` **批准** — 纯 Python，仅 HS256 场景更轻（约 0.5MB），替代原方案的 `python-jose[cryptography]`（~2MB 含二进制依赖链）
+- `passlib[bcrypt]` **批准**

@@ -258,9 +258,7 @@ Task-02 **不需要**以下表（属于后续任务）：
 
 详见 [dependency-request.md](dependency-request.md)。
 
-Task-02 可能需要 2 个新依赖：
+Task-02 需要 2 个新依赖（均已获用户批准）：
 
-1. **python-jose** — JWT 签发与验证
+1. **PyJWT** — JWT (HS256) 签发与验证
 2. **passlib[bcrypt]** — 密码 hash 与验证
-
-均未安装，需等待用户确认。
