@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ad Assistant Git Guardrails"
+  short_description: "执行提交前 Review 和 Git 分支规则。"
+  default_prompt: "Use $ad-assistant-git-guardrails to check whether an AI 图文广告助手 commit is allowed."
+policy:
+  allow_implicit_invocation: true
+

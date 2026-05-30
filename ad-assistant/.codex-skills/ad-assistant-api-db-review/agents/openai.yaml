@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ad Assistant API DB Review"
+  short_description: "审查 API 契约、DTO 和数据库变更。"
+  default_prompt: "Use $ad-assistant-api-db-review to review API and database changes."
+policy:
+  allow_implicit_invocation: true
+

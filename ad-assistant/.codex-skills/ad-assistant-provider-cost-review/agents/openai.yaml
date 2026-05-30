@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ad Assistant Provider Cost Review"
+  short_description: "审查 Provider、成本和 AI 算力扣费。"
+  default_prompt: "Use $ad-assistant-provider-cost-review to review AI Provider and cost controls."
+policy:
+  allow_implicit_invocation: true
+

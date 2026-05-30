@@ -1,0 +1,39 @@
+# Local assistant/editor state
+.claude/settings.local.json
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.next/
+out/
+target/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Tauri / desktop
+src-tauri/target/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/

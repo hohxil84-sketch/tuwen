@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ad Assistant Task Executor"
+  short_description: "按任务单执行图文广告助手开发。"
+  default_prompt: "Use $ad-assistant-task-executor to execute an approved AI 图文广告助手 task."
+policy:
+  allow_implicit_invocation: true
+

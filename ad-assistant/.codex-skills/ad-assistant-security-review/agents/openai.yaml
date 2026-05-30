@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ad Assistant Security Review"
+  short_description: "审查授权、Token、Tauri 和本地服务安全。"
+  default_prompt: "Use $ad-assistant-security-review to review AI 图文广告助手 security before commit."
+policy:
+  allow_implicit_invocation: true
+
