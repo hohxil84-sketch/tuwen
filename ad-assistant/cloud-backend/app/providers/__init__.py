@@ -8,5 +8,3 @@
 # - deepseek_provider.py
 # - claude_provider.py
 # - ocr_provider.py
-# - image_provider.py
-# - vector_provider.py
