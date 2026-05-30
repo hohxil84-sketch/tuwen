@@ -1,2 +1,1 @@
-# Cloud backend tests
-# Sprint-01: skeleton only — no tests implemented yet
+"""Cloud backend tests — Sprint-01 Auth/Device."""
