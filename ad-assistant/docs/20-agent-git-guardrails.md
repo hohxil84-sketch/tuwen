@@ -143,4 +143,53 @@ Codex：
 - 包含真实密钥、Token、密码的文件
 - 与任务单无关的大规模格式化
 - BACKLOG、FUTURE、BLOCKED 功能实现
+## Branch And Push Guardrails For Agents
 
+Claude Code / DeepSeek must treat `main` as a protected stable branch.
+
+Before writing or committing, the agent must run:
+
+```powershell
+git status --short --branch
+```
+
+If the current branch is `main`, the agent must create or switch to a task branch before continuing:
+
+```powershell
+git switch -c feature/<task-name>
+```
+
+Required branch targets:
+
+- Development work: `feature/<task-name>`
+- Bug fixes: `fix/<scope>-<issue>`
+- Documentation only: `docs/<scope>`
+- Tooling/config maintenance: `chore/<scope>`
+
+Commit rules:
+
+- Stage only files that belong to the current task.
+- Do not use `git add -A` when unrelated or unreviewed files exist.
+- Do not commit on `main`.
+- Do not commit if Codex Review reports blocking issues.
+- Do not commit if the task changes database schema, API contracts, Provider interfaces, Token logic, Tauri permissions, or payment logic without explicit user confirmation.
+
+Push rules:
+
+- Push only the current task branch:
+
+```powershell
+git push -u origin <current-branch>
+```
+
+- Do not run `git push origin main`.
+- Do not force push.
+- Do not rewrite shared history.
+
+Pull request rules:
+
+- PR base: `main`.
+- PR head: current task branch.
+- PR title format: `[task] short summary`.
+- PR body must include scope, tests, Codex Review result, and known risks.
+- Merge is allowed only after Codex Review explicitly says `允许提交` or `允许合并`.

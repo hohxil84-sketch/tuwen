@@ -79,3 +79,30 @@ Claude Code + DeepSeek 不允许自行提交。
 - 风险点
 - 是否触发重大变更
 - 等待 Codex Review，不得自行提交
+## Git 提交规则
+
+Claude Code / DeepSeek 必须遵守以下 Git 规则：
+
+1. 开发前先执行 `git status --short --branch`。
+2. 如果当前在 `main`，必须先切任务分支，例如 `git switch -c feature/sprint-01-scaffold`。
+3. 不允许在 `main` 上提交业务代码。
+4. 只允许提交当前任务相关文件，不允许把无关文件混入同一个 commit。
+5. Codex Review 未通过时，不允许提交。
+6. 提交后只能推送当前任务分支：`git push -u origin <current-branch>`。
+7. 不允许 `git push origin main`。
+8. 不允许 `git push --force`。
+9. 合并到 `main` 必须通过 PR，PR base 为 `main`，PR head 为当前任务分支。
+
+推荐提交消息格式：
+
+```text
+type(scope): summary
+```
+
+示例：
+
+```text
+docs(git): clarify branch and push rules
+feat(scaffold): add sprint 01 project skeleton
+fix(auth): correct device binding validation
+```
