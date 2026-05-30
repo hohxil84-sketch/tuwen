@@ -2,7 +2,7 @@
 
 ## 状态
 
-`MVP_REQUIRED` — 等待 Codex Review 任务单（第 2 轮）
+`MVP_REQUIRED` — 等待 Codex Review 任务单（第 3 轮）
 
 ## 分支
 
@@ -20,7 +20,32 @@ OCR 是 MVP P0 核心功能。图文广告行业高频需求：从名片、传�
 
 Sprint-01 只做 **OCR 最小闭环（纯本地）**：用户在桌面端选图 → 本地 PaddleOCR 引擎识别 → 结果显示在 UI → 存入本地 SQLite 历史。
 
-本地 OCR 引擎使用 PaddleOCR（离线运行，不调用云端 AI Provider，不扣算力，不联网）。后续 Task 再扩展云端 OCR Provider、使用统计上报和高级识别能力。
+本地 OCR 引擎使用 PaddleOCR。OCR 推理过程不调用云端 AI Provider、不扣算力、不上传图片或识别内容。后续 Task 再扩展云端 OCR Provider、使用统计上报和高级识别能力。
+
+### PaddleOCR 模型缓存策略
+
+PaddleOCR 首次运行需要下载模型文件（约 50-100MB），Task-04 采用以下策略：
+
+**开发环境初始化（首次安装，需要联网）：**
+- 首次安装依赖后，在开发/测试环境中运行一次初始化脚本，预下载模型到本地缓存目录
+- 默认模型缓存目录：`~/.paddleocr/`（PaddleOCR 默认路径，可通过环境变量 `PADDLEOCR_HOME` 覆盖）
+- 初始化脚本明确提示用户"正在下载 OCR 模型文件，仅需一次"，显示下载进度
+
+**运行时行为（支持离线）：**
+- 运行时优先使用已缓存的模型文件，不主动联网
+- 如模型缓存已存在，OCR 引擎直接加载，无需网络
+- 如模型缓存不存在（首次运行且未初始化），返回明确错误 `OCR_MODEL_NOT_FOUND`，附带操作指引（"请先运行初始化脚本下载模型，或手动下载模型文件到 ~/.paddleocr/"）
+
+**下载失败处理：**
+- 初始化脚本下载失败时，返回明确错误码和重试建议
+- 不静默失败、不无限重试
+- 错误信息中标注当前网络状态检查提示
+
+**离线环境部署：**
+- 支持将模型文件预置到安装包中，或通过离线包手动复制到缓存目录
+- 离线环境检测到模型缓存目录已就绪时，不尝试联网
+
+> 总结：Task-04 **允许开发环境联网下载模型**，运行时 **必须支持已缓存模型的离线使用**。不要求"绝不联网"，但 OCR 推理过程和用户使用阶段不依赖网络。
 
 ## 本次只开发什么
 
@@ -81,8 +106,9 @@ Sprint-01 只做 **OCR 最小闭环（纯本地）**：用户在桌面端选图 
 
 - `ocr_history` 表 DDL：
   - `id` TEXT PRIMARY KEY (UUID v4)
-  - `image_path` TEXT NOT NULL（原始图片的本地路径）
-  - `image_filename` TEXT NOT NULL（原始文件名，用于 UI 展示）
+  - `image_filename` TEXT NOT NULL（原始文件名，用于 UI 展示，不含路径）
+  - `image_hash` TEXT NOT NULL（图片文件 SHA-256 前 16 位 hex，用于去重校验）
+  - `local_copy_path` TEXT（应用沙箱内相对路径，如 `ocr_images/20250530_abc123.png`；可选，仅当本地服务将图片副本保存到沙箱目录时填写）
   - `text` TEXT（识别全文）
   - `blocks_json` TEXT（文本块 JSON，SQLite 不支持原生 JSON 类型）
   - `engine` TEXT（`paddleocr`）
@@ -91,7 +117,14 @@ Sprint-01 只做 **OCR 最小闭环（纯本地）**：用户在桌面端选图 
 - API：
   - `GET /local/ocr/history?limit=50&offset=0` — 返回历史列表（按时间倒序）
   - `GET /local/ocr/history/{id}` — 返回单条 OCR 结果详情
-- 不存储：明文 Token、密码、Provider Key、原始图片二进制（只存路径引用）
+- 安全要求：
+  - ❌ **禁止保存用户原始绝对路径**（如 `C:\Users\张三\Desktop\报价单.png` 或 `/home/zhangsan/报价单.png`）
+  - ❌ **禁止保存包含用户名、客户名或其他 PII 的目录路径**
+  - ✅ `image_filename` 只存文件名，不存路径
+  - ✅ `local_copy_path` 只允许应用沙箱内相对路径（如 `ocr_images/<uuid>.png`）
+  - ✅ 如需在历史页预览原图，使用 `local_copy_path` 引用沙箱内副本
+  - ✅ OCR 完成后，本地服务将图片副本存入沙箱目录，记录 `local_copy_path`
+  - ❌ 不存储：明文 Token、密码、Provider Key、原始图片二进制
 
 ### 5. 桌面端 OCR 工作台页面
 
@@ -337,6 +370,9 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 4 个依赖需 Cod
 - ✅ PaddleOCR wrapper 不存在命令注入风险
 - ✅ 日志不泄露文件内容
 - ✅ 不向云端发送任何 OCR 内容或用户文件路径
+- ✅ OCR 历史不保存用户原始绝对路径
+- ✅ OCR 历史不保存包含用户名/客户名的目录路径
+- ✅ 图片预览只引用应用沙箱内副本或临时文件
 
 ## 测试方式
 
@@ -389,7 +425,7 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 4 个依赖需 Cod
 - PaddleOCR 依赖体积大（~400MB），首次安装耗时长
 - 本地 SQLite schema 设计影响后续 OCR 功能扩展
 - 本地服务与桌面端通信依赖 127.0.0.1:9100，端口冲突需处理
-- OCR 引擎首次加载模型文件需网络下载（约 50-100MB），需处理下载失败场景
+- OCR 模型首次下载需联网（约 50-100MB），需通过初始化脚本处理下载失败；运行时模型缓存就绪后不需要网络
 
 影响范围（全部在 `desktop-app/` 内）：
 - `desktop-app/local-service/` — 本地 OCR 服务（wrapper、路由、历史、入口）
@@ -407,19 +443,20 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 4 个依赖需 Cod
 
 ## 给 Codex Review 的审查指令
 
-请审查 Task-04 OCR 最小闭环任务单（第 2 轮，已按第 1 轮 Review 意见收窄范围）。
+请审查 Task-04 OCR 最小闭环任务单（第 3 轮，已按第 1、2 轮 Review 意见收窄范围并修复隐私冲突）。
 
 重点检查：
 1. ✅ 任务范围是否仅限本地 OCR（不涉及 cloud-backend、usage_events、provider_call_log、扣费/支付）
 2. ✅ "允许修改哪些文件" 是否包含任何 cloud-backend 文件（不应包含）
 3. ✅ "禁止修改哪些文件" 是否覆盖了 cloud-backend 全目录
-4. ✅ PaddleOCR wrapper 安全规则是否完整（参数白名单、文件校验、超时、路径限制、命令注入防护）
-5. ✅ 本地服务是否仅监听 127.0.0.1（不暴露公网）
-6. ✅ 新增依赖许可证和体积是否可接受
-7. ✅ 是否存在前端直连第三方 AI API 的设计（不应存在）
-8. ✅ OCR 内容全文是否上报到云端（不应上报，Task-04 纯本地）
-9. ✅ 本地 SQLite 是否存储明文敏感信息
-10. ✅ 任务单"本次不开发什么"是否覆盖了 BACKLOG / P1 / FUTURE / 云端相关功能
+4. ✅ PaddleOCR 模型缓存策略是否解决了"离线运行"与"首次下载"的冲突
+5. ✅ PaddleOCR wrapper 安全规则是否完整（参数白名单、文件校验、超时、路径限制、命令注入防护）
+6. ✅ 本地服务是否仅监听 127.0.0.1（不暴露公网）
+7. ✅ 新增依赖许可证和体积是否可接受
+8. ✅ 是否存在前端直连第三方 AI API 的设计（不应存在）
+9. ✅ OCR 内容全文是否上报到云端（不应上报，Task-04 纯本地）
+10. ✅ 本地 SQLite 是否存储明文敏感信息、用户绝对路径、包含 PII 的目录路径
+11. ✅ 任务单"本次不开发什么"是否覆盖了 BACKLOG / P1 / FUTURE / 云端相关功能
 
 输出：
 - 任务单结构完整性
