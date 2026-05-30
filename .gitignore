@@ -17,6 +17,7 @@ build/
 .next/
 out/
 target/
+tools/
 
 # Python
 __pycache__/
