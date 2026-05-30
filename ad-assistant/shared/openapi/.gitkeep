@@ -1,0 +1,13 @@
+# OpenAPI specifications — the authoritative source for API contracts.
+# Sprint-01: skeleton only — no API specs defined yet.
+#
+# Reserved specs:
+# - auth.yaml    (Auth API: login, refresh, logout)
+# - device.yaml  (Device API: bind, current)
+# - ocr.yaml     (OCR API: submit task, query result)
+# - usage.yaml   (Usage API: submit events)
+# - credit.yaml  (Credit API: balance query)
+# - provider-log.yaml (Provider Call Log API)
+#
+# All responses follow unified structure:
+# { success: boolean, data: object|null, error: object|null, request_id: string }

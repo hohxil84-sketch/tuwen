@@ -1,0 +1,10 @@
+# Data Transfer Objects — shared request/response type definitions.
+# Sprint-01: skeleton only — no DTOs defined yet.
+#
+# Reserved:
+# - auth.ts      (AuthLoginRequest, AuthLoginResponse, etc.)
+# - device.ts    (DeviceBindRequest, DeviceCurrentResponse, etc.)
+# - ocr.ts       (OcrTaskRequest, OcrTaskResponse, etc.)
+# - usage.ts
+# - credit.ts
+# - provider-log.ts

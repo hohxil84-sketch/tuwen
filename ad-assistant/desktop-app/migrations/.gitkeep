@@ -1,0 +1,10 @@
+# Local SQLite migrations directory
+# Sprint-01: skeleton only — no migrations executed yet
+#
+# Reserved local tables:
+# - ocr_history
+# - local_task_state
+# - app_settings
+# - offline_license_cache
+#
+# NEVER store in SQLite: plaintext tokens, Provider API Keys, user passwords

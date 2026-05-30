@@ -1,0 +1,9 @@
+# Unified error codes — shared between all projects.
+# Sprint-01: skeleton only — no error codes defined yet.
+#
+# Reserved error code categories:
+# - AUTH_REQUIRED, AUTH_EXPIRED, AUTH_INVALID
+# - DEVICE_NOT_BOUND, DEVICE_BANNED, DEVICE_LIMIT_EXCEEDED
+# - INSUFFICIENT_CREDITS, PLAN_EXPIRED, FEATURE_NOT_ALLOWED
+# - PROVIDER_ERROR, PROVIDER_TIMEOUT, PROVIDER_RATE_LIMITED
+# - VALIDATION_ERROR, NOT_FOUND, INTERNAL_ERROR

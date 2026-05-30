@@ -4,11 +4,8 @@
 
 MVP 优先工具：
 - PaddleOCR：OCR
-- vtracer：位图转矢量
-- ImageMagick：图片处理
 
 Sprint-01 只允许使用 OCR 最小闭环。
-vtracer 和 ImageMagick 只可预留文档，不得实现业务功能，除非任务单明确要求。
 
 ## 工具封装原则
 

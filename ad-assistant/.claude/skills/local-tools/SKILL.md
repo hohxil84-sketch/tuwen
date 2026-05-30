@@ -1,6 +1,6 @@
 ---
 name: local-tools
-description: 本地工具封装 Skill — PaddleOCR、vtracer、ImageMagick 的受控封装，禁止任意命令执行。触发时机：封装本地 CLI 工具、编写本地 FastAPI 服务端点、处理文件 I/O、调用图像处理工具时。
+description: 本地工具封装 Skill — PaddleOCR 的受控封装，禁止任意命令执行。触发时机：封装本地 CLI 工具、编写本地 FastAPI 服务端点、处理文件 I/O 时。
 ---
 
 # 本地工具封装 Skill
@@ -10,10 +10,8 @@ description: 本地工具封装 Skill — PaddleOCR、vtracer、ImageMagick 的�
 | 工具 | 用途 | Sprint-01 状态 |
 |------|------|---------------|
 | PaddleOCR | OCR 文字识别 | ✅ 允许开发 |
-| vtracer | 位图转矢量 | ⚠️ Sprint-01 只预留文档 |
-| ImageMagick | 图片处理 | ⚠️ Sprint-01 只预留文档 |
 
-Sprint-01 只实现 OCR 最小闭环，vtracer 和 ImageMagick 只能预留目录和文档。
+Sprint-01 只实现 OCR 最小闭环。
 
 ## 封装架构
 
@@ -24,12 +22,8 @@ desktop-app/local-service/
   main.py              # FastAPI 入口，仅监听 127.0.0.1
   routes/
     ocr.py             # OCR 端点
-    vector.py           # 矢量化端点（预留）
-    image.py            # 图片处理端点（预留）
   wrappers/
     paddleocr.py        # PaddleOCR 封装
-    vtracer.py           # vtracer 封装（预留）
-    imagemagick.py       # ImageMagick 封装（预留）
 ```
 
 ## 必须遵守的安全规则
@@ -82,19 +76,19 @@ desktop-app/local-service/
 
 ## 子进程调用规范
 
-如果必须调用外部 CLI（如 `vtracer`、`magick`）：
+如果必须调用外部 CLI：
 
 ```python
 # ✅ 正确：使用参数列表，禁用 shell
 subprocess.run(
-    ["vtracer", "--input", safe_path, "--output", safe_output],
+    ["tool_name", "--input", safe_path, "--output", safe_output],
     shell=False,
     timeout=120,
     capture_output=True
 )
 
 # ❌ 禁止：字符串拼接 + shell
-subprocess.run(f"vtracer --input {user_input}", shell=True)
+subprocess.run(f"tool_name --input {user_input}", shell=True)
 ```
 
 所有子进程调用必须在 wrapper 函数内，接受参数校验后再执行。

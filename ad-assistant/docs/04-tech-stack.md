@@ -41,8 +41,6 @@ MVP 不允许未经确认替换桌面技术栈。
 
 MVP 优先：
 - PaddleOCR
-- vtracer
-- ImageMagick
 
 BACKLOG：
 - rembg
@@ -75,5 +73,5 @@ BACKLOG：
 - Next.js
 - Tailwind CSS
 - AI Provider SDK
-- OCR、图像处理、矢量化核心工具
+- OCR 核心工具
 

@@ -83,7 +83,7 @@ OCR 最小闭环：
 - 风控日志
 
 本地 FastAPI 服务负责：
-- 调用本地 OCR、vtracer、ImageMagick 等工具
+- 调用本地 OCR 等工具
 - 提供受控的本地处理 API
 - 不持有云端 Provider API Key
 - 不提供远程命令执行能力
