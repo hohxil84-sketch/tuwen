@@ -2,7 +2,7 @@
 
 ## 状态
 
-`MVP_REQUIRED` — 等待 Codex Review 任务单
+`MVP_REQUIRED` — 等待 Codex Review 任务单（第 2 轮）
 
 ## 分支
 
@@ -18,9 +18,9 @@
 
 OCR 是 MVP P0 核心功能。图文广告行业高频需求：从名片、传单、喷绘稿、门头照片中提取文字，用于改字、排版、报价。
 
-Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 PaddleOCR 引擎识别 → 结果显示在 UI → 存入本地 SQLite 历史 → 上报使用统计到云端。
+Sprint-01 只做 **OCR 最小闭环（纯本地）**：用户在桌面端选图 → 本地 PaddleOCR 引擎识别 → 结果显示在 UI → 存入本地 SQLite 历史。
 
-本地 OCR 引擎使用 PaddleOCR（离线运行，不调用云端 AI Provider，不扣算力）。后续 Task 再扩展云端 OCR Provider 和高级识别能力。
+本地 OCR 引擎使用 PaddleOCR（离线运行，不调用云端 AI Provider，不扣算力，不联网）。后续 Task 再扩展云端 OCR Provider、使用统计上报和高级识别能力。
 
 ## 本次只开发什么
 
@@ -64,7 +64,7 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
   - 调用 PaddleOCR wrapper
   - 返回统一结构 `{success, data, error, request_id}`
 - `GET /local/ocr/health` — OCR 引擎健康检查（PaddleOCR 是否就绪）
-- 参数校验错误返回 422（与云端一致）
+- 参数校验错误返回 422
 - 不在本地服务保存明文 Token / API Key
 
 ### 3. 本地服务入口更新
@@ -72,12 +72,12 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
 文件：`desktop-app/local-service/main.py`
 
 - 注册 OCR 路由
-- 启动时预加载 PaddleOCR 模型（或首次调用时懒加载）
+- 启动时预加载 PaddleOCR 模型（或首次调用时懒加载，需处理下载失败场景）
 - 添加 CORS 中间件（仅允许 localhost 来源）
 
 ### 4. 本地 SQLite OCR 历史
 
-文件：`desktop-app/local-service/history.py`（新文件）或集成到 routes
+文件：`desktop-app/local-service/history.py`（新文件）
 
 - `ocr_history` 表 DDL：
   - `id` TEXT PRIMARY KEY (UUID v4)
@@ -114,92 +114,37 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
 
 文件：`desktop-app/src/pages/HistoryPage.vue`
 
-- 历史记录列表（本地 SQLite 查询）
+- 历史记录列表（通过本地服务 API 查询 SQLite）
 - 每条显示：文件名、识别时间、文本前 100 字符预览
 - 点击查看完整 OCR 结果
 - 分页加载（每页 50 条）
 
 ### 7. 前端 API 调用层
 
-新文件（如需要）：`desktop-app/src/services/ocrService.ts` 或类似
+新文件（如需要）：`desktop-app/src/services/ocrService.ts`
 
 - 封装对 `http://127.0.0.1:9100/local/ocr` 的调用
 - 图片文件上传（FormData）
 - 错误处理（超时、网络错误、服务不可用）
 - 统一响应解析
 
-### 8. 云端 OCR 任务记录 API
-
-文件：`cloud-backend/app/api/ocr.py`（替换 placeholder）
-
-- `POST /api/v1/ocr/tasks`
-  - 需要登录（复用 Task-03 deps.py 授权校验链）
-  - 请求体：
-    ```json
-    {
-      "engine": "paddleocr",
-      "image_filename": "example.png",
-      "image_size_bytes": 102400,
-      "duration_ms": 1200,
-      "text_length": 256,
-      "block_count": 5,
-      "avg_confidence": 0.95
-    }
-    ```
-  - 响应：`{success: true, data: {task_id, status: "completed"}}`
-  - 此端点仅做记录，不扣费（本地 OCR 为免费功能，遵循 `docs/07-ai-cost-control.md`）
-- `GET /api/v1/ocr/tasks?limit=50&offset=0` — 当前用户 OCR 任务列表
-- 不在云端保存 OCR 识别内容全文（只保存元数据/统计信息）
-
-### 9. 云端使用统计上报
-
-文件：`cloud-backend/app/api/usage.py`（替换 placeholder）
-
-- `POST /api/v1/usage/events`
-  - 需要登录
-  - 记录功能使用事件（feature=`ocr`, event_type=`local_paddleocr`）
-  - 不扣费、不修改额度
-  - 写入 `usage_events` 表
-- 客户端提交的是使用事件，不是最终扣费结果
-
-### 10. 数据库模型（云端）
-
-新文件（如需要）：`cloud-backend/app/models/ocr_task.py`
-
-- `ocr_tasks` 表模型：
-  - `id` UUID PRIMARY KEY
-  - `user_id` FK → users.id
-  - `device_id` FK → devices.id
-  - `engine` VARCHAR（paddleocr）
-  - `image_filename` VARCHAR
-  - `image_size_bytes` BIGINT
-  - `duration_ms` INTEGER
-  - `text_length` INTEGER
-  - `block_count` INTEGER
-  - `avg_confidence` DOUBLE PRECISION
-  - `status` VARCHAR（completed / failed）
-  - `created_at` TIMESTAMP WITH TIME ZONE
-- ⚠️ 不在 `ocr_tasks` 表存储 OCR 识别内容全文
-
-### 11. DDL 草案文件
-
-文件：`cloud-backend/migrations/ddl/005_ocr_tasks.sql`
-
-- 输出 OCR tasks 表 DDL（文件仅为草案，不执行数据库迁移）
-- 附带 downgrade 注释
-
-### 12. 自动化测试
+### 8. 自动化测试
 
 - 本地 PaddleOCR wrapper 单元测试（mock PaddleOCR，测试参数校验、文件校验、错误码映射）
 - 本地 OCR API 端点测试（测试文件上传、参数校验、响应格式）
-- 云端 OCR task 记录 API 测试（测试授权校验、请求格式、响应格式）
-- 云端 usage events API 测试
-- 目标：≥ 12 个测试用例
+- 本地 OCR 历史 API 测试（保存、查询、分页）
+- 目标：≥ 12 个测试用例，全部在本地运行（不依赖云端服务）
 
 ## 本次不开发什么
 
+- ❌ 云端 OCR task 记录 API（`POST/GET /api/v1/ocr/tasks`）— 后续 Task
+- ❌ 云端使用统计上报（`POST /api/v1/usage/events`）— 后续 Task
+- ❌ 云端 OCR 数据库模型（`ocr_tasks` 表）— 后续 Task
+- ❌ 云端 DDL 草案（`005_ocr_tasks.sql`）— 后续 Task
+- ❌ usage_events 表写入 — 后续 Task
+- ❌ provider_call_log 写入 — 后续 Task
 - ❌ 云端 AI Provider OCR（调用云端大模型做 OCR）— 后续 Task
-- ❌ OCR 扣费 / 算力扣除（本地 OCR 为免费功能）
+- ❌ OCR 扣费 / 算力扣除（本地 OCR 为免费功能，不涉及扣费）— 后续 Task
 - ❌ OCR 结果编辑（修改识别文本、合并/拆分文本块）
 - ❌ 批量 OCR（一次选多张图）
 - ❌ OCR 结果导出（复制到剪贴板除外）
@@ -213,9 +158,9 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
 - ❌ 桌面端打包 / 分发 / 自动更新
 - ❌ 本地服务进程管理（Tauri sidecar 配置）— 后续 Task
 - ❌ 额度系统（credit_accounts / credit_ledger）— 后续 Task
-- ❌ provider_call_log 写入（本地 OCR 不经过 Provider 层，不写 provider_call_log）
-- ❌ 执行真实数据库迁移（DDL 仅作为文件输出，不执行）
 - ❌ 账号锁定实现（仍按 Task-03 约定推迟）
+- ❌ 执行真实数据库迁移
+- ❌ 修改已有云端代码或数据库模型
 
 ## 允许修改哪些文件
 
@@ -228,7 +173,7 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
 - `desktop-app/local-service/wrappers/paddleocr.py`
 - `desktop-app/local-service/wrappers/__init__.py`
 - `desktop-app/local-service/history.py`（新文件）
-- `desktop-app/local-service/requirements.txt`（新文件或等效依赖声明）
+- `desktop-app/local-service/requirements.txt`（新文件，本地服务依赖声明）
 
 桌面端 UI：
 - `desktop-app/src/pages/OcrPage.vue`
@@ -239,23 +184,9 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
 - `desktop-app/src/components/`（新组件，如有需要）
 - `desktop-app/package.json`
 
-云端后台：
-- `cloud-backend/app/api/ocr.py`
-- `cloud-backend/app/api/usage.py`
-- `cloud-backend/app/api/__init__.py`
-- `cloud-backend/app/models/ocr_task.py`（新文件）
-- `cloud-backend/app/models/__init__.py`
-- `cloud-backend/app/schemas/ocr.py`（新文件）
-- `cloud-backend/app/schemas/__init__.py`
-- `cloud-backend/app/main.py`
-- `cloud-backend/migrations/ddl/005_ocr_tasks.sql`（新文件）
-- `cloud-backend/migrations/migration-plan-draft.md`
-
 测试：
-- `cloud-backend/tests/test_ocr.py`（新文件）
-- `cloud-backend/tests/test_usage.py`（新文件）
 - `desktop-app/local-service/tests/`（新目录，本地服务测试）
-- `cloud-backend/pyproject.toml`（dev 依赖声明）
+- `desktop-app/tests/`（桌面端基础测试，如有需要）
 
 任务管理：
 - `tasks/current-task.md`
@@ -264,6 +195,7 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
 
 未经用户再次确认，禁止修改：
 
+- `cloud-backend/` 下所有文件（包括 `app/api/ocr.py`、`app/api/usage.py`、`app/models/`、`app/schemas/`、`migrations/` 等）— Task-04 不涉及云端
 - API 契约正式文件（`docs/05-api-contract.md`）
 - shared DTO 正式文件
 - Tauri 权限配置
@@ -273,20 +205,12 @@ Sprint-01 只做 **OCR 最小闭环**：用户在桌面端选图 → 本地 Padd
 - Auth/Device 已实现的代码（`auth.py`, `device.py`, `deps.py`, `auth_service.py`, `device_service.py`, `security.py`）
 - 已完成的数据库模型（`user.py`, `device.py`, `auth_session.py`, `risk_log.py`）
 - 已完成的 DDL 文件（`001_users.sql`, `002_devices.sql`, `003_auth_sessions.sql`, `004_risk_logs.sql`）
-- 本地 Python 服务启动方式（不能改为其他端口或其他启动方式）
-- 配置文件 `cloud-backend/app/core/config.py`（除非需要新增 OCR 相关配置项）
-
-## DDL 文件授权
-
-**允许创建 `migrations/ddl/005_ocr_tasks.sql` DDL 草案文件**，但明确：
-- ✅ 允许：创建 005_ocr_tasks.sql DDL 草案
-- ❌ 禁止：在开发/生产数据库上执行这些 DDL
-- ❌ 禁止：运行 Alembic 自动生成迁移
-- 📝 说明：DDL 文件按 `migration-plan-draft.md` 中已确认的 PostgreSQL 语法编写，附有 downgrade 注释
+- 本地 Python 服务启动方式（不能改为其他端口或启动方式）
+- 配置文件 `cloud-backend/app/core/config.py`
 
 ## 新增依赖申请
 
-Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 3 个依赖需 Codex Review 批准：
+Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 4 个依赖需 Codex Review 批准：
 
 ### 申请 7：paddlepaddle（CPU 版）
 
@@ -330,11 +254,19 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 3 个依赖需 Cod
 | **替代方案** | 1. `Pillow`（纯图像读写，但 PaddleOCR 内部部分预处理依赖 OpenCV）2. `opencv-python`（含 GUI 模块，体积更大，headless 更合适） |
 | **推荐理由** | PaddleOCR 官方依赖链要求 OpenCV，headless 版本减少不必要的 GUI 依赖，最广泛的图像处理库 |
 
-### 本地服务额外依赖（Python）
+### 申请 10：python-multipart
 
-| 依赖 | 版本 | 用途 | 许可证 | 风险 |
-|------|------|------|--------|------|
-| `python-multipart` | `>=0.0.12` | FastAPI 文件上传解析（multipart/form-data） | Apache 2.0 | 低（FastAPI 官方推荐） |
+| 项目 | 说明 |
+|------|------|
+| **包名** | `python-multipart` |
+| **版本** | `>=0.0.12` |
+| **用途** | FastAPI 文件上传解析（multipart/form-data） |
+| **许可证** | Apache 2.0 |
+| **体积** | 约 0.1MB（纯 Python） |
+| **依赖链** | 无强制依赖 |
+| **安全风险** | 低。FastAPI 官方推荐的文件上传依赖 |
+| **替代方案** | 1. `aiofiles`（异步文件写入，但不负责解析 multipart）2. 手写 multipart 解析（不安全） |
+| **推荐理由** | FastAPI 官方推荐，广泛使用，体积小 |
 
 ### 桌面端依赖（Node.js）
 
@@ -346,21 +278,21 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 3 个依赖需 Cod
 
 | 依赖 | 版本 | 用途 | 许可证 | 风险 |
 |------|------|------|--------|------|
-| 无新依赖 | — | 复用 Task-03 已批准的 FastAPI + SQLAlchemy + Pydantic 栈 | — | 无 |
+| 无新依赖 | — | Task-04 不涉及云端后台 | — | 无 |
 
 ### 依赖汇总
 
 | # | 依赖 | 许可证 | 体积 | 风险 | 状态 |
 |---|------|--------|------|------|------|
-| 7 | `paddlepaddle` (CPU) | Apache 2.0 | ~300-400MB | 低 | ⏳ 待批准 |
-| 8 | `paddleocr` | Apache 2.0 | ~5-10MB + 模型 ~50-100MB | 低 | ⏳ 待批准 |
-| 9 | `opencv-python-headless` | Apache 2.0 | ~30-50MB | 低 | ⏳ 待批准 |
-| — | `python-multipart` | Apache 2.0 | ~0.1MB | 低 | ⏳ 待批准 |
+| 7 | `paddlepaddle` (CPU) | Apache 2.0 | ~300-400MB | 低 | ⏳ 待 Codex 批准 |
+| 8 | `paddleocr` | Apache 2.0 | ~5-10MB + 模型 ~50-100MB | 低 | ⏳ 待 Codex 批准 |
+| 9 | `opencv-python-headless` | Apache 2.0 | ~30-50MB | 低 | ⏳ 待 Codex 批准 |
+| 10 | `python-multipart` | Apache 2.0 | ~0.1MB | 低 | ⏳ 待 Codex 批准 |
 
 **备注：**
 - PaddleOCR 首次运行时自动下载模型文件到本地缓存目录（约 50-100MB），只需下载一次
-- 以上依赖仅安装在本地服务 Python 环境（`desktop-app/local-service/`），不影响云端后台
-- 云端后台无需新增任何依赖
+- 以上依赖仅安装在本地服务 Python 环境（`desktop-app/local-service/`），不涉及云端后台
+- **所有依赖状态为"待 Codex 批准"，在 Codex 明确批准前不安装**
 
 ## 验收标准
 
@@ -378,7 +310,7 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 3 个依赖需 Cod
 - ✅ `GET /local/ocr/health` 返回 OCR 引擎就绪状态
 - ✅ 不接受非图片文件
 - ✅ 不接受超大文件（> 50MB 默认）
-- ✅ 响应格式与云端一致（统一结构）
+- ✅ 响应格式统一
 
 ### 桌面端 UI
 - ✅ 用户可以通过文件选择器选择图片
@@ -397,27 +329,20 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 3 个依赖需 Cod
 - ✅ 可查看历史 OCR 详情
 - ✅ 不存储明文敏感信息
 
-### 云端记录
-- ✅ OCR 任务元数据上报到云端（不包含识别内容全文）
-- ✅ 云端 OCR task API 需要登录授权
-- ✅ 使用统计事件上报成功
-- ✅ 不扣费、不修改额度
-
 ### 安全
 - ✅ 本地不保存明文 Token / API Key
 - ✅ 本地服务仅监听 127.0.0.1
-- ✅ OCR 内容全文不传到云端
-- ✅ 不上报用户文件路径到云端
 - ✅ 所有 API 响应遵循统一结构 `{success, data, error, request_id}`
 - ✅ 本地服务不提供任意命令执行能力
 - ✅ PaddleOCR wrapper 不存在命令注入风险
 - ✅ 日志不泄露文件内容
+- ✅ 不向云端发送任何 OCR 内容或用户文件路径
 
 ## 测试方式
 
 必须至少提供：
 
-### 本地服务测试（本地运行）
+### 本地服务测试
 - PaddleOCR wrapper 单元测试（≥ 5 个）：
   - 参数白名单校验
   - 文件扩展名校验
@@ -436,35 +361,29 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 3 个依赖需 Cod
   - 分页加载
   - 单条详情查询
 
-### 云端测试
-- OCR task 记录 API 测试（≥ 3 个）：
-  - 登录用户提交 OCR 任务记录 → 201
-  - 未登录请求 → 401
-  - 查询任务列表
-- Usage events API 测试（≥ 3 个）：
-  - 登录用户上报使用事件 → 201
-  - 未登录请求 → 401
-  - 查询使用事件
-
 ### 测试目标
-- ≥ 18 个测试用例
+- ≥ 12 个测试用例
 - 100% 通过
+- 全部在本地运行（不依赖云端服务、不依赖 PostgreSQL）
 
 ## 是否允许新增依赖
 
-是。4 个依赖待 Codex 批准：
-- `paddlepaddle` (CPU, Apache 2.0)
-- `paddleocr` (Apache 2.0)
-- `opencv-python-headless` (Apache 2.0)
-- `python-multipart` (Apache 2.0)
+是。4 个依赖 **待 Codex 批准**（批准前不安装）：
 
-均为本地服务依赖，不影响云端后台。云端后台无新依赖。
+| # | 依赖 | 许可证 | 状态 |
+|---|------|--------|------|
+| 7 | `paddlepaddle` (CPU) | Apache 2.0 | ⏳ 待 Codex 批准 |
+| 8 | `paddleocr` | Apache 2.0 | ⏳ 待 Codex 批准 |
+| 9 | `opencv-python-headless` | Apache 2.0 | ⏳ 待 Codex 批准 |
+| 10 | `python-multipart` | Apache 2.0 | ⏳ 待 Codex 批准 |
+
+均为本地服务依赖，不影响云端后台。
 
 ## 是否涉及重大变更
 
 否。
 
-原因：Task-04 在 Task-03 Auth/Device 基础上新增 OCR 功能，不修改已有的数据库表结构、API 契约、Provider 接口、授权逻辑或 Token 机制。
+原因：Task-04 仅在 `desktop-app/` 内新增本地 OCR 功能，不修改任何云端代码、数据库表结构、API 契约、Provider 接口、授权逻辑或 Token 机制。
 
 风险点：
 - PaddleOCR 依赖体积大（~400MB），首次安装耗时长
@@ -472,39 +391,35 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 3 个依赖需 Cod
 - 本地服务与桌面端通信依赖 127.0.0.1:9100，端口冲突需处理
 - OCR 引擎首次加载模型文件需网络下载（约 50-100MB），需处理下载失败场景
 
-影响范围：
-- `desktop-app/local-service/` — 本地 OCR 服务
-- `desktop-app/src/` — 桌面端 UI
-- `cloud-backend/app/api/ocr.py` — 云端 OCR 记录
-- `cloud-backend/app/api/usage.py` — 使用统计
-- `cloud-backend/app/models/` — OCR task 模型
-- `cloud-backend/migrations/ddl/` — DDL 草案
-- `cloud-backend/tests/` — 测试
+影响范围（全部在 `desktop-app/` 内）：
+- `desktop-app/local-service/` — 本地 OCR 服务（wrapper、路由、历史、入口）
+- `desktop-app/src/` — 桌面端 UI（OCR 工作台、历史列表、API 调用层）
+- `desktop-app/tests/` — 本地测试
 
 回滚方案：
 - 通过 Git 分支回滚（当前在 `feature/sprint-01-ocr-minimal`）
-- 数据库 DDL 未执行，无回滚需求
 - 本地 SQLite 为新建，无数据迁移需求
+- 不影响 `cloud-backend/` 任何代码
 
 是否兼容旧版本：是（无旧版本）。
 
-是否需要数据库迁移：否（DDL 仅草案文件，不在数据库执行；本地 SQLite 为新建）。
+是否需要数据库迁移：否（本地 SQLite 为新建，不涉及云端 PostgreSQL）。
 
 ## 给 Codex Review 的审查指令
 
-请审查 Task-04 OCR 最小闭环任务单。
+请审查 Task-04 OCR 最小闭环任务单（第 2 轮，已按第 1 轮 Review 意见收窄范围）。
 
 重点检查：
-1. ✅ 任务范围是否符合 Sprint-01 OCR 最小闭环定位（不越界到 P1/Backlog 功能）
-2. ✅ 云端 OCR task 记录是否包含 OCR 内容全文（不应包含，只存元数据）
-3. ✅ 本地 OCR 是否扣费（不应扣费，本地 OCR 为免费功能）
+1. ✅ 任务范围是否仅限本地 OCR（不涉及 cloud-backend、usage_events、provider_call_log、扣费/支付）
+2. ✅ "允许修改哪些文件" 是否包含任何 cloud-backend 文件（不应包含）
+3. ✅ "禁止修改哪些文件" 是否覆盖了 cloud-backend 全目录
 4. ✅ PaddleOCR wrapper 安全规则是否完整（参数白名单、文件校验、超时、路径限制、命令注入防护）
 5. ✅ 本地服务是否仅监听 127.0.0.1（不暴露公网）
 6. ✅ 新增依赖许可证和体积是否可接受
-7. ✅ 是否存在前端直连第三方 AI API 的设计
-8. ✅ OCR 内容全文是否上报到云端（不应上报）
+7. ✅ 是否存在前端直连第三方 AI API 的设计（不应存在）
+8. ✅ OCR 内容全文是否上报到云端（不应上报，Task-04 纯本地）
 9. ✅ 本地 SQLite 是否存储明文敏感信息
-10. ✅ 任务单"本次不开发什么"是否覆盖了 BACKLOG / P1 / FUTURE 功能
+10. ✅ 任务单"本次不开发什么"是否覆盖了 BACKLOG / P1 / FUTURE / 云端相关功能
 
 输出：
 - 任务单结构完整性
