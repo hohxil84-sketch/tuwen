@@ -2,7 +2,7 @@
 
 ## 状态
 
-`MVP_REQUIRED` — 等待 Codex Review 任务单（第 3 轮）
+`MVP_REQUIRED` — 等待 Codex Review 任务单（第 4 轮，修复阻断问题）
 
 ## 分支
 
@@ -97,7 +97,9 @@ PaddleOCR 首次运行需要下载模型文件（约 50-100MB），Task-04 采�
 文件：`desktop-app/local-service/main.py`
 
 - 注册 OCR 路由
-- 启动时预加载 PaddleOCR 模型（或首次调用时懒加载，需处理下载失败场景）
+- 启动时预加载 PaddleOCR 模型（或首次调用时懒加载）
+  - **关键约束：运行时初始化 PaddleOCR 必须禁用自动下载。** 缓存就绪则加载；缓存缺失只能返回 `OCR_MODEL_NOT_FOUND`，不得触发联网下载
+  - 模型下载只允许在初始化脚本（`scripts/init_paddleocr_models.py`）中执行，禁止在服务入口或路由中自动下载
 - 添加 CORS 中间件（仅允许 localhost 来源）
 
 ### 4. 本地 SQLite OCR 历史
@@ -207,6 +209,7 @@ PaddleOCR 首次运行需要下载模型文件（约 50-100MB），Task-04 采�
 - `desktop-app/local-service/wrappers/__init__.py`
 - `desktop-app/local-service/history.py`（新文件）
 - `desktop-app/local-service/requirements.txt`（新文件，本地服务依赖声明）
+- `desktop-app/local-service/scripts/init_paddleocr_models.py`（新文件，模型初始化脚本，仅开发/测试环境使用）
 
 桌面端 UI：
 - `desktop-app/src/pages/OcrPage.vue`
@@ -215,11 +218,17 @@ PaddleOCR 首次运行需要下载模型文件（约 50-100MB），Task-04 采�
 - `desktop-app/src/router.ts`
 - `desktop-app/src/main.ts`
 - `desktop-app/src/components/`（新组件，如有需要）
-- `desktop-app/package.json`
+- `desktop-app/package.json`（允许调整构建配置，但不新增 npm 依赖）
 
 测试：
 - `desktop-app/local-service/tests/`（新目录，本地服务测试）
 - `desktop-app/tests/`（桌面端基础测试，如有需要）
+
+构建与运行产物忽略：
+- `.gitignore`（仓库根目录，排除 OCR runtime artifacts 和 review artifacts）
+- `desktop-app/tsconfig.node.json`（修复 vue-tsc TypeScript 项目引用构建）
+- `desktop-app/vite.config.ts`（修复 Vite @ 路径别名构建）
+- `desktop-app/package-lock.json`（npm install 生成，锁定前端依赖版本）
 
 任务管理：
 - `tasks/current-task.md`
@@ -323,7 +332,7 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 4 个依赖需 Cod
 | 10 | `python-multipart` | Apache 2.0 | ~0.1MB | 低 | ⏳ 待 Codex 批准 |
 
 **备注：**
-- PaddleOCR 首次运行时自动下载模型文件到本地缓存目录（约 50-100MB），只需下载一次
+- PaddleOCR 模型文件由初始化脚本（`scripts/init_paddleocr_models.py`）在开发准备阶段下载到本地缓存目录（约 50-100MB），只需执行一次。运行时加载 PaddleOCR **禁用自动下载**，仅使用已缓存模型；缓存缺失时返回 `OCR_MODEL_NOT_FOUND` 而非触发联网
 - 以上依赖仅安装在本地服务 Python 环境（`desktop-app/local-service/`），不涉及云端后台
 - **所有依赖状态为"待 Codex 批准"，在 Codex 明确批准前不安装**
 
@@ -417,9 +426,19 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 4 个依赖需 Cod
 
 ## 是否涉及重大变更
 
-否。
+是（仅限 `desktop-app/` 本地范围，不涉及 cloud-backend / PostgreSQL）。
 
-原因：Task-04 仅在 `desktop-app/` 内新增本地 OCR 功能，不修改任何云端代码、数据库表结构、API 契约、Provider 接口、授权逻辑或 Token 机制。
+原因：Task-04 新建本地 SQLite 表 `ocr_history`（DDL 参见 §4），按项目规则 `CODEX.md:34` "修改数据库表结构" 属于重大变更。但本变更严格限定在桌面端本地 SQLite，**不修改** cloud-backend PostgreSQL 的任何表结构、Model、或 DDL 文件。
+
+| 维度 | 说明 |
+|------|------|
+| 变更类型 | 新建本地 SQLite 表（`ocr_history`），不修改已有表 |
+| 影响范围 | `desktop-app/local-service/ocr_history.db`（SQLite 文件，首次运行时自动创建） |
+| 是否影响云端 | 否。cloud-backend PostgreSQL 表结构、DDL、Model 均不变 |
+| 是否影响 API 契约 | 否。`docs/05-api-contract.md` 不变 |
+| 是否影响 Provider 接口 | 否 |
+| 是否影响授权/Token | 否 |
+| 是否需要数据库迁移 | 否。本地 SQLite 为新建，不涉及 Alembic/migration 工具 |
 
 风险点：
 - PaddleOCR 依赖体积大（~400MB），首次安装耗时长
@@ -443,20 +462,31 @@ Task-04 需要在本地服务引入 PaddleOCR 引擎，以下 4 个依赖需 Cod
 
 ## 给 Codex Review 的审查指令
 
-请审查 Task-04 OCR 最小闭环任务单（第 3 轮，已按第 1、2 轮 Review 意见收窄范围并修复隐私冲突）。
+请审查 Task-04 OCR 最小闭环任务单（第 4 轮，已按第 1-3 轮 Review 意见修复，本轮重点修复第 4 轮阻断问题）。
 
-重点检查：
+### 第 4 轮修复内容
+
+1. **阻断 #1 修复**：已添加 `desktop-app/local-service/scripts/init_paddleocr_models.py` 到允许文件列表（§允许修改哪些文件/本地服务）
+2. **阻断 #2 修复**：已将"是否涉及重大变更"改为"是（仅限 desktop-app 本地 SQLite，不涉及 cloud-backend / PostgreSQL）"，并附详细维度说明表
+3. **高风险修复**：已在 §3 本地服务入口更新中明确"运行时初始化 PaddleOCR 必须禁用自动下载"，模型下载仅限初始化脚本执行
+4. **中低风险修复**：已为 `desktop-app/package.json` 添加"允许调整构建配置，但不新增 npm 依赖"说明
+
+### 重点检查
+
 1. ✅ 任务范围是否仅限本地 OCR（不涉及 cloud-backend、usage_events、provider_call_log、扣费/支付）
-2. ✅ "允许修改哪些文件" 是否包含任何 cloud-backend 文件（不应包含）
-3. ✅ "禁止修改哪些文件" 是否覆盖了 cloud-backend 全目录
-4. ✅ PaddleOCR 模型缓存策略是否解决了"离线运行"与"首次下载"的冲突
-5. ✅ PaddleOCR wrapper 安全规则是否完整（参数白名单、文件校验、超时、路径限制、命令注入防护）
-6. ✅ 本地服务是否仅监听 127.0.0.1（不暴露公网）
-7. ✅ 新增依赖许可证和体积是否可接受
-8. ✅ 是否存在前端直连第三方 AI API 的设计（不应存在）
-9. ✅ OCR 内容全文是否上报到云端（不应上报，Task-04 纯本地）
-10. ✅ 本地 SQLite 是否存储明文敏感信息、用户绝对路径、包含 PII 的目录路径
-11. ✅ 任务单"本次不开发什么"是否覆盖了 BACKLOG / P1 / FUTURE / 云端相关功能
+2. ✅ "允许修改哪些文件" 是否包含初始化脚本路径（应包含：`scripts/init_paddleocr_models.py`）
+3. ✅ "允许修改哪些文件" 是否包含任何 cloud-backend 文件（不应包含）
+4. ✅ "禁止修改哪些文件" 是否覆盖了 cloud-backend 全目录
+5. ✅ PaddleOCR 模型缓存策略是否解决了"离线运行"与"首次下载"的冲突
+6. ✅ §3 是否明确运行时禁用自动下载、仅初始化脚本可下载模型
+7. ✅ PaddleOCR wrapper 安全规则是否完整（参数白名单、文件校验、超时、路径限制、命令注入防护）
+8. ✅ 本地服务是否仅监听 127.0.0.1（不暴露公网）
+9. ✅ 新增依赖许可证和体积是否可接受
+10. ✅ 是否存在前端直连第三方 AI API 的设计（不应存在）
+11. ✅ OCR 内容全文是否上报到云端（不应上报，Task-04 纯本地）
+12. ✅ 本地 SQLite 是否存储明文敏感信息、用户绝对路径、包含 PII 的目录路径
+13. ✅ "是否涉及重大变更"口径是否正确（是，但仅限 local SQLite，不涉及 cloud-backend）
+14. ✅ 任务单"本次不开发什么"是否覆盖了 BACKLOG / P1 / FUTURE / 云端相关功能
 
 输出：
 - 任务单结构完整性

@@ -31,6 +31,15 @@ venv/
 # Tauri / desktop
 src-tauri/target/
 
+# Local-service runtime artifacts (generated at runtime, never committed)
+ocr_history.db
+ocr_history.db-*
+ocr_images/
+
+# Task / review artifacts (not part of the codebase)
+pr-body.md
+**/docs/ocr-summary.md
+
 # OS and editor noise
 .DS_Store
 Thumbs.db

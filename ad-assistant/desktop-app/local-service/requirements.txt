@@ -1,0 +1,12 @@
+# Local OCR Service Dependencies
+# Sprint-01 Task-04 OCR 最小闭环
+#
+# === Pre-existing (Sprint-01 scaffold) ===
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+#
+# === Task-04 OCR dependencies (pending Codex approval) ===
+paddlepaddle>=3.0.0
+paddleocr>=3.0.0
+opencv-python-headless>=4.10.0
+python-multipart>=0.0.12
