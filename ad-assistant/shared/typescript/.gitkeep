@@ -1,0 +1,4 @@
+# TypeScript type definitions — shared between frontend and SDK.
+# Sprint-01: skeleton only — no types defined yet.
+#
+# Types should be generated from OpenAPI specs or manually kept in sync.

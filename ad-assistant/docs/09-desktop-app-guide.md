@@ -37,8 +37,6 @@
 
 本地 FastAPI 服务用于封装：
 - PaddleOCR
-- vtracer
-- ImageMagick
 
 禁止本地服务提供通用远程命令执行接口。
 

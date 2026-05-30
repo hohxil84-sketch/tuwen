@@ -1,0 +1,8 @@
+# Client SDK — shared API client utilities.
+# Sprint-01: skeleton only — no SDK code yet.
+#
+# Reserved:
+# - API client with request_id injection
+# - Token refresh interceptor
+# - Error code mapping
+# - Type-safe request/response helpers

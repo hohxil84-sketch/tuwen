@@ -1,0 +1,7 @@
+# Pinia stores directory
+# Sprint-01: skeleton only — no stores defined yet
+#
+# Reserved:
+# - authStore.ts    (login state, token lifecycle)
+# - ocrStore.ts     (OCR tasks, results, history)
+# - usageStore.ts   (usage stats display)

@@ -1,0 +1,6 @@
+{
+  "name": "ad-assistant-shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "跨项目共享层 — OpenAPI、DTO、TypeScript 类型、错误码、常量、SDK"
+}

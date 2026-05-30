@@ -20,7 +20,7 @@ description: 前端桌面端实现 Skill — Tauri 2 + Vue3 + Pinia + SQLite，�
 
 - 用户界面（登录页、工作台、OCR 结果展示、历史记录）
 - 图片选择和预览
-- 调用本地 FastAPI 服务（OCR、图像处理）
+- 调用本地 FastAPI 服务（OCR）
 - 调用云端业务 API（Auth、OCR、Usage、Credit）
 - 展示云端返回的权限、套餐、额度状态
 - 本地 SQLite 历史记录和任务状态
@@ -66,8 +66,6 @@ SQLite 绝不存储：
 本地 FastAPI 服务只做受控封装：
 
 - PaddleOCR — OCR 识别
-- vtracer — 位图转矢量
-- ImageMagick — 图片处理
 
 每个工具必须：
 - 参数白名单校验
