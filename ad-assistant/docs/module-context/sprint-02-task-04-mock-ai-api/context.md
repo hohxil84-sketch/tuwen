@@ -2,15 +2,19 @@
 
 ## Status
 
-`IMPLEMENTED` — implementation complete on branch `feature/sprint-02-task-04-mock-ai-api`. Awaiting Codex Review before commit and merge.
+`MERGED` — PR #13 merged to `main`.
 
 ## Branch
 
 - Implementation branch: `feature/sprint-02-task-04-mock-ai-api`
+- PR: #13
+- Merge commit: `0cc7f14` (`feat(api): add mock AI ad-copy endpoint (#13)`)
+- Feature commit: `6a40445` (`feat(api): add mock AI ad-copy endpoint`)
 
 ## Base
 
 - Merge commit from PR #12: `c73f1c2` (`feat(provider): add mock provider foundation`)
+- Latest verified main after rules PR: `8fa3440` (`docs(rules): add communication and git note conventions (#14)`)
 
 ## Implementation Evidence (2026-05-31)
 
@@ -33,6 +37,8 @@
 - **No modifications to provider/cost/provider_log/credit services**: ✅
 - **No modifications to MockProvider**: ✅
 - **Git diff --check**: passed
+- **PR #13 CI**: `pg-integration` passed
+- **Codex PR review**: passed, no blocking or high-risk findings
 
 ## Task Summary
 

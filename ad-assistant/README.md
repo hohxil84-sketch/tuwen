@@ -8,6 +8,16 @@
 
 当前只允许开发 `tasks/current-task.md` 明确列出的功能。
 
+## 当前已验证进度
+
+截至 2026-05-31，`main` 最新已验证提交为 `8fa3440`。
+
+- PR #13 已合并：`POST /api/v1/mock-ai/ad-copy` mock-only 云端 API 已进入 `main`。
+- PR #14 已合并：Codex / Claude Code / DeepSeek 协作规则已更新。
+- Mock AI API 需要 auth、活跃绑定设备、有效套餐和 `mock_ad_copy` 权限。
+- Mock AI API 通过 `MockProvider` 和 `execute_provider_call` 写入 `provider_call_log`。
+- 当前 mock API 不调用真实 Provider、不扣点、不写 `credit_ledger`、不暴露 `raw_usage`。
+
 MVP P0：
 - 登录/授权
 - OCR

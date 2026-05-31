@@ -2,11 +2,13 @@
 
 ## Status
 
-`IMPLEMENTED` — implementation complete on branch `feature/sprint-02-task-04-mock-ai-api`. 21 focused tests pass, 147 regression pass. Awaiting Codex Review before commit and merge.
+`MERGED` — PR #13 merged to `main` as `0cc7f14` (`feat(api): add mock AI ad-copy endpoint (#13)`).
 
 Codex prepared this task sheet after PR #12 was merged to `main`.
 
 Implementation completed by CC on 2026-05-31.
+
+Merge completed on 2026-05-31.
 
 ## Suggested Branch
 
