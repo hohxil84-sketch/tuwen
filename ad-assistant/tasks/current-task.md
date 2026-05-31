@@ -287,6 +287,7 @@ API：
 - `cloud-backend/app/main.py`（仅注册 credit router）
 - `cloud-backend/tests/test_credit.py`（新文件）
 - `cloud-backend/tests/test_migrations_integration.py`（仅扩展 007/008 覆盖）
+- `cloud-backend/tests/conftest_pg.py`（仅将 PG DDL fixture 从 001~006 扩展为 001~008）
 - `docs/05-api-contract.md`（仅更新 Credit API 当前实现）
 - `tasks/current-task.md`
 
