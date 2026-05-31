@@ -1,336 +1,259 @@
-# Current Task: Sprint-02 Task-04 Mock AI API Endpoint
+# Current Task: Sprint-02 Task-05 Desktop Mock AI API Client
 
 ## Status
 
-`MERGED` — PR #13 merged to `main` as `0cc7f14` (`feat(api): add mock AI ad-copy endpoint (#13)`).
+`IMPLEMENTED_CODEX_APPROVED`
 
-Codex prepared this task sheet after PR #12 was merged to `main`.
+Implementation completed on 2026-06-01 on branch `feature/sprint-02-task-05-desktop-mock-ai-client`.
 
-Implementation completed by CC on 2026-05-31.
+Base: `main` @ `8fa3440`.
 
-Merge completed on 2026-05-31.
+Codex Review passed all 3 iterations. Commit authorized on 2026-06-01.
 
 ## Suggested Branch
 
-`feature/sprint-02-task-04-mock-ai-api`, based on latest `main`.
+`feature/sprint-02-task-05-desktop-mock-ai-client`, based on latest `main`.
 
-If a local Git ref permission or slash-name issue occurs, use the flat branch name `sprint-02-task-04-mock-ai-api`.
+If a local Git ref permission or slash-name issue occurs, use the flat branch name `sprint-02-task-05-desktop-mock-ai-client`.
 
 ## Prerequisites
 
-- Sprint-02 Task-03 Provider Mock Foundation was merged to `main` by PR #12.
-- Latest verified merge commit: `c73f1c2` (`feat(provider): add mock provider foundation`).
-- Provider mock foundation commit: `34b1528`.
-- Provider mock focused tests passed during review: `24 passed, 1 warning`.
-- Backend regression tests passed during review: `126 passed, 1 warning`.
-- PR #12 GitHub check `pg-integration` passed.
-- `MockProvider`, `ProviderRequest`, `ProviderResult`, `calculate_mock_cost`, and `execute_provider_call` now exist.
-- Existing API style uses `/api/v1/*`, `success_response`, auth/device dependencies, schemas, service layer, and focused API tests.
+- Latest verified `main`: `8fa3440` (`docs(rules): add communication and git note conventions (#14)`).
+- Sprint-02 Task-04 was merged by PR #13 as `0cc7f14`.
+- `POST /api/v1/mock-ai/ad-copy` exists in cloud backend.
+- The endpoint requires auth, active bound device, valid plan, and `mock_ad_copy` feature permission.
+- The endpoint returns unified `{success, data, error, request_id}` response.
+- The endpoint is mock-only, writes `provider_call_log`, charges `0`, and does not write `credit_ledger`.
+- Desktop app currently has minimal Vue pages and local OCR service calls, but no cloud API client or real login UI.
 
 ## Background
 
-The backend now has an internal mock provider path, but no public feature endpoint calls it yet. The next step is a minimal authenticated API endpoint that proves a desktop or frontend client can call the cloud backend and receive a mock AI result while the backend logs the provider call.
+The backend now exposes a protected mock AI endpoint that is safe for MVP integration testing. The next small product step is to let the desktop app call this backend endpoint through a narrow cloud API client.
 
-This is the first intentionally client-callable mock AI feature. It must be small, protected, and clearly marked as mock-only.
+This task is a desktop integration slice only. It proves login/session-in-memory, device-bound cloud auth, and a mock ad-copy request from the desktop UI without adding real AI providers, real billing, persistent token storage, or backend changes.
 
 ## Major Change Proposal
 
-This task modifies the API contract by adding one new endpoint. User confirmation is required before implementation.
+This task touches desktop auth/session handling and calls a protected cloud API from the desktop app. User confirmation is required before implementation.
 
 1. Reason
-   - Turn the internal mock provider foundation into a callable backend MVP path.
-   - Let the future desktop MVP call a real backend endpoint instead of fake local data.
-   - Prove auth/device checks, request validation, provider execution, and provider logging work together.
+   - Connect the desktop MVP to the already-merged cloud mock AI endpoint.
+   - Replace pure placeholder UI with a minimal authenticated cloud call path.
+   - Prove desktop-to-cloud request/response handling before real provider or billing work.
 
 2. Risks
-   - Public API shape may become a contract used by the desktop app.
-   - Prompt-like user input could accidentally be logged if route/service boundaries are careless.
-   - Missing auth/device checks would expose mock AI execution to unauthenticated clients.
-   - Request ID may diverge between API response and provider log if not propagated deliberately.
+   - Desktop token handling can become unsafe if tokens are persisted in local storage or logs.
+   - A hard-coded cloud URL can make local testing brittle.
+   - UI could accidentally suggest real AI generation even though the endpoint is mock-only.
+   - Client-side feature or plan assumptions could drift from server-side authorization.
 
 3. Impact
-   - Adds one POST endpoint under `/api/v1`.
-   - Adds request/response schemas and API tests.
-   - Updates API docs for the new endpoint.
-   - No database schema change.
-   - No real AI provider, no billing deduction, no desktop UI yet.
+   - Adds a small desktop cloud API service layer.
+   - Adds in-memory desktop auth/session state.
+   - Updates desktop UI to login and call `POST /api/v1/mock-ai/ad-copy`.
+   - Adds focused frontend tests if the existing toolchain can support them without new dependencies; otherwise documents manual verification.
+   - No backend schema, API contract, provider, credit, payment, shared DTO, or OpenAPI changes.
 
 4. Rollback
-   - Remove the new route and schema files.
-   - Remove the route registration from `app/main.py`.
-   - Remove focused API tests and docs for this endpoint.
+   - Remove the desktop cloud API service and auth/session store.
+   - Revert the desktop page/router changes.
+   - Remove focused tests and documentation for this task.
    - No database rollback is needed.
 
 5. Backward Compatibility
-   - Compatible. Existing endpoints remain unchanged.
-   - The new endpoint is additive.
+   - Compatible. Existing backend APIs remain unchanged.
+   - Existing local OCR page and service must keep working.
 
 6. Database Migration
-   - None. This task must not add, remove, or edit DDL files.
+   - None. This task must not add, remove, or edit cloud or desktop database migrations.
 
 ## What To Build
 
-### 1. Add a protected mock AI endpoint
+### 1. Add a desktop cloud API service
 
-Add a new endpoint:
+Add:
 
-```text
-POST /api/v1/mock-ai/ad-copy
-```
-
-Purpose:
-
-- Generate deterministic mock ad copy through `MockProvider`.
-- Return a unified API response.
-- Write `provider_call_log`.
-- Provide a backend target for the future Desktop MVP task.
+- `desktop-app/src/services/cloudApi.ts`
 
 Required behavior:
 
-- Must require valid auth token and bound active device using existing dependencies.
-- Must call `verify_plan(user)`.
-- Must call `verify_feature(user, "mock_ad_copy")` or an equivalent route-level feature check.
-- Must instantiate/use `MockProvider`.
-- Must call `execute_provider_call`.
-- Must pass the authenticated `user_id`, authenticated `device_id`, feature name, and request ID into provider logging.
-- Must return `success_response(...)`.
-- Must not expose raw `raw_usage` to normal clients.
-- Must not return or accept provider cost, final credit charge, plan decision, or provider selection from the client.
+- Define typed request/response helpers for:
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/logout` if useful and cheap
+  - `POST /api/v1/mock-ai/ad-copy`
+- Use the backend unified response shape.
+- Send `Authorization: Bearer <access_token>` only after login.
+- Include the backend-assigned `request_id` in the mock ad-copy return value so the UI can display it.
+- Read the base URL from `import.meta.env.VITE_CLOUD_API_BASE_URL`, with default `http://127.0.0.1:8000`.
+- Never call OpenAI, DeepSeek, Claude, ComfyUI, or any third-party AI API.
+- Never accept provider, model, cost, credits, user ID, device ID, plan, or permission decisions from the UI.
+- Never log access tokens, refresh tokens, passwords, device fingerprints, or request bodies containing user-entered product text.
 
-Recommended request body:
-
-```json
-{
-  "product_name": "string",
-  "selling_points": ["string"],
-  "platform": "douyin",
-  "tone": "direct"
-}
-```
-
-Recommended response `data`:
-
-```json
-{
-  "feature": "mock_ad_copy",
-  "provider": "mock",
-  "model": "mock-text-v1",
-  "text": "Mock generated text ...",
-  "estimated_cost": 0.0,
-  "credits_charged": 0
-}
-```
-
-The response body wrapper remains:
-
-```json
-{
-  "success": true,
-  "data": {},
-  "error": null,
-  "request_id": "req_xxx"
-}
-```
-
-### 2. Add schemas
+### 2. Add in-memory auth/session state
 
 Add:
 
-- `cloud-backend/app/schemas/mock_ai.py`
+- `desktop-app/src/stores/authStore.ts`
 
-Required schema behavior:
+Required behavior:
 
-- Validate `product_name` is non-empty and reasonably bounded.
-- Validate `selling_points` length and item length are bounded.
-- Validate `platform` and `tone` are bounded strings.
-- Do not include client-submitted provider, model, cost, credits, plan, user_id, device_id, or request_id in the request schema.
-- Response schema may include provider/model/estimated_cost/credits_charged because those values are computed by the backend.
+- Store access token, refresh token, user info, and device info in memory only.
+- Provide login/logout helpers that call the cloud API service.
+- Provide an authenticated mock ad-copy call helper or expose token state for the page service call.
+- Do not use `localStorage`, `sessionStorage`, IndexedDB, SQLite, cookies, Tauri secure storage, or files for token persistence in this task.
+- Do not implement automatic token refresh unless already required by the simplest login flow.
+- Do not implement account registration, password reset, device management, subscription purchase, or admin flows.
 
-### 3. Add route module
-
-Add:
-
-- `cloud-backend/app/api/v1/mock_ai.py`
-
-Required route behavior:
-
-- Use existing dependency pattern from `app/api/v1/provider_log.py`.
-- Use `get_current_user_with_device`.
-- Use `get_db`.
-- Use `success_response`.
-- Use `MockProvider` and `execute_provider_call`.
-- Convert `MockProviderError` to a sanitized HTTP error if needed.
-- Do not log raw user text.
-- Do not expose `raw_usage`.
-
-### 4. Register route and feature permission
+### 3. Update the desktop UI
 
 Update:
 
-- `cloud-backend/app/main.py`
-- `cloud-backend/app/api/deps.py`
+- `desktop-app/src/pages/LoginPage.vue`
+- `desktop-app/src/pages/OcrPage.vue`
+- `desktop-app/src/router.ts` if a small route guard or link is needed
+- `desktop-app/src/App.vue` only if needed for shared navigation/status
 
 Required behavior:
 
-- Include the new router in `app/main.py`.
-- Add a narrow feature permission entry for `mock_ad_copy` in `FEATURE_PLAN_REQUIREMENTS`.
-- `mock_ad_copy` should be allowed for `standard`, `expert`, and `enterprise`.
-- Do not otherwise change auth, token, device, plan, or feature permission logic.
+- Login page accepts account, password, and device fingerprint.
+- Login page calls cloud auth and keeps tokens in memory only.
+- UI clearly labels the mock AI result as mock/test output.
+- OCR page keeps the existing local OCR workflow.
+- OCR page may add a small "Mock AI ad copy" panel using user-entered:
+  - product name
+  - selling points
+  - platform
+  - tone
+- Mock AI panel calls `POST /api/v1/mock-ai/ad-copy` only after login.
+- Display returned `text`, `provider`, `model`, `credits_charged`, and `request_id`.
+- Show sanitized error messages for 401/403/422/network failures.
+- Do not add a generic prompt execution UI.
+- Do not let the user choose provider/model/cost/credits.
 
-### 5. Propagate request_id into provider_call_log
+### 4. Add focused frontend tests if feasible
 
-Update `app/main.py` only if needed to make the existing middleware set:
+Preferred additions:
 
-```python
-request.state.request_id = rid
-```
+- `desktop-app/tests/cloudApi.test.ts`
+- `desktop-app/tests/authStore.test.ts`
 
-The route should pass the same request ID to `execute_provider_call`, so the API response `request_id` and `provider_call_log.request_id` match when `X-Request-ID` is supplied.
+Required coverage if tests are added:
 
-If the request has no `X-Request-ID`, it is acceptable for the middleware to generate one and for the route to use it.
+- cloud API service builds correct endpoint URLs.
+- mock ad-copy call sends Bearer token and no provider/model/cost/credit fields.
+- auth store does not persist tokens to browser storage.
+- non-success unified responses become sanitized errors.
 
-### 6. Add focused API tests
+If the current desktop toolchain cannot run tests without new dependencies, do not add dependencies. Instead, document manual verification steps in the completion output.
 
-Add:
-
-- `cloud-backend/tests/test_mock_ai_api.py`
-
-Required coverage:
-
-- unauthenticated request returns 401.
-- authenticated active user/device can call `POST /api/v1/mock-ai/ad-copy`.
-- response uses unified wrapper.
-- response does not expose `raw_usage`.
-- response has backend-computed provider/model/estimated_cost/credits_charged.
-- `provider_call_log` receives a success row with:
-  - authenticated `user_id`;
-  - authenticated `device_id`;
-  - feature `mock_ad_copy`;
-  - provider `mock`;
-  - model `mock-text-v1`;
-  - status `success`;
-  - `credits_charged=0`.
-- `X-Request-ID` is propagated to the response and provider log.
-- validation rejects empty or oversized input.
-- disabled/banned device behavior is covered if existing fixtures make it cheap.
-- no `credit_ledger` row is created.
-
-### 7. Update documentation
+### 5. Update documentation
 
 Update or add:
 
-- `docs/05-api-contract.md`
-- `docs/23-mock-ai-api-endpoint.md`
-- `docs/module-context/sprint-02-task-04-mock-ai-api/context.md`
+- `docs/24-desktop-mock-ai-api-client.md`
+- `docs/module-context/sprint-02-task-05-desktop-mock-ai-client/context.md`
+- `docs/09-desktop-app-guide.md`
+- `docs/sprint-02-summary.md`
 - `tasks/current-task.md`
-
-Optional narrow updates if helpful:
-
-- `docs/06-provider-architecture.md`
-- `docs/07-ai-cost-control.md`
-- `docs/11-cloud-backend-guide.md`
 
 Docs must clearly state:
 
-- endpoint is mock-only;
-- endpoint is authenticated and device-bound;
+- desktop integration is mock-only;
+- tokens are memory-only in this task;
 - no real provider calls occur;
-- `credits_charged` remains `0`;
-- no `credit_ledger` deduction occurs;
-- clients cannot submit provider/model/cost/credit decisions;
-- response shape is for MVP/Desktop integration testing.
+- no real credit deduction occurs;
+- the server remains the authority for auth, plan, feature permission, provider, model, cost, and credits;
+- desktop must not store API keys or call third-party AI APIs.
 
 ## What Not To Build
 
 - Do not add real OpenAI, DeepSeek, Claude, ComfyUI, OCR, image, vector, or local provider calls.
-- Do not add provider SDKs, dependencies, API keys, env vars, or secrets.
+- Do not add provider SDKs, dependencies, API keys, env vars containing secrets, or third-party AI network calls.
 - Do not implement provider routing or model selection from the client.
 - Do not implement real credit deduction or `credit_ledger` consumption.
-- Do not add payment, recharge, order, grant, monthly quota, expiration, admin, or invoice features.
-- Do not modify database DDL or migrations.
-- Do not modify provider table/model schema.
-- Do not add frontend, desktop, official website, or Tauri code.
-- Do not update OpenAPI/shared DTO generation unless explicitly confirmed in a later task.
+- Do not add payment, recharge, order, grant, monthly quota, expiration, admin, invoice, registration, password reset, or subscription flows.
+- Do not modify cloud backend code, cloud backend tests, DDL, migrations, models, Provider services, auth/token algorithms, or credit services.
+- Do not update OpenAPI/shared DTO generation.
 - Do not broaden GitHub Actions workflows.
-- Do not add queues, workers, retry infrastructure, rate limiting infrastructure, or background jobs.
-- Do not create a generic prompt execution endpoint.
-- Do not let the client submit raw provider prompt, provider name, model name, raw cost, estimated cost, credits charged, user_id, device_id, or final permission decision.
+- Do not modify Tauri permissions, auto-update, filesystem permissions, or local Python service startup.
+- Do not persist tokens in localStorage, sessionStorage, IndexedDB, SQLite, files, or logs.
+- Do not create a generic prompt execution UI or arbitrary AI workflow UI.
+- Do not modify official website code.
 
 ## Allowed Files
 
 Implementation task may modify only:
 
-- `cloud-backend/app/api/v1/mock_ai.py` (new)
-- `cloud-backend/app/api/deps.py` (narrow `mock_ad_copy` feature permission only)
-- `cloud-backend/app/main.py` (router registration and request_id state propagation only)
-- `cloud-backend/app/schemas/mock_ai.py` (new)
-- `cloud-backend/tests/test_mock_ai_api.py` (new)
-- `docs/05-api-contract.md`
-- `docs/23-mock-ai-api-endpoint.md`
-- `docs/module-context/sprint-02-task-04-mock-ai-api/context.md`
+- `desktop-app/src/services/cloudApi.ts` (new)
+- `desktop-app/src/stores/authStore.ts` (new)
+- `desktop-app/src/pages/LoginPage.vue`
+- `desktop-app/src/pages/OcrPage.vue`
+- `desktop-app/src/router.ts`
+- `desktop-app/src/App.vue`
+- `desktop-app/src/env.d.ts` (only for `VITE_CLOUD_API_BASE_URL` typing if needed)
+- `desktop-app/tests/cloudApi.test.ts` (new, optional if no new dependencies are needed)
+- `desktop-app/tests/authStore.test.ts` (new, optional if no new dependencies are needed)
+- `docs/24-desktop-mock-ai-api-client.md`
+- `docs/module-context/sprint-02-task-05-desktop-mock-ai-client/context.md`
+- `docs/09-desktop-app-guide.md`
+- `docs/sprint-02-summary.md`
 - `tasks/current-task.md`
-- `docs/06-provider-architecture.md` (optional narrow note)
-- `docs/07-ai-cost-control.md` (optional narrow note)
-- `docs/11-cloud-backend-guide.md` (optional narrow note)
 
-If implementation proves a narrow service helper is required, CC must stop and report why before adding a new service file.
+If implementation proves another desktop file is required, CC must stop and report why before modifying it.
 
 ## Forbidden Files
 
 Do not modify:
 
-- `cloud-backend/migrations/ddl/**`
-- `cloud-backend/app/models/**`
-- `cloud-backend/app/providers/base.py`
-- `cloud-backend/app/providers/mock_provider.py`
-- `cloud-backend/app/services/cost_service.py`
-- `cloud-backend/app/services/provider_service.py`
-- `cloud-backend/app/services/provider_log_service.py`
-- `cloud-backend/app/services/credit_service.py`
-- `cloud-backend/tests/test_migrations_integration.py`
-- `cloud-backend/tests/conftest_pg.py`
-- `cloud-backend/pyproject.toml`
-- dependency files or lockfiles
-- `.github/workflows/**`
-- `.env` or `.env.example`
-- `desktop-app/**`
-- `official-website/**`
+- `cloud-backend/**`
 - `shared/**`
+- `official-website/**`
+- `.github/workflows/**`
+- `desktop-app/src-tauri/**`
+- `desktop-app/local-service/**`
+- `desktop-app/local-tools/**`
+- `desktop-app/migrations/**`
+- `desktop-app/package.json`
+- `desktop-app/package-lock.json`
+- dependency files or lockfiles
+- `.env` or `.env.example`
+- files containing secrets
 
 ## Acceptance Criteria
 
-- `POST /api/v1/mock-ai/ad-copy` exists.
-- Endpoint requires auth and bound active device.
-- Endpoint validates request body with a dedicated schema.
-- Endpoint denies client control over provider/model/cost/credits/user/device.
-- Endpoint calls `MockProvider` through `execute_provider_call`.
-- Endpoint writes exactly one `provider_call_log` success row on success.
-- Provider log includes authenticated user/device and `feature="mock_ad_copy"`.
-- API response and provider log share the same request ID when `X-Request-ID` is supplied.
-- Response uses unified `{success, data, error, request_id}` wrapper.
-- Response does not expose `raw_usage` or raw prompt text.
-- `credits_charged` is `0`.
-- No `credit_ledger` row is created.
-- No real provider SDK, key, env var, dependency, network call, DDL, OpenAPI/shared DTO, frontend, or desktop changes.
-- Focused API tests pass.
-- Existing backend tests pass.
+- Desktop app can perform a cloud login with account/password/device fingerprint.
+- Tokens remain memory-only and are not persisted to browser storage, files, SQLite, or logs.
+- Desktop app can call `POST /api/v1/mock-ai/ad-copy` after login.
+- Mock AI request does not include provider, model, cost, credits, user_id, device_id, plan, or permission decisions.
+- UI displays mock ad-copy text and key computed fields from backend response, including the real backend-assigned `request_id`.
+- UI clearly marks the output as mock/test output.
+- Existing local OCR upload, OCR result display, and OCR history behavior are not intentionally broken.
+- Cloud backend code, DDL, Provider code, credit code, shared DTO/OpenAPI, Tauri permissions, and dependencies remain unchanged.
+- No third-party AI SDK, API key, secret, or network call is added.
+- `npm run build` passes in `desktop-app`.
+- If focused frontend tests are added, they pass.
 - `git diff --check` passes.
-- Module context is updated with implementation facts and test evidence.
+- Module context is updated with implementation facts and verification evidence.
 
 ## Test Method
 
-Focused tests:
+Desktop build:
 
 ```bash
-cd D:/Project/ad-assistant/cloud-backend
-python -m pytest tests/test_mock_ai_api.py -v
+cd D:/Project/ad-assistant/desktop-app
+npm run build
 ```
 
-Backend regression tests:
+Focused tests: Skipped — `desktop-app/package.json` has no test script, and new dependencies are not allowed per task rules.
 
-```bash
-cd D:/Project/ad-assistant/cloud-backend
-python -m pytest tests/ -v --ignore=tests/test_migrations_integration.py
+```text
+1. Start cloud backend locally.
+2. Start desktop Vite dev server.
+3. Login with a valid test user and device fingerprint.
+4. Submit a mock ad-copy request.
+5. Confirm UI shows mock result, provider=mock, model=mock-text-v1, credits_charged=0, and request_id.
+6. Refresh the desktop page and confirm token state is gone.
+7. Verify existing OCR upload/recognition/history behavior is not broken.
 ```
 
 Whitespace check:
@@ -340,53 +263,53 @@ cd D:/Project/ad-assistant
 git diff --check
 ```
 
-PostgreSQL migration integration tests are not required for this task because no DDL changes are allowed. Existing PR CI should continue to cover the migration suite.
+Backend regression tests are not required for this task because backend files are forbidden. If any backend file is touched, stop and request a new task scope.
 
 ## Dependency Permission
 
 No new dependencies are allowed.
 
+Do not edit `desktop-app/package.json` or `desktop-app/package-lock.json`.
+
 ## Major Change Status
 
-Yes. This task adds one public API endpoint and therefore changes the API contract.
+Yes. This task adds desktop auth/session handling and a new cloud API call path.
 
-It does not change database schema, real provider integrations, auth/token algorithms, credit/payment runtime deduction, shared DTO/OpenAPI generated artifacts, Tauri permissions, or CI infrastructure.
+It does not change the backend API contract, database schema, Provider interface, real provider integrations, credit/payment runtime deduction, shared DTO/OpenAPI generated artifacts, Tauri permissions, local Python service startup, or CI infrastructure.
 
 User confirmation of this task sheet is required before implementation.
 
 ## Security Requirements
 
-- Require cloud auth and bound active device.
-- Deny unknown features by default; allow only `mock_ad_copy` for this endpoint.
-- Do not log raw product text, selling points, prompts, API keys, tokens, or secrets.
-- Do not expose `raw_usage` to the client.
-- Do not accept provider/model/cost/credits/user/device from the client.
-- Keep `credits_charged=0`.
-- Do not write `credit_ledger`.
-- Keep all errors sanitized.
-- Do not create a generic arbitrary prompt execution endpoint.
+- Keep tokens memory-only for this task.
+- Do not log tokens, passwords, device fingerprints, raw request bodies, or secrets.
+- Do not store tokens in localStorage, sessionStorage, IndexedDB, SQLite, cookies, files, or Tauri storage.
+- Do not send API keys to the client.
+- Do not let the client decide plan, feature permission, provider, model, cost, or credits.
+- Do not call third-party AI APIs from the desktop app.
+- Keep all mock AI errors sanitized.
+- Make mock-only status visible in UI copy.
 
 ## Review Instructions For Codex
 
-Review Sprint-02 Task-04 Mock AI API Endpoint.
+Review Sprint-02 Task-05 Desktop Mock AI API Client.
 
 Focus on:
 
-1. API contract: route path, method, wrapper, schema validation, stable response fields.
-2. Auth/device: endpoint is protected and uses authenticated user/device in logs.
-3. Provider path: endpoint calls `MockProvider` through `execute_provider_call`.
-4. Request ID: response and provider log match when `X-Request-ID` is supplied.
-5. Security: no raw prompt/log leakage, no client cost/provider control, no secrets.
-6. Credit safety: no deduction and no `credit_ledger` writes.
-7. File scope and forbidden-file compliance.
-8. Test coverage for auth, success, validation, request ID, logging, and no-ledger behavior.
+1. Desktop token safety: memory-only, no persistence, no logs.
+2. Cloud API call shape: endpoint path, auth header, unified response handling.
+3. Client authority boundaries: no provider/model/cost/credits/plan decisions from UI.
+4. Mock-only clarity: no real AI provider calls or misleading UI.
+5. File scope and forbidden-file compliance.
+6. Existing OCR behavior is not broken by the UI changes.
+7. Test/build evidence and manual verification completeness.
 
 Output:
 
-- API contract check;
-- auth/device check;
-- provider/cost/credit check;
-- security check;
+- token/session safety check;
+- desktop API contract check;
+- provider/cost/credit boundary check;
+- UI/mock-only check;
 - test gaps;
 - whether commit is allowed.
 
@@ -395,39 +318,114 @@ Output:
 Implementer must report:
 
 - changed files;
-- endpoint path and method;
-- request/response schema summary;
-- auth/device behavior;
-- provider log behavior;
-- request_id propagation evidence;
+- login/session behavior;
+- mock AI request/response behavior;
+- token storage confirmation;
 - exact test commands and results;
-- confirmation that no DDL/dependency/shared/frontend/desktop changes were made;
+- manual verification steps and results if no frontend tests were added;
+- confirmation that no backend/DDL/dependency/shared/Tauri/local-service changes were made;
 - confirmation that no real provider keys/SDKs/network calls were added;
 - residual risks;
 - whether module context was updated;
 - wait for Codex Review, do not self-merge.
 
-## Implementation Evidence (2026-05-31)
+---
 
-- **Branch**: `feature/sprint-02-task-04-mock-ai-api`
-- **Base**: main @ `c73f1c2`
-- **Test results**:
-  - Focused: `21 passed in 4.90s` (`pytest tests/test_mock_ai_api.py -v`)
-  - Regression: `147 passed in 18.96s` (`pytest tests/ -v --ignore=tests/test_migrations_integration.py`)
-- **Changed files** (11):
-  - `cloud-backend/app/api/v1/mock_ai.py` (new)
-  - `cloud-backend/app/api/deps.py` (modified — +1 feature entry)
-  - `cloud-backend/app/main.py` (modified — +1 line state, +2 lines import/router)
-  - `cloud-backend/app/schemas/mock_ai.py` (new)
-  - `cloud-backend/tests/test_mock_ai_api.py` (new, 21 tests)
-  - `docs/05-api-contract.md` (updated)
-  - `docs/23-mock-ai-api-endpoint.md` (updated)
-  - `docs/module-context/sprint-02-task-04-mock-ai-api/context.md` (updated)
-  - `docs/06-provider-architecture.md` (optional)
-  - `docs/07-ai-cost-control.md` (optional)
-  - `tasks/current-task.md` (updated)
-- **No DDL/dependency changes**: ✅
-- **No real provider keys/SDKs/network calls**: ✅
-- **No credit_ledger writes**: ✅
-- **No forbidden file modified**: ✅
-- **Git diff --check**: passed
+## Implementation Evidence (2026-06-01, iteration 1 fixes)
+
+### Changed Files
+
+| Type | File |
+|------|------|
+| 🆕 New | `desktop-app/src/services/cloudApi.ts` |
+| 🆕 New | `desktop-app/src/stores/authStore.ts` |
+| ✏ Modified | `desktop-app/src/pages/LoginPage.vue` |
+| ✏ Modified | `desktop-app/src/pages/OcrPage.vue` |
+| ✏ Modified | `desktop-app/src/App.vue` |
+| ✏ Modified | `desktop-app/src/router.ts` |
+| ✏ Modified | `desktop-app/src/env.d.ts` |
+| 📄 New/Updated | `docs/24-desktop-mock-ai-api-client.md` |
+| 📄 Updated | `docs/module-context/sprint-02-task-05-desktop-mock-ai-client/context.md` |
+| 📄 Updated | `docs/09-desktop-app-guide.md` |
+| 📄 Updated | `docs/sprint-02-summary.md` |
+| 📄 Updated | `tasks/current-task.md` |
+
+### request_id Fix (Codex Review iteration 1)
+
+- `cloudApi.ts`: Added `MockAdCopyResponse` interface that extends `MockAdCopyData` with `request_id`. `mockAdCopy()` now returns `{ ...response.data, request_id: response.request_id }` — the real backend-assigned request_id from the unified response envelope.
+- `authStore.ts`: `callMockAdCopy()` return type updated to `MockAdCopyResponse`.
+- `OcrPage.vue`: Removed placeholder `"见服务端响应"`. Uses `mockResult.request_id` directly from the `MockAdCopyResponse` type.
+
+### Router Comment Fix (Codex Review iteration 1)
+
+- `router.ts`: Comment now accurately describes that no router-level auth guard was added. Pages check auth state internally via Pinia authStore.
+
+### Type Alignment Fix (Codex Review iteration 2)
+
+- `cloudApi.ts`: `UserInfo`, `DeviceInfo`, `LoginData` types aligned with `cloud-backend/app/schemas/auth.py`.
+  - `UserInfo`: `id`, `account`, `plan_code` (removed: nickname, avatar_url, plan_id, plan_name)
+  - `DeviceInfo`: `id`, `status`, `is_new` (removed: fingerprint, name, is_active, bound_at)
+  - `LoginData`: added `expires_in`
+- `authStore.ts`: `userName` computed uses `account` only (`nickname` removed).
+- `LoginPage.vue`: device display uses `id` + `status` + `is_new` (replaced `device.name`).
+- `tasks/current-task.md`: removed `npm test` example (no test script exists).
+
+### Manual Verification Attempt (iteration 2)
+
+**Blocked** — attempted to start cloud backend for live testing:
+- PostgreSQL not installed in this environment (`psql` not found, PostgreSQL service not installed).
+- Cloud backend requires PostgreSQL `ad_assistant_dev` database, Alembic migrations, and `JWT_SECRET_KEY`.
+- All 8 manual verification steps remain **未验证**.
+
+**Request to 大哥**: 请确认是否接受"仅 build + 代码级验证"的残余风险，或提供可用的 PostgreSQL/backend 环境以完成手工验证。
+
+### Codex Review Iteration 3 Fixes (2026-06-01)
+
+Two blocking issues identified by Codex:
+
+#### Fix 1: cloudApi.ts logout sends refresh_token body (was missing)
+
+- **`cloudApi.ts`**: `logout()` now accepts `refreshToken: string | null` and sends `{ refresh_token: ... }` in the POST body to `/api/v1/auth/logout`.
+  - Before: `logout()` sent no body — backend `.logout_user()` had no refresh_token to revoke the session.
+  - After: body includes `refresh_token` so the backend can revoke the session.
+- **`authStore.ts`**: `logout()` now passes `refreshToken.value` to `cloudLogout(refreshToken.value)`.
+
+#### Fix 2: OcrPage.vue Mock AI error display uses sanitizeApiError (not raw apiErr.message)
+
+- **`cloudApi.ts`**: Added `sanitizeApiError(err)` — shared error sanitizer extracted from `authStore.ts` private `sanitizeErrorMessage()`. Covers 401 (UNAUTHORIZED/AUTH_REQUIRED), 403 (FORBIDDEN), 422 (VALIDATION_ERROR), NETWORK_ERROR, and more. Includes `looksInternal()` heuristic to filter stack traces and JSON dumps.
+- **`authStore.ts`**: Removed private `sanitizeErrorMessage`/`looksInternal`. Now imports and uses `sanitizeApiError` from `cloudApi.ts`.
+- **`OcrPage.vue`**: `handleMockAdCopy()` catch block now calls `sanitizeApiError(apiErr)` instead of `apiErr?.message || "Mock AI 请求失败..."`. This covers all error codes (401/403/422/network) with user-friendly Chinese messages.
+
+#### Build Verification (iteration 3)
+
+| Check | Result |
+|-------|--------|
+| `npm run build` (desktop-app) | ✅ passed — `vue-tsc --noEmit` + `vite build`, 43 modules transformed, 0 errors |
+| `git diff --check` | ✅ passed — no whitespace issues |
+
+### Build Verification
+
+| Check | Result |
+|-------|--------|
+| `npm run build` (desktop-app) | See iteration 1 re-run below |
+| `git diff --check` | See iteration 1 re-run below |
+| Frontend tests | Skipped — no test runner in `package.json`; new deps not allowed |
+| Backend files | ✅ Zero changes |
+| Dependency files | ✅ Zero changes |
+| Tauri/local-service | ✅ Zero changes |
+
+### Security Confirmation
+
+- ✅ Tokens memory-only (JavaScript Pinia reactive state — never persisted)
+- ✅ No secrets logged
+- ✅ No API keys on client
+- ✅ Server is sole authority for auth/plan/feature/provider/model/cost/credits
+- ✅ Mock-only status clearly labeled in UI
+- ✅ Error messages sanitized (Chinese user-friendly, no stack traces)
+
+### Residual Risks
+
+- Login UI is MVP-level; not production account workflow
+- Persistent secure token storage deferred
+- Mock API response shape may change
+- No frontend automated test coverage

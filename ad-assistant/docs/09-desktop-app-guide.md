@@ -42,15 +42,34 @@
 
 修改本地 Python 服务启动方式属于重大变更，必须先确认。
 
+## 云端 API 客户端
+
+Sprint-02 Task-05 新增：
+
+- `desktop-app/src/services/cloudApi.ts` — 云端 API HTTP 客户端
+  - `POST /api/v1/auth/login` — 登录
+  - `POST /api/v1/auth/logout` — 登出（best-effort）
+  - `POST /api/v1/mock-ai/ad-copy` — Mock AI 广告文案生成
+  - 默认 base URL: `http://127.0.0.1:8000`，可通过 `VITE_CLOUD_API_BASE_URL` 覆盖
+  - 登录后自动附加 `Authorization: Bearer <access_token>`
+  - 绝不调用第三方 AI API
+  - 绝不记录 token、密码、设备指纹或用户文本
+
+- `desktop-app/src/stores/authStore.ts` — Pinia 内存态 Auth Store
+  - Token 仅存 JavaScript 内存，不落盘
+  - 提供 login/logout/callMockAdCopy 方法
+  - 错误消息自动脱敏为中文用户友好提示
+
 ## UI MVP 页面
 
-Sprint-01 只允许包含：
-- 登录页
+当前允许包含：
+- 登录页（含云端登录表单）
 - 授权状态区域
 - 图片上传区域
 - OCR 结果区域
 - OCR 历史列表
 - 使用统计基础区域
+- Mock AI 广告文案面板（仅 Mock，标注清晰）
 
 不得开发：
 - PPT
@@ -59,4 +78,6 @@ Sprint-01 只允许包含：
 - AI 工作流
 - 自动报价
 - PS/CDR 自动控制
+- 通用 Prompt 执行 UI
+- Provider/Model 选择器
 

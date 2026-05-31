@@ -1,10 +1,14 @@
 /**
- * Vue Router — Sprint-01 skeleton.
+ * Vue Router — Sprint-01 skeleton + Sprint-02 Task-05.
  *
- * Pages allowed in Sprint-01:
+ * Pages:
  * - LoginPage
  * - OcrPage
  * - HistoryPage
+ *
+ * Sprint-02 Task-05: No router-level auth guard was added. Each page
+ * checks auth state internally via the Pinia authStore and shows
+ * a login prompt when the user is not authenticated.
  */
 import { createRouter, createWebHashHistory } from "vue-router";
 
