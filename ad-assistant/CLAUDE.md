@@ -138,3 +138,14 @@ docs(git): clarify branch and push rules
 feat(scaffold): add sprint 01 project skeleton
 fix(auth): correct device binding validation
 ```
+
+## Context And Review Scope Rules
+
+为减少 token 消耗，Claude Code / DeepSeek 默认遵守以下上下文边界：
+
+- 一个模块完成后，必须向 Codex 提供当前模块总结、README 更新内容、开发记录和测试结果。
+- 一个模块对应一个新会话；新会话只读取当前模块相关文件。
+- 默认不做全项目分析；只有任务单、模块上下文或用户明确要求时，才扩大读取范围。
+- 默认少开自动审查和自动修复；只有用户明确要求，或修改触及数据库、API、授权、Provider、点数、安全、CI 等高风险边界时，才做必要的专项审查。
+- 用户要求 Codex `Review` 时，执行者必须只提供本次修改文件、当前 diff、任务单和相关模块上下文，不要求 Codex 审查整个仓库。
+- 如本次修改文件暴露跨模块风险，执行者必须明确说明风险链路，方便 Codex 只读取必要的相邻文件。
