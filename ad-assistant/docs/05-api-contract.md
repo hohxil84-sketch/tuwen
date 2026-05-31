@@ -137,9 +137,60 @@ Sprint-01 当前实现用于查询当前登录用户自己的使用事件。
 
 ### Credit
 
+Sprint-02 Task-02 当前实现仅提供只读查询 API，不提供客户端可调用的扣费、充值、发放或调整余额 API。
+
 `GET /api/v1/credits/balance`
 
-返回云端计算的可用额度。
+返回当前登录用户的 AI 算力余额。若账户不存在，由云端 service 自动创建基础账户（余额为 0）。
+
+必须鉴权。普通用户只能查询自己的余额。
+
+响应 `data` 结构：
+```json
+{
+  "user_id": "uuid",
+  "plan_code": "standard",
+  "monthly_grant": 0,
+  "balance": 0,
+  "period_start": null,
+  "period_end": null,
+  "status": "active",
+  "updated_at": "2026-05-31T00:00:00+00:00"
+}
+```
+
+`GET /api/v1/credits/ledger`
+
+返回当前登录用户的 AI 算力流水，按 `created_at` 倒序，支持 `limit` 和 `offset`。
+
+必须鉴权。普通用户只能查询自己的流水。
+
+响应 `data` 结构：
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "user_id": "uuid",
+      "change_type": "grant",
+      "amount": 1000,
+      "balance_after": 1000,
+      "source_type": "system",
+      "source_id": null,
+      "description": null,
+      "created_at": "2026-05-31T00:00:00+00:00"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+**当前限制：**
+- 客户端只能查询自己的余额和流水。
+- 客户端不得提交扣费结果、不得设置余额、不得创建流水。
+- 未实现真实 Provider 扣费、充值、支付或套餐自动发放。
 
 ### Provider Log
 

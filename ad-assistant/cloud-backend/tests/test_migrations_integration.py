@@ -60,6 +60,8 @@ ALL_TABLES = [
     "risk_logs",
     "usage_events",
     "provider_call_log",
+    "credit_accounts",
+    "credit_ledger",
 ]
 
 # Column → expected data-type substring (case-insensitive match against
@@ -135,6 +137,30 @@ _EXPECTED_COLUMNS: dict[str, dict[str, str]] = {
         "latency_ms": "integer",
         "created_at": "timestamp",
     },
+    "credit_accounts": {
+        "id": "uuid",
+        "user_id": "uuid",
+        "plan_code": "character varying",
+        "monthly_grant": "integer",
+        "balance": "integer",
+        "period_start": "timestamp",
+        "period_end": "timestamp",
+        "status": "character varying",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+    },
+    "credit_ledger": {
+        "id": "uuid",
+        "user_id": "uuid",
+        "account_id": "uuid",
+        "change_type": "character varying",
+        "amount": "integer",
+        "balance_after": "integer",
+        "source_type": "character varying",
+        "source_id": "character varying",
+        "description": "character varying",
+        "created_at": "timestamp",
+    },
 }
 
 # Tables that have at least one CHECK constraint (for test-discovery).
@@ -171,6 +197,70 @@ _CHECK_TABLES: dict[str, list[dict]] = {
                     (:id, 'test', 'test', 'test', 'success', 'SOME_ERR')\
             """,
             "expect_error_contains": "chk_provider_call_log_error_code",
+        },
+    ],
+    "credit_accounts": [
+        {
+            "constraint_name": "chk_credit_accounts_balance",
+            "insert_sql": """\
+                INSERT INTO credit_accounts
+                    (id, user_id, balance)
+                VALUES
+                    (:id, :uid, -1)\
+            """,
+            "expect_error_contains": "chk_credit_accounts_balance",
+        },
+        {
+            "constraint_name": "chk_credit_accounts_status",
+            "insert_sql": """\
+                INSERT INTO credit_accounts
+                    (id, user_id, status)
+                VALUES
+                    (:id, :uid, 'invalid_status')\
+            """,
+            "expect_error_contains": "chk_credit_accounts_status",
+        },
+        {
+            "constraint_name": "chk_credit_accounts_monthly_grant",
+            "insert_sql": """\
+                INSERT INTO credit_accounts
+                    (id, user_id, monthly_grant)
+                VALUES
+                    (:id, :uid, -5)\
+            """,
+            "expect_error_contains": "chk_credit_accounts_monthly_grant",
+        },
+    ],
+    "credit_ledger": [
+        {
+            "constraint_name": "chk_credit_ledger_amount_nonzero",
+            "insert_sql": """\
+                INSERT INTO credit_ledger
+                    (id, user_id, change_type, amount, balance_after, source_type)
+                VALUES
+                    (:id, :uid, 'grant', 0, 100, 'system')\
+            """,
+            "expect_error_contains": "chk_credit_ledger_amount_nonzero",
+        },
+        {
+            "constraint_name": "chk_credit_ledger_balance_after",
+            "insert_sql": """\
+                INSERT INTO credit_ledger
+                    (id, user_id, change_type, amount, balance_after, source_type)
+                VALUES
+                    (:id, :uid, 'consume', -50, -1, 'provider_call')\
+            """,
+            "expect_error_contains": "chk_credit_ledger_balance_after",
+        },
+        {
+            "constraint_name": "chk_credit_ledger_change_type",
+            "insert_sql": """\
+                INSERT INTO credit_ledger
+                    (id, user_id, change_type, amount, balance_after, source_type)
+                VALUES
+                    (:id, :uid, 'INVALID', 10, 50, 'system')\
+            """,
+            "expect_error_contains": "chk_credit_ledger_change_type",
         },
     ],
 }
@@ -308,8 +398,25 @@ class TestCheckConstraintEnforcement:
         sql = case["insert_sql"]
         expected_fragment = case["expect_error_contains"]
 
+        # 需要 user FK 的表，先创建一个测试用户
+        params: dict = {"id": uuid.uuid4()}
+        if ":uid" in sql:
+            seed_uid = uuid.uuid4()
+            await pg_db.execute(
+                text(
+                    "INSERT INTO users (id, account, password_hash) "
+                    "VALUES (:id, :account, :pw)"
+                ),
+                {
+                    "id": seed_uid,
+                    "account": f"check_test_{seed_uid.hex[:8]}@test.com",
+                    "pw": "hashed",
+                },
+            )
+            params["uid"] = seed_uid
+
         with pytest.raises(IntegrityError) as exc_info:
-            await pg_db.execute(text(sql), {"id": uuid.uuid4()})
+            await pg_db.execute(text(sql), params)
 
         # The error should mention the constraint name — but asyncpg wraps it
         # inside the exception message.  We check both the str() and any
@@ -377,6 +484,49 @@ class TestForeignKeyConstraints:
                     "did": fake_id,
                     "hash": "test-token-hash",
                 },
+            )
+
+        error_text = str(exc_info.value).lower()
+        if exc_info.value.__cause__ is not None:
+            error_text += " " + str(exc_info.value.__cause__).lower()
+        assert "foreign" in error_text, (
+            f"Expected FK violation, got: {str(exc_info.value)[:300]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_credit_accounts_rejects_invalid_user_id(self, pg_db):
+        """credit_accounts FK to users must be enforced."""
+        fake_user_id = "00000000-0000-0000-0000-000000000000"
+
+        with pytest.raises(IntegrityError) as exc_info:
+            await pg_db.execute(
+                text(
+                    "INSERT INTO credit_accounts (id, user_id) "
+                    "VALUES (:id, :uid)"
+                ),
+                {"id": uuid.uuid4(), "uid": fake_user_id},
+            )
+
+        error_text = str(exc_info.value).lower()
+        if exc_info.value.__cause__ is not None:
+            error_text += " " + str(exc_info.value.__cause__).lower()
+        assert "foreign" in error_text, (
+            f"Expected FK violation, got: {str(exc_info.value)[:300]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_credit_ledger_rejects_invalid_user_id(self, pg_db):
+        """credit_ledger FK to users must be enforced."""
+        fake_user_id = "00000000-0000-0000-0000-000000000000"
+
+        with pytest.raises(IntegrityError) as exc_info:
+            await pg_db.execute(
+                text(
+                    "INSERT INTO credit_ledger "
+                    "(id, user_id, change_type, amount, balance_after, source_type) "
+                    "VALUES (:id, :uid, 'grant', 100, 100, 'system')"
+                ),
+                {"id": uuid.uuid4(), "uid": fake_user_id},
             )
 
         error_text = str(exc_info.value).lower()

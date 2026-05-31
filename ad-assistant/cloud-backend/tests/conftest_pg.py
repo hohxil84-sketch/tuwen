@@ -70,7 +70,7 @@ async def pg_engine():
 
     * Reads ``TEST_DATABASE_URL`` from the environment.
     * Skips the **entire session** when the variable is absent.
-    * Executes DDL files ``001`` → ``006`` in order on setup.
+    * Executes DDL files ``001`` → ``008`` in order on setup.
     * Executes ``DROP TABLE IF EXISTS`` in reverse order on teardown.
     """
     database_url = os.environ.get("TEST_DATABASE_URL")
@@ -81,7 +81,7 @@ async def pg_engine():
 
     # ---- Setup: apply all DDL in order -------------------------------------
     ddl_files = sorted(DDL_DIR.glob("*.sql"))
-    assert len(ddl_files) == 6, f"Expected 6 DDL files, found {len(ddl_files)}"
+    assert len(ddl_files) == 8, f"Expected 8 DDL files, found {len(ddl_files)}"
 
     async with engine.begin() as conn:
         for ddl_path in ddl_files:
