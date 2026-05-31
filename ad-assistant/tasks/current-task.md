@@ -1,4 +1,4 @@
-# 当前任务：Sprint-02 Task-01 AI 算力账户 + Provider 抽象 + PostgreSQL 集成测试基础设施
+# 当前任务：Sprint-02 Task-01 PostgreSQL 集成测试基础设施
 
 ## 状态
 
@@ -6,405 +6,254 @@
 
 ## 建议分支
 
-`feature/sprint-02-task-01-credit-provider`，基于 `main` 当前最新提交。
+`feature/sprint-02-task-01-pg-integration-test`，基于 `main` 当前最新提交。
 
 ## 前置任务
 
 - Sprint-01 Task-01 ~ Task-06 已全部合并到 `main`。
-- `usage_events` 表已存在（Task-05）。
-- `provider_call_log` 表已存在（Task-05）。
-- Provider 层目前只有骨架占位（`cloud-backend/app/providers/base.py`、`__init__.py`）。
+- 现有 DDL 文件：`001_users.sql` ~ `006_provider_call_log.sql`。
 - 测试框架当前仅使用 SQLite 内存数据库（`tests/conftest.py`）。
+- 现有 SQLite ORM 测试当前通过 `79 passed`。
 
 ## 背景
 
-Sprint-01 完成了 Auth/Device、本地 OCR、usage_events 和 provider_call_log 基础表。Sprint-02 需要推进云端 AI 算力的核心闭环：需要有用户额度账户来管理可用算力，需要有 credit_ledger 来记录每一笔额度变动，需要 Provider 抽象能产出 `estimated_cost` 并写入 `provider_call_log`，还需要 PostgreSQL 集成测试基础设施来验证 DDL 在真实数据库中的行为。
+Sprint-01 期间新建了 6 张表的 DDL，但所有测试都在 SQLite 内存数据库上运行。SQLite 与 PostgreSQL 在 DDL 约束（CHECK、FK、数据类型）、默认值函数（`gen_random_uuid()` vs SQLite hex）、索引行为等方面存在差异。在继续建新表之前，需要建立 PostgreSQL 集成测试基础设施，确保现有 DDL 在目标数据库中可正确执行，并为后续 credit、Provider 等模块提供可复用的 PG 测试基座。
 
-本轮只建表、建 Provider 抽象和模拟 Provider、建 PostgreSQL 测试基础设施，**不做真实 AI Provider 调用、不做真实扣费、不做支付/充值/赠送**。
+本任务是纯测试基础设施任务，**不新建业务表、不修改 DDL、不实现 Provider**。
+
+## Sprint-02 任务拆分说明
+
+按 Codex 建议，原合并任务单已拆分为三个独立任务：
+
+| 任务 | 范围 | 依赖 |
+|------|------|------|
+| **Task-01（本任务）** | PostgreSQL 集成测试基础设施 | 无 |
+| Task-02（后续） | `credit_accounts` + `credit_ledger` 基础表 | Task-01 PG 测试基座 |
+| Task-03（后续） | `BaseProvider` 正式化 + `MockProvider` | Task-02 credit 表 + Task-01 PG 测试基座 |
+
+Task-03 需额外注意：`ProviderResult` 字段必须与 `provider_call_log` 字段保持清晰映射关系：
+- `prompt_tokens` ← `input_units`（输入 token 数）
+- `completion_tokens` ← `output_units`（输出 token 数）
+- `total_tokens` = `input_units + output_units`
+- `estimated_cost` ← `cost_service.estimate_cost()` 计算结果
+- `latency_ms` ← Provider 调用计时
+- 该映射将在 Task-03 任务单中详细定义。
 
 ## 本次只开发什么
 
-### 子任务 A：credit_accounts 和 credit_ledger 基础表
+### 1. PostgreSQL 集成测试 fixture（conftest_pg.py）
 
-#### A1. credit_accounts 表
+新建 `cloud-backend/tests/conftest_pg.py`：
 
-新建 `credit_accounts` 表，记录每个用户的 AI 算力账户。
+- 读取环境变量 `TEST_DATABASE_URL`（如 `postgresql+asyncpg://postgres:test@localhost:5432/postgres`）。
+- 如果环境变量未设置，session 级 fixture 调用 `pytest.skip("TEST_DATABASE_URL not set")`，**不阻止无 PG 环境时的 SQLite 测试**。
+- Session 级 fixture：
+  - 创建 async SQLAlchemy engine（连接真实 PostgreSQL）。
+  - 按编号顺序执行 `cloud-backend/migrations/ddl/*.sql` 文件（`001` → `006`）。
+  - yield engine。
+  - teardown 时执行 DDL 文件中注释形式的 `DROP TABLE IF EXISTS`（按逆序），清理测试表。
+  - dispose engine。
+- Function 级 fixture：
+  - 每个测试用例在自己的事务中运行，测试结束后 rollback。
+  - 模式参考现有 `tests/conftest.py` 的 `db_session` fixture。
 
-最低字段：
-- `id` UUID PRIMARY KEY
-- `user_id` UUID → users(id) NOT NULL UNIQUE（一个用户一个账户）
-- `balance` INTEGER NOT NULL DEFAULT 0（当前可用 AI 算力点数）
-- `frozen` INTEGER NOT NULL DEFAULT 0（冻结中的点数，预留字段）
-- `version` INTEGER NOT NULL DEFAULT 1（乐观锁版本号）
-- `created_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
-- `updated_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
+### 2. DDL 集成测试（test_migrations_integration.py）
 
-约束：
-- `balance >= 0` CHECK
-- `frozen >= 0` CHECK
-- `user_id` UNIQUE
+新建 `cloud-backend/tests/test_migrations_integration.py`：
 
-#### A2. credit_ledger 表
+- 所有测试依赖 `conftest_pg.py` 的 PG fixture；未设置 `TEST_DATABASE_URL` 时自动 skip。
+- 测试用例：
 
-新建 `credit_ledger` 表，记录每一笔额度变动明细（不可变日志）。
+  #### 2a. 表存在性测试
+  - 验证全部 6 张表（`users`、`devices`、`auth_sessions`、`risk_logs`、`usage_events`、`provider_call_log`）在 PostgreSQL 中成功创建。
 
-最低字段：
-- `id` UUID PRIMARY KEY
-- `user_id` UUID → users(id) NOT NULL（所属用户）
-- `account_id` UUID → credit_accounts(id) NOT NULL（关联账户）
-- `type` VARCHAR NOT NULL（操作类型：`CHARGE`/`DEDUCT`/`FREEZE`/`UNFREEZE`/`REFUND`/`ADJUST`）
-- `amount` INTEGER NOT NULL（变动金额，正数为增加，负数为扣减）
-- `balance_before` INTEGER NOT NULL（变动前余额）
-- `balance_after` INTEGER NOT NULL（变动后余额）
-- `reference_type` VARCHAR（关联来源类型：`provider_call`/`admin_adjust`/`recharge`，可为空）
-- `reference_id` VARCHAR（关联来源 ID，如 `provider_call_log.id`，可为空）
-- `note` TEXT（备注，可为空）
-- `operator` VARCHAR（操作者：`system`/`admin:<admin_id>`，不可为空）
-- `request_id` VARCHAR（关联 API 请求 ID，可为空）
-- `created_at` TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  #### 2b. 列完整性测试
+  - 对每张表，通过 `information_schema.columns` 验证所有必需列存在且数据类型正确。
 
-约束：
-- `type` CHECK IN ('CHARGE', 'DEDUCT', 'FREEZE', 'UNFREEZE', 'REFUND', 'ADJUST')
-- `balance_before >= 0` CHECK
-- `balance_after >= 0` CHECK
-- `amount` 可为正或负，但 `type=DEDUCT` 时不允许正数（由 service 层校验，非 DDL 约束）
+  #### 2c. CHECK 约束生效测试
+  - 对 `provider_call_log` 表：插入 `status='pending'`（非法值）→ PostgreSQL 报错 `check constraint`。
+  - 对 `provider_call_log` 表：插入 `prompt_tokens=-1`（非法值）→ PostgreSQL 报错。
+  - 验证 CHECK 约束名字与 DDL 中定义一致（如 `chk_provider_call_log_status`）。
+  - 对每张有 CHECK 约束的表至少验证 1 条。
 
-索引：
-- `idx_credit_ledger_user_id` ON (user_id, created_at DESC)
-- `idx_credit_ledger_account_id` ON (account_id, created_at DESC)
+  #### 2d. FK 约束测试
+  - 向 `devices` 表插入 `user_id` 为不存在 UUID → PostgreSQL 报错 `foreign key constraint`。
 
-#### A3. 后端模型 / Schema / Service
+  #### 2e. 降级路径验证
+  - 验证每个 DDL 文件末尾存在 `DROP TABLE IF EXISTS <table_name>` 注释行。
+  - 验证该语句语法正确：在 tearDown 中按逆序执行这些 DROP 语句，确认 PostgreSQL 不报错。
+  - **说明**：这不是真实的 migration rollback 测试（本任务不引入 migration 框架），只验证降级路径可执行。
 
-- 新建 `CreditAccount` ORM 模型。
-- 新建 `CreditLedger` ORM 模型。
-- 新建 `credit_accounts` Schema（Pydantic request/response DTO）。
-- 新建 `credit_ledger` Schema（Pydantic request/response DTO）。
-- 新建 `credit_service.py`：
-  - `get_credit_account(db, user_id) -> dict` — 查询用户信用账户。
-  - `list_credit_ledger(db, user_id, limit, offset) -> dict` — 查询用户额度变动明细。
-- **本次不实现 `deduct_credits()`**（扣费逻辑需要 Provider 调用链路完成后再做）。
+### 3. CI / 本地运行说明
 
-#### A4. 查询 API
+- 在 `cloud-backend/docs/` 新增 `pg-integration-test-guide.md`（或追加到现有文档）：
+  - 本地启动测试 PG：`docker run -d --name pg-test -e POSTGRES_PASSWORD=test -p 5432:5432 postgres:16`
+  - 运行集成测试：`TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres pytest tests/test_migrations_integration.py -v`
+  - 运行全部测试（含集成）：同上命令
+  - 仅运行 SQLite 测试（无 PG 时默认行为）：`pytest tests/ -v --ignore=tests/test_migrations_integration.py`
+  - 清理 PG 容器：`docker rm -f pg-test`
+  - 说明 `TEST_DATABASE_URL` 为空时集成测试自动 skip，不影响日常开发。
 
-- `GET /api/v1/credits/balance` — 查询当前用户的 AI 算力余额。
-  - 必须鉴权。
-  - 普通用户只能查询自己的账户。
-  - 如果用户没有 account 记录，自动返回 `balance=0`（不自动创建账户）。
-  - 返回统一结构 `{success, data, error, request_id}`。
+### 4. 现有测试不回归
 
-- `GET /api/v1/credits/ledger?limit=50&offset=0` — 查询当前用户的额度变动明细。
-  - 必须鉴权。
-  - 普通用户只能查询自己的 ledger。
-  - 按 `created_at` 倒序。
-  - 返回统一结构 `{success, data, error, request_id}`。
-
-#### A5. DDL 迁移文件
-
-- 新建 `cloud-backend/migrations/ddl/007_credit_accounts.sql`
-- 新建 `cloud-backend/migrations/ddl/008_credit_ledger.sql`
-- 每个 DDL 文件末尾包含回滚注释 `DROP TABLE IF EXISTS <table_name>;`
-
-### 子任务 B：云端 Provider 抽象与模拟 Provider 调用
-
-#### B1. Provider 基类正式化
-
-当前 `cloud-backend/app/providers/base.py` 只有注释占位。本任务将其正式化为可用的抽象基类/协议：
-
-- 定义 `BaseProvider` 抽象基类，要求子类实现：
-  - `async call(*, feature, model, input_data, user_id, device_id, request_id) -> ProviderResult`
-- 定义 `ProviderResult` Pydantic model / dataclass，字段对齐 `provider_call_log` 和 README 描述的 Provider 返回结构：
-  - `provider: str`
-  - `model: str`
-  - `input_units: int`
-  - `output_units: int`
-  - `image_units: int`
-  - `gpu_seconds: float`
-  - `raw_cost: float`
-  - `estimated_cost: float`
-  - `currency: str`（默认 `"CNY"`）
-  - `result: dict`
-  - `raw_usage: dict`
-- 定义 `ProviderError` 异常类，包含 `error_code: str` 和 `message: str`。
-
-#### B2. 模拟 Provider 实现
-
-新建 `MockProvider`，不调用任何外部 AI API：
-
-- `call()` 方法：
-  - 根据 `feature` 返回预设的模拟结果（OCR → 模拟识别文本，vectorize → 模拟矢量路径）。
-  - 生成模拟的 token/耗时/cost 数据。
-  - 延迟 10-50ms 模拟网络调用。
-- 成功调用时：
-  - 内部调用 `record_provider_call()` 写入 `provider_call_log`（status=success）。
-  - 设置 `estimated_cost=0.001`（模拟 0.1 分钱成本）。
-- 错误模拟：
-  - 支持特殊输入触发失败（如 `input_data={"simulate_error": "timeout"}`）。
-  - 失败时写入 `provider_call_log`（status=error，含 error_code）。
-
-#### B3. Provider 路由入口
-
-新建 `MockProvider` 的调用端点，用于验证端到端链路：
-
-- `POST /api/v1/providers/mock/call`
-  - 必须鉴权。
-  - 请求 body：`{feature, model, input_data}`
-  - 调用 `MockProvider.call()`。
-  - 成功后写入 `provider_call_log`。
-  - 返回 `{provider, model, result, estimated_cost, credits_charged}`。
-  - 返回统一结构 `{success, data, error, request_id}`。
-
-#### B4. 成本估算工具
-
-- 新建 `cloud-backend/app/services/cost_service.py`：
-  - `estimate_cost(provider, model, prompt_tokens, completion_tokens, image_units, gpu_seconds) -> float`
-  - 定义不同 Provider/Model 的估算价格常量（如 deepseek-chat: ¥0.001/1K tokens）。
-  - 返回 CNY 估算成本。
-  - 这是估算，不代表真实 Provider 账单。
-
-### 子任务 C：PostgreSQL 集成测试基础设施
-
-#### C1. 集成测试配置
-
-- 新建 `cloud-backend/tests/conftest_pg.py`：
-  - 使用 `TEST_DATABASE_URL` 环境变量连接真实 PostgreSQL。
-  - 如果没有设置环境变量，fixture 触发 `pytest.skip`。
-  - Session 级 fixture：创建 engine、运行 DDL、yield、dispose。
-  - Function 级 fixture：事务回滚（类似现有 SQLite conftest 模式）。
-
-#### C2. DDL 集成测试
-
-- 新建 `cloud-backend/tests/test_migrations_integration.py`：
-  - 连接到真实 PostgreSQL 后，执行所有 DDL 文件。
-  - 验证所有表存在且列正确。
-  - 验证 CHECK 约束能被 PostgreSQL 遵守（插入非法数据 → 报错）。
-  - 验证 DDL 中所有 `DROP TABLE IF EXISTS` 注释能正常执行（回滚测试）。
-  - 如果 `TEST_DATABASE_URL` 未设置，测试自动 skip。
-
-#### C3. CI 集成指引
-
-- 在 `docs/` 新增或更新文档说明如何在本地和 CI 环境中运行 PostgreSQL 集成测试：
-  - Docker Compose 配置推荐（`docker run -d --name pg-test -e POSTGRES_PASSWORD=test -p 5432:5432 postgres:16`）。
-  - 环境变量设置方式。
-  - 现有 SQLite 测试和 PG 集成测试的区别和运行方式。
-
-### 子任务 D：文档同步
-
-- 更新 `docs/05-api-contract.md`：补充 Credit API（`GET /api/v1/credits/balance`、`GET /api/v1/credits/ledger`）和 Mock Provider API（`POST /api/v1/providers/mock/call`）。
-- 更新 `docs/13-module-roadmap.md`：Sprint-02 状态备注。
-- 更新 `docs/sprint-01-summary.md`：当前 Sprint-02 Task-01 已启动备注（可选，不强制）。
+- `pytest tests/ -v --ignore=tests/test_migrations_integration.py` 继续通过（目标 ≥ 79 passed）。
+- `git diff --check` 通过。
 
 ## 本次不开发什么
 
-- ❌ 不调用真实 OpenAI / Claude / DeepSeek / 图片 Provider。
-- ❌ 不把 API Key 发给客户端。
-- ❌ 不实现真实扣费逻辑（`deduct_credits()` 留到后续任务）。
-- ❌ 不实现会员、套餐、支付、充值、赠送额度。
-- ❌ 不实现后台管理系统。
-- ❌ 不实现复杂报表或数据看板。
-- ❌ 不修改 Auth/Device 核心逻辑（仅读取 user_id）。
-- ❌ 不修改 Tauri 权限或桌面端代码。
-- ❌ 不修改 desktop-app 业务代码。
+- ❌ 不新建业务表（`credit_accounts`、`credit_ledger` 等）。
+- ❌ 不修改已有 DDL 文件（`001_users.sql` ~ `006_provider_call_log.sql`）。
+- ❌ 不实现 Provider 抽象、MockProvider、BaseProvider。
+- ❌ 不实现 credit_service、cost_service。
+- ❌ 不新增 API 端点。
+- ❌ 不修改 API 契约（`docs/05-api-contract.md`）。
+- ❌ 不修改 OpenAPI / shared DTO。
+- ❌ 不调用真实 AI API。
+- ❌ 不修改 Auth/Device 核心逻辑。
+- ❌ 不修改 Tauri 权限或 desktop-app。
 - ❌ 不新增前端页面。
-- ❌ 不修改 `shared/` DTO 或 OpenAPI 文件（除非与本次 API 契约强相关且用户已确认）。
+- ❌ 不新增 Python 依赖（`asyncpg` 已在依赖栈中）。
 - ❌ 不实现 BACKLOG / FUTURE 功能。
-- ❌ 不引入大型第三方依赖。
 
 ## 允许修改哪些文件
 
-允许在确认后修改：
-
-### 子任务 A（credit 表）
-- `cloud-backend/app/models/credit_account.py`（新文件）
-- `cloud-backend/app/models/credit_ledger.py`（新文件）
-- `cloud-backend/app/models/__init__.py`
-- `cloud-backend/app/schemas/credit.py`（新文件）
-- `cloud-backend/app/schemas/__init__.py`
-- `cloud-backend/app/services/credit_service.py`（新文件）
-- `cloud-backend/app/api/v1/credit.py`（新文件）
-- `cloud-backend/app/main.py`
-- `cloud-backend/migrations/ddl/007_credit_accounts.sql`（新文件）
-- `cloud-backend/migrations/ddl/008_credit_ledger.sql`（新文件）
-
-### 子任务 B（Provider）
-- `cloud-backend/app/providers/base.py`（修改：从占位变为正式抽象基类）
-- `cloud-backend/app/providers/mock_provider.py`（新文件）
-- `cloud-backend/app/providers/__init__.py`
-- `cloud-backend/app/schemas/provider.py`（新文件）
-- `cloud-backend/app/services/cost_service.py`（新文件）
-- `cloud-backend/app/api/v1/provider_call.py`（新文件）
-- `cloud-backend/app/main.py`
-
-### 子任务 C（集成测试）
 - `cloud-backend/tests/conftest_pg.py`（新文件）
 - `cloud-backend/tests/test_migrations_integration.py`（新文件）
-- `docs/` 下集成测试说明文档（新文件或现有文档追加）
-
-### 子任务 D（文档）
-- `docs/05-api-contract.md`
-- `docs/13-module-roadmap.md`
+- `cloud-backend/docs/pg-integration-test-guide.md`（新文件）
 - `tasks/current-task.md`
-
-### 测试文件
-- `cloud-backend/tests/test_credit.py`（新文件）
-- `cloud-backend/tests/test_provider.py`（新文件）
 
 ## 禁止修改哪些文件
 
 未经用户再次确认，禁止修改：
 
+- `cloud-backend/app/**`（所有业务代码）
+- `cloud-backend/migrations/ddl/*.sql`（已有 DDL 文件）
+- `cloud-backend/tests/conftest.py`（现有 SQLite fixture）
+- `cloud-backend/tests/test_*.py`（除 `test_migrations_integration.py` 外的已有测试）
 - `desktop-app/**`
-- `shared/**`
+- `shared/**`（含 OpenAPI、DTO、TypeScript 类型）
 - `official-website/**`
 - `tools/**`
 - `.github/**`
-- `cloud-backend/app/api/v1/auth.py` — Auth 核心逻辑
-- `cloud-backend/app/api/v1/devices.py` — Device 核心逻辑
-- `cloud-backend/app/api/deps.py` — 鉴权链（但可读取依赖/新增 deps 函数，不修改现有逻辑）
-- `cloud-backend/app/core/security.py` — Token 逻辑
-- `cloud-backend/app/core/config.py` — 配置（仅追加环境配置，不修改现有）
-- `cloud-backend/app/models/user.py`
-- `cloud-backend/app/models/device.py`
-- `cloud-backend/app/models/auth_session.py`
-- `cloud-backend/app/models/risk_log.py`
-- `cloud-backend/app/models/usage_event.py`
-- `cloud-backend/app/models/provider_call_log.py`
-- `cloud-backend/app/services/auth_service.py`
-- `cloud-backend/app/services/device_service.py`
-- `cloud-backend/app/services/usage_service.py`
-- `cloud-backend/app/services/provider_log_service.py`
-- `cloud-backend/migrations/ddl/001_users.sql` ~ `006_provider_call_log.sql`
+- `docs/05-api-contract.md`
+- `docs/13-module-roadmap.md`
 - 任何依赖配置文件（`requirements.txt`、`pyproject.toml`、`package.json` 等）
 - 任何锁文件
 - `.env` / `.env.example`
 
 ## 验收标准
 
-### 子任务 A
-- ✅ `credit_accounts` 表创建成功，包含所有必需字段和约束。
-- ✅ `credit_ledger` 表创建成功，包含所有必需字段和约束。
-- ✅ `GET /api/v1/credits/balance` 返回用户余额（无账户时 balance=0）。
-- ✅ `GET /api/v1/credits/ledger` 返回额度变动明细，支持分页。
-- ✅ 鉴权正确：无 token → 401，用户 A 不能查用户 B 的数据。
-
-### 子任务 B
-- ✅ `BaseProvider` 抽象基类定义完整，包含 `call()` 和 `ProviderResult`。
-- ✅ `MockProvider` 能成功调用并返回模拟结果。
-- ✅ `MockProvider` 调用后 `provider_call_log` 中存在对应记录。
-- ✅ `MockProvider` 错误模拟能记录 status=error 和 error_code。
-- ✅ `POST /api/v1/providers/mock/call` 端点正常工作，返回统一结构。
-- ✅ `cost_service.estimate_cost()` 能对不同 provider/model 返回合理估算。
-
-### 子任务 C
-- ✅ `tests/conftest_pg.py` 存在，`TEST_DATABASE_URL` 未设置时自动 skip。
-- ✅ `tests/test_migrations_integration.py` 存在，覆盖所有 DDL 文件的列和约束验证。
-- ✅ DDL 回滚注释能成功执行 `DROP TABLE`。
-- ✅ 现有 SQLite 测试（`pytest tests/ -v`）继续全部通过，无回归。
-
-### 通用
-- ✅ 所有新 API 遵循统一响应结构 `{success, data, error, request_id}`。
+- ✅ `tests/conftest_pg.py` 存在，`TEST_DATABASE_URL` 未设置时 session fixture 自动 skip。
+- ✅ `tests/test_migrations_integration.py` 存在，覆盖：
+  - 全部 6 张表存在性。
+  - 每张表列完整性（名称 + 类型）。
+  - CHECK 约束生效（至少覆盖 `provider_call_log` 的 status/tokens 约束）。
+  - FK 约束生效（至少 `devices.user_id → users.id`）。
+  - DDL 文件降级注释存在且可执行。
+- ✅ 设置 `TEST_DATABASE_URL` 后集成测试全部通过。
+- ✅ 未设置 `TEST_DATABASE_URL` 时所有集成测试自动 skip。
+- ✅ 现有 SQLite 测试无回归（`pytest tests/ -v --ignore=tests/test_migrations_integration.py` 全部通过）。
 - ✅ `git diff --check` 通过。
-- ✅ 无新增外部依赖。
 
 ## 测试方式
 
-### SQLite ORM 测试（必须）
+### SQLite 测试（必须，无 PG 环境）
 
 ```bash
 cd cloud-backend
 pytest tests/ -v --ignore=tests/test_migrations_integration.py
 ```
 
-目标：所有非集成测试通过。
-
 ### PostgreSQL 集成测试（条件执行）
 
 ```bash
-# 启动测试 PG
+# 1. 启动测试 PG
 docker run -d --name pg-test -e POSTGRES_PASSWORD=test -p 5432:5432 postgres:16
 
-# 运行集成测试
+# 2. 等待 PG 就绪
+until docker exec pg-test pg_isready -U postgres; do sleep 1; done
+
+# 3. 运行集成测试
+cd cloud-backend
 TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
   pytest tests/test_migrations_integration.py -v
 
-# 清理
+# 4. 运行全部测试（SQLite + PG）
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
+  pytest tests/ -v
+
+# 5. 清理
 docker rm -f pg-test
 ```
 
 ### 静态检查
 
 ```bash
+cd D:/Project/ad-assistant
 git status --short --branch
 git diff --check
 ```
 
 ## 是否允许新增依赖
 
-**否**。使用已有依赖栈（`fastapi`、`sqlalchemy[asyncio]`、`pydantic`、`asyncpg`、`pytest`、`pytest-asyncio`、`httpx`、`aiosqlite`）。
-
-如需新增依赖，先停止并说明原因，等待确认。
+**否**。已有依赖栈中 `asyncpg` 已安装，无需新增。
 
 ## 是否涉及重大变更
 
-**是**。按 `CODEX.md` 定义，以下属于重大变更：
+**否**。
 
-| 维度 | 说明 |
-|------|------|
-| 变更类型 | 新建 PostgreSQL 表（`credit_accounts`、`credit_ledger`）；修改 Provider 接口（从占位到正式抽象基类） |
-| 影响范围 | `cloud-backend/migrations/ddl/`（新 DDL）、`cloud-backend/app/models/`（新模型）、`cloud-backend/app/providers/`（基类正式化） |
-| 是否影响 API 契约 | 新增 3 个端点（credit/balance、credit/ledger、mock/call） |
-| 是否影响授权/Token | 否。仅读取已有 user_id |
-| 是否影响已有表结构 | 否。新建独立表，不修改已有 6 张表 |
-| 是否需要数据库迁移 | 是。通过 DDL 文件（`007_credit_accounts.sql`、`008_credit_ledger.sql`）执行 |
-| 是否兼容旧版本 | 是。新表为独立新建，不影响已有表 |
-| 是否影响 Provider 接口 | 是。`base.py` 从注释占位变为正式抽象基类（向前兼容，无已有 Provider 实现需迁移） |
-
-风险点：
-- `credit_accounts` 和 `credit_ledger` 的乐观锁和并发扣费逻辑需要后续任务完善（本任务建表和基础查询）。
-- Mock Provider 返回模拟数据，后续接入真实 Provider 时需要替换。
-- PostgreSQL 集成测试依赖 Docker 环境，不是强制要求。
-
-回滚方案：通过 Git 分支回滚（`feature/sprint-02-task-01-credit-provider`）。DDL 中包含 `DROP TABLE IF EXISTS` 注释用于数据库回滚。
+本任务只新增测试文件，不修改数据库 schema、API 实现、Provider 接口、Auth/Token、扣费、支付、Tauri 权限或本地服务启动方式。
 
 ## 安全检查
 
-- 不下发 API Key 到客户端。
-- 不由客户端扣点或计算 `estimated_cost`。
-- 不由客户端决定套餐、权限或是否免费。
-- 不绕过云端授权。
-- 不保存明文 Token。
-- `provider_call_log` 不记录 prompt 原文、图片原文、API Key。
-- `credit_ledger.note` 不存储 Token、密码、完整隐私原文。
-- 所有查询 API 必须鉴权且用户隔离。
-- Mock Provider 不连接外部服务，无网络调用风险。
+- 本任务为纯测试基础设施，无安全风险。
+- 测试 PG 连接使用本地 Docker 容器，不连接外部数据库。
+- 测试环境变量 `TEST_DATABASE_URL` 不得包含生产数据库凭证。
+- 不下发 API Key、不修改权限、不绕过授权。
 - 不新增远程命令执行能力。
-- 不放宽文件系统权限。
+
+## 后续候选任务
+
+以下任务不在本任务范围内，仅作为 Sprint-02 后续计划参考：
+
+- **Task-02（候选）**：`credit_accounts` + `credit_ledger` 基础表、模型、schema、查询 API（`GET /api/v1/credits/balance`、`GET /api/v1/credits/ledger`）。
+- **Task-03（候选）**：`BaseProvider` 正式化 + `MockProvider` + `cost_service` + mock call 端点（`POST /api/v1/providers/mock/call`）。
+
+Task-03 的 `ProviderResult` 字段必须与 `provider_call_log` 建立明确映射：
+
+| ProviderResult 字段 | provider_call_log 字段 | 说明 |
+|---------------------|------------------------|------|
+| `input_units` | `prompt_tokens` | 输入 token 数 |
+| `output_units` | `completion_tokens` | 输出 token 数 |
+| `input_units + output_units` | `total_tokens` | 总计 |
+| `image_units` | 无直接映射 | 图片数，记录到 `metadata_json` 或后续扩展 |
+| `gpu_seconds` | 无直接映射 | GPU 时间，记录到 `metadata_json` 或后续扩展 |
+| `estimated_cost` | `estimated_cost` | 成本估算（由 `cost_service` 计算） |
+| `currency` | 无直接映射 | 币种（默认 CNY），影响 `estimated_cost` 计算 |
+| `result` | 不存储 | 业务结果返回调用方 |
+| `raw_usage` | 不存储 | 原始 usage 供调试，不落库 |
 
 ## 给 Codex Review 的审查指引
 
-请审查 Sprint-02 Task-01 AI 算力账户 + Provider 抽象 + PostgreSQL 集成测试基础设施。
+请审查 Sprint-02 Task-01 PostgreSQL 集成测试基础设施。
 
 重点检查：
 
-1. 任务范围是否只做 credit 表、Provider 抽象、Mock Provider、PG 测试基础设施（不做真实 AI 调用/扣费/支付/充值）。
-2. `credit_accounts` 和 `credit_ledger` 字段设计是否满足后续扣费需求。
-3. `BaseProvider` 接口定义是否对齐项目统一 Provider 返回结构。
-4. `MockProvider` 是否正确写入 `provider_call_log`。
-5. `cost_service.estimate_cost()` 是否能被后续真实 Provider 复用。
-6. 鉴权要求：credit 查询 API 是否强制鉴权且用户隔离。
-7. 安全要求：`provider_call_log` 和 `credit_ledger` 不存储敏感内容。
-8. PostgreSQL 集成测试是否仅在 `TEST_DATABASE_URL` 设定时运行，不影响现有 SQLite 测试。
-9. 是否涉及重大变更及是否已在任务文档中明确记录。
-10. 是否无新增外部依赖。
+1. 任务范围是否只做 PG 集成测试基础设施（不建新表、不写 Provider、不改 DDL）。
+2. `conftest_pg.py` 是否正确处理 `TEST_DATABASE_URL` 未设置时的 skip 逻辑。
+3. DDL 执行顺序是否正确（`001` → `006`），teardown 逆序是否正确。
+4. 集成测试是否覆盖表存在性、列完整性、CHECK 约束、FK 约束、降级路径。
+5. 现有 SQLite 测试是否不受影响（`--ignore` 模式）。
+6. 是否无新增依赖。
+7. 是否不修改 OpenAPI / shared DTO / API 契约。
+8. 后续候选任务说明是否清晰、不越界。
 
 输出：
 
 - 任务单结构完整性
 - 范围越界检查
-- 表结构设计合理性
-- Provider 接口检查
+- 测试覆盖评估
 - 安全风险检查
-- PostgreSQL 集成测试基础设施检查
-- 是否涉及重大变更确认
 - 是否允许提交
 
 ## 完成输出要求
@@ -412,9 +261,9 @@ git diff --check
 执行者完成后必须输出：
 
 - 修改文件列表
-- 实现内容（按子任务 A/B/C/D 分列）
+- 实现内容
 - 未实现内容
-- 测试命令和结果
+- 测试命令和结果（SQLite + PG 集成测试分别列出）
 - 风险点
 - 是否触发重大变更
 - 等待 Codex Review，不得自行提交
