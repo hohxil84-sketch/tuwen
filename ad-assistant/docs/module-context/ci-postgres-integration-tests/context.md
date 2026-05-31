@@ -75,8 +75,9 @@ pytest tests/test_migrations_integration.py -v
 - **Local static check**: `git diff --check` passed
 - **PG service health check**: `pg_isready` configured with 10s interval, 5s timeout, 5 retries
 - **Residual risks**:
-  - Workflow YAML syntax validated locally only; first CI run may surface adjustments
-  - `pip install -e ".[dev]"` may need caching in future CI optimization tasks
+  - First CI run surfaced editable-install issue; fixed by switching to explicit
+    `pip install` of individual deps from `pyproject.toml` (no `pip install -e`)
+  - Future optimization: pip dependency caching for faster CI runs
   - AsyncPG connection to service container `localhost:5432` relies on GitHub Actions default network; if GitHub changes service networking defaults, connection string may need update
 
 ## Known Risks

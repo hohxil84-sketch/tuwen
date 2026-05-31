@@ -25,13 +25,14 @@ The workflow file `.github/workflows/postgres-integration-tests.yml` (at Git rep
 - run on PRs targeting `main`;
 - run on pushes to `ci-postgres-integration-tests` and `chore/ci-postgres-integration-tests`;
 - use `ubuntu-latest`;
-- use `ubuntu-latest`;
 - use Python 3.12;
 - start PostgreSQL with `postgres:16`;
 - configure a `pg_isready` health check so CI waits for the database
   to accept connections before running tests (race condition avoidance);
 - use temporary test credentials only;
-- install existing backend dev dependencies;
+- install explicit dependencies from `cloud-backend/pyproject.toml`
+  (`[project].dependencies` + `[project.optional-dependencies].dev`)
+  without editable install; `app` is importable from the test working directory;
 - run the PostgreSQL integration suite.
 
 CI connection string:
