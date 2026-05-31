@@ -197,7 +197,7 @@ async def list_provider_call_logs(
                 "prompt_tokens": r.prompt_tokens,
                 "completion_tokens": r.completion_tokens,
                 "total_tokens": r.total_tokens,
-                "estimated_cost": float(r.estimated_cost) if r.estimated_cost else None,
+                "estimated_cost": float(r.estimated_cost) if r.estimated_cost is not None else None,
                 "credits_charged": r.credits_charged,
                 "latency_ms": r.latency_ms,
                 "created_at": r.created_at.isoformat() if r.created_at else None,

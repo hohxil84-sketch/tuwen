@@ -401,6 +401,40 @@ class TestProviderCallLogWrite:
             assert "token" not in key.lower()
             assert "prompt_text" not in key.lower()
 
+    async def test_estimated_cost_zero_is_preserved(self, client, db_session, test_user, test_device):
+        """estimated_cost=0 应在 service 序列化和 API 响应中返回 0.0 而非 null."""
+        # 写入 estimated_cost=0
+        result = await record_provider_call(
+            db=db_session,
+            provider="free_provider",
+            model="free-model",
+            feature="ocr",
+            status="success",
+            user_id=test_user.id,
+            device_id=test_device.id,
+            estimated_cost=0.0,
+        )
+
+        # service 层查询
+        data = await list_provider_call_logs(
+            db=db_session,
+            user_id=test_user.id,
+            limit=10,
+        )
+        assert data["items"][0]["estimated_cost"] == 0.0
+        assert data["items"][0]["estimated_cost"] is not None
+
+        # API 层查询
+        res = await client.get(
+            "/api/v1/provider-call-logs?limit=10",
+            headers=_auth_header(test_user, test_device),
+        )
+        assert res.status_code == 200
+        body = res.json()
+        item = body["data"]["items"][0]
+        assert item["estimated_cost"] == 0.0
+        assert item["estimated_cost"] is not None
+
 
 # ---------------------------------------------------------------------------
 # 5. 查询鉴权测试
