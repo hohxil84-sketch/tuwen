@@ -23,6 +23,7 @@ Claude Code + DeepSeek 不允许自行提交。
 3. `CLAUDE.md`
 4. `tasks/current-task.md`
 5. 与任务相关的 `docs/*.md`
+6. 如果任务涉及已有模块的扩展或修改，必须读取对应的 `docs/module-context/<module-or-task>/context.md`
 
 ## 必须遵守的任务边界
 
@@ -82,6 +83,7 @@ Claude Code / DeepSeek 写代码时，每新增一个函数，必须添加简短
 - 测试命令和结果
 - 风险点
 - 是否触发重大变更
+- 是否已更新对应 `docs/module-context/<module-or-task>/context.md`
 - 等待 Codex Review，不得自行提交
 
 ## 模块完成后的交接规则
@@ -92,9 +94,22 @@ Review 通过并合并到 `main` 后：
 - 不得在原分支继续开发下一个模块。
 - 不得自行创建下一个模块的业务实现。
 - 必须等待 Codex 准备下一任务文档。
+- 必须等待 Codex 保存或更新模块上下文：`docs/module-context/<module-or-task>/context.md`。
 - 必须等待用户开启新会话并切换到新的任务分支。
 
 新模块开发必须使用新的任务分支和新的任务文档。
+
+## 模块上下文规则
+
+后续扩展或修改某个已完成模块时，Claude Code / DeepSeek 必须先读取该模块上下文文件，再开始实现。
+
+每次修改模块后，执行者必须把新增事实交给 Codex Review，由 Codex 确认并维护上下文文件。上下文必须记录：
+- 本次修改目标
+- commit 或 PR
+- 改动文件
+- 测试结果
+- 已知风险
+- 后续修改注意事项
 
 ## Git 提交规则
 
