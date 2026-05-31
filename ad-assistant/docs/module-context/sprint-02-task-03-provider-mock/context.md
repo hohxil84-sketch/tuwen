@@ -2,11 +2,14 @@
 
 ## Status
 
-`IMPLEMENTED` — implementation complete on branch `feature/sprint-02-task-03-provider-mock`. Awaiting Codex Review before commit and merge.
+`MERGED` - PR #12 merged to `main`.
 
 ## Branch
 
 - Implementation branch: `feature/sprint-02-task-03-provider-mock`
+- PR: #12
+- Merge commit: `c73f1c2`
+- Feature commit: `34b1528`
 
 ## Implementation Evidence (2026-05-31)
 
