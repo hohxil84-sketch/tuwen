@@ -98,9 +98,42 @@ MVP API 分组：
 
 ### Usage
 
-`POST /api/v1/usage/events`
+`GET /api/v1/usage/events`
 
-用于记录功能使用事件，不允许由客户端提交最终扣费结果。
+Sprint-01 当前实现用于查询当前登录用户自己的使用事件。
+
+要求：
+- 必须鉴权。
+- 普通用户只能查询自己的 `usage_events`。
+- 支持 `limit`、`offset`、`feature` 查询参数。
+- 按 `created_at` 倒序返回。
+- 返回统一结构 `{success, data, error, request_id}`。
+
+当前返回 `data` 结构：
+```json
+{
+  "items": [
+    {
+      "id": "event_id",
+      "user_id": "user_id",
+      "device_id": "device_id",
+      "event_type": "OCR_LOCAL",
+      "feature": "ocr",
+      "request_id": "req_xxx",
+      "metadata_json": {},
+      "created_at": "2026-05-30T00:00:00+00:00"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+说明：
+- 使用事件写入由后端 service 内部调用完成。
+- 当前不暴露客户端直接写入使用事件的 POST API。
+- 不允许由客户端提交最终扣费结果。
 
 ### Credit
 
@@ -112,7 +145,44 @@ MVP API 分组：
 
 `GET /api/v1/provider-call-logs`
 
-仅后台管理或授权用户可访问。
+Sprint-01 当前实现允许普通用户查询自己的 Provider 调用日志；后台管理查询另行任务实现。
+
+要求：
+- 必须鉴权。
+- 普通用户只能查询自己的 `provider_call_log`。
+- 支持 `limit`、`offset`、`feature`、`status` 查询参数。
+- 按 `created_at` 倒序返回。
+- 返回统一结构 `{success, data, error, request_id}`。
+- 不返回 prompt 原文、图片原文、API Key、Token、完整隐私内容。
+
+当前返回 `data` 结构：
+```json
+{
+  "items": [
+    {
+      "id": "log_id",
+      "request_id": "req_xxx",
+      "user_id": "user_id",
+      "device_id": "device_id",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "feature": "ocr",
+      "status": "success",
+      "error_code": null,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "estimated_cost": 0,
+      "credits_charged": 0,
+      "latency_ms": 100,
+      "created_at": "2026-05-30T00:00:00+00:00"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
 
 ## 禁止
 
@@ -123,4 +193,3 @@ MVP API 分组：
 - 是否允许高级 AI
 
 这些字段只能由云端计算。
-

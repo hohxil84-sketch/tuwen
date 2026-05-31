@@ -65,3 +65,7 @@ Sprint-01 只允许包含：
 - 使用统计基础表
 - provider_call_log 表
 
+状态备注：
+- Sprint-01 已完成 Task-01 至 Task-05，并完成 Task-05 `estimated_cost=0` 序列化小修。
+- Sprint-01 收尾交接见 `docs/sprint-01-summary.md`。
+- 下一阶段候选任务只作为建议记录，不代表已经启动 Sprint-02 开发。
