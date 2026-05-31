@@ -47,10 +47,21 @@ Current verified head: `8fa3440 docs(rules): add communication and git note conv
 - Real credit deduction and pricing remain unimplemented.
 - Desktop app has not yet been wired to the cloud mock AI API.
 
+## In Progress
+
+| Task | Scope | Branch |
+|------|-------|--------|
+| Task-05 | Desktop Mock AI API Client | `feature/sprint-02-task-05-desktop-mock-ai-client` |
+
+Task-05 status (2026-06-01): `IMPLEMENTED_AWAITING_CODEX_REVIEW`
+- `npm run build` passes (43 modules, 0 errors)
+- `git diff --check` passes
+- No backend, dependency, Tauri, or local-service changes
+- No frontend automated tests (no test runner in `package.json`; new deps not allowed per task rules)
+
 ## Next-Stage Candidate Tasks
 
 These are candidates only. Create a new task document and new branch before implementation.
 
-- Candidate A: Desktop MVP calls `POST /api/v1/mock-ai/ad-copy`.
 - Candidate B: API response/OpenAPI/shared DTO generation for the mock AI endpoint.
 - Candidate C: Real Provider routing design, still without real billing deduction.
