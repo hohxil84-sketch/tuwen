@@ -1,8 +1,8 @@
 # Sprint-02 Summary
 
-Date: 2026-05-31
+Date: 2026-06-01
 Base branch: `main`
-Current verified head: `8fa3440 docs(rules): add communication and git note conventions (#14)`
+Current verified head: `42dbad8 Merge pull request #16 from hohxil84-sketch/feature/sprint-02-task-05-desktop-mock-ai-client`
 
 ## Completed Modules
 
@@ -13,6 +13,7 @@ Current verified head: `8fa3440 docs(rules): add communication and git note conv
 | Task-03 | Mock Provider foundation | PR #12 / `c73f1c2` |
 | Task-04 | Mock AI ad-copy API endpoint | PR #13 / `0cc7f14` |
 | Rules | Agent communication and review-scope rules | PR #14 / `8fa3440` |
+| Task-05 | Desktop Mock AI API Client | PR #16 / `42dbad8` |
 
 ## Current Cloud API Capability
 
@@ -23,6 +24,9 @@ Current verified head: `8fa3440 docs(rules): add communication and git note conv
 - `POST /api/v1/mock-ai/ad-copy` is available as a mock-only AI endpoint.
 - Mock AI API writes `provider_call_log` with `credits_charged=0`.
 - Mock AI API propagates `X-Request-ID` to the response and provider log.
+- Desktop app has a narrow cloud API client for login/logout/mock ad-copy.
+- Desktop tokens are memory-only for Task-05 and are not persisted to browser storage, files, SQLite, cookies, or Tauri storage.
+- Desktop OCR page has a login-gated Mock AI ad-copy panel that displays backend `request_id`, provider, model, and `credits_charged`.
 
 ## Current Safety Boundaries
 
@@ -30,7 +34,7 @@ Current verified head: `8fa3440 docs(rules): add communication and git note conv
 - No real credit deduction is implemented.
 - Mock AI API does not write `credit_ledger`.
 - Mock AI API does not expose `raw_usage` to clients.
-- Desktop and frontend integration are still separate future tasks.
+- Desktop Mock AI integration is mock-only and does not add real provider calls, client-side provider selection, real credit deduction, API keys, or third-party AI network calls.
 
 ## Verification
 
@@ -38,6 +42,9 @@ Current verified head: `8fa3440 docs(rules): add communication and git note conv
 - Task-04 backend regression: `147 passed, 1 warning`.
 - PR #13 CI: `pg-integration` passed.
 - PR #14 CI: `pg-integration` passed.
+- PR #16 CI: `pg-integration` passed.
+- Task-05 desktop build: `npm run build` passed with 43 modules transformed and 0 errors.
+- Task-05 whitespace check: `git diff --check main..HEAD` passed after commit `89b901a`.
 - `git diff --check` passed during local reviews.
 
 ## Residual Risks
@@ -45,23 +52,23 @@ Current verified head: `8fa3440 docs(rules): add communication and git note conv
 - `POST /api/v1/mock-ai/ad-copy` is an MVP mock contract; future shape changes should be treated as API contract changes.
 - Real Provider routing and model selection remain unimplemented.
 - Real credit deduction and pricing remain unimplemented.
-- Desktop app has not yet been wired to the cloud mock AI API.
+- Task-05 live manual verification remains incomplete because the local PostgreSQL/backend environment was not available during review.
 
 ## In Progress
 
 | Task | Scope | Branch |
 |------|-------|--------|
-| Task-05 | Desktop Mock AI API Client | `feature/sprint-02-task-05-desktop-mock-ai-client` |
+| Task-06 draft | Desktop Mock AI E2E Smoke Verification | `feature/sprint-02-task-06-desktop-mock-e2e-smoke` |
 
-Task-05 status (2026-06-01): `IMPLEMENTED_AWAITING_CODEX_REVIEW`
-- `npm run build` passes (43 modules, 0 errors)
-- `git diff --check` passes
-- No backend, dependency, Tauri, or local-service changes
-- No frontend automated tests (no test runner in `package.json`; new deps not allowed per task rules)
+Task-06 status (2026-06-01): `CONFIRMED_READY_FOR_IMPLEMENTATION`
+- Goal: make the merged Task-05 desktop mock MVP path reproducible and manually verified.
+- Scope: local runbook, optional dev-only seed helper if needed, manual smoke evidence.
+- No real provider routing, real billing, API contract, DDL, dependency, Tauri, shared DTO, or desktop source changes are allowed by the draft.
 
 ## Next-Stage Candidate Tasks
 
 These are candidates only. Create a new task document and new branch before implementation.
 
+- Candidate A: Desktop Mock AI E2E smoke verification and local runbook.
 - Candidate B: API response/OpenAPI/shared DTO generation for the mock AI endpoint.
 - Candidate C: Real Provider routing design, still without real billing deduction.

@@ -22,3 +22,17 @@
 - Scope: added communication and Git note rules for Codex / Claude Code / DeepSeek.
 - Rules: address user as "大哥"; commit/push/PR/handoff notes use Chinese and English bilingual notes; Codex Review output includes CC-forwardable next-step instructions in Chinese.
 - Tests: PR #14 `pg-integration` passed.
+
+## 2026-06-01
+
+### Sprint-02 Task-05 Desktop Mock AI API Client
+
+- Branch: `feature/sprint-02-task-05-desktop-mock-ai-client`
+- PR: #16
+- Merge commit: `42dbad8`
+- Feature commit: `89b901a`
+- Scope: added desktop cloud API client, memory-only auth store, login UI, and login-gated Mock AI ad-copy panel on the OCR page.
+- Key behavior: desktop calls `POST /api/v1/auth/login`, best-effort `POST /api/v1/auth/logout` with `refresh_token`, and `POST /api/v1/mock-ai/ad-copy`; mock response displays provider, model, `credits_charged`, and backend `request_id`.
+- Safety: tokens are memory-only; no localStorage/sessionStorage/IndexedDB/SQLite/cookies/files/Tauri storage; no API keys; no third-party AI calls; no client-side provider/model/cost/credit decisions.
+- Tests: `npm run build` passed in `desktop-app` with 43 modules and 0 errors; `git diff --check main..HEAD` passed after commit `89b901a`; PR #16 `pg-integration` passed.
+- Residual risk: live manual verification was not completed because local PostgreSQL/backend service was not available during review.

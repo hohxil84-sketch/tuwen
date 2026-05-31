@@ -2,7 +2,14 @@
 
 ## Status
 
-`IMPLEMENTED_CODEX_APPROVED` — implementation complete on 2026-06-01, Codex approved on 2026-06-01.
+`MERGED` — implementation complete on 2026-06-01, Codex approved on 2026-06-01, merged to `main` by PR #16.
+
+Merge evidence:
+- Feature commit: `89b901a feat(desktop): add mock AI cloud API client (Sprint-02 Task-05)`
+- Merge commit: `42dbad8 Merge pull request #16 from hohxil84-sketch/feature/sprint-02-task-05-desktop-mock-ai-client`
+- Merge strategy: merge commit, no squash, no rebase.
+- Base before merge: `645d181 docs(closeout): record Sprint-02 Task-04 completion (#15)`
+- PR #16 CI: `pg-integration` passed.
 
 Codex Review iteration 1 fixes applied on 2026-06-01:
 - request_id now flows from cloudApi response envelope → authStore → OcrPage (no placeholder text).
@@ -26,6 +33,7 @@ Codex Review iteration 3 fixes applied on 2026-06-01:
 
 - `feature/sprint-02-task-05-desktop-mock-ai-client`
 - Based on `main` @ `8fa3440`
+- Merged to `main` @ `42dbad8`
 
 ## Goal
 
@@ -71,6 +79,7 @@ POST /api/v1/mock-ai/ad-copy
 
 - `npm run build`: ✅ 43 modules, 0 errors (2026-06-01, re-verified iteration 3)
 - `git diff --check`: ✅ no whitespace issues
+- PR #16 `pg-integration`: ✅ passed
 - No backend files touched
 - No dependency files touched
 - No Tauri/local-service/shared changes
@@ -116,6 +125,6 @@ All manual verification steps remain **未验证**:
 
 ## Next Steps (after Codex Review)
 
-- Wait for Codex Review and merge approval
-- Do NOT self-merge
-- After merge, Codex prepares next task document
+- Task-05 is merged; do not continue development on the Task-05 branch.
+- Codex prepared Sprint-02 Task-06 draft in `tasks/current-task.md`.
+- Next implementation must wait for user confirmation and use a new task branch.

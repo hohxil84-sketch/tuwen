@@ -3,7 +3,10 @@
 Date: 2026-06-01
 Branch: `feature/sprint-02-task-05-desktop-mock-ai-client`
 Base: `main` @ `8fa3440`
-Status: `IMPLEMENTED_AWAITING_CODEX_REVIEW` (iteration 2 fixes applied)
+Status: `MERGED`
+Feature commit: `89b901a`
+Merge commit: `42dbad8`
+PR: #16
 
 ## Purpose
 
@@ -55,6 +58,14 @@ This is a desktop integration slice only — no real AI, no real billing, no tok
 - **tasks/current-task.md**: removed `npm test` example (no test script in package.json).
 - `npm run build` + `git diff --check` ✅ passed (0 type errors, 43 modules).
 
+### Codex Review Iteration 3 — Logout And Error Sanitization (2026-06-01)
+
+- **cloudApi.ts**: `logout(refreshToken)` now sends `{ refresh_token: refreshToken }` to `/api/v1/auth/logout`.
+- **authStore.ts**: `logout()` passes `refreshToken.value` to cloud logout, then clears local memory state.
+- **cloudApi.ts**: `sanitizeApiError()` exported as the shared user-facing error sanitizer.
+- **OcrPage.vue**: Mock AI errors now use `sanitizeApiError()` instead of displaying raw backend messages.
+- `npm run build` + `git diff --check` ✅ passed after iteration 3.
+
 ## Security
 
 - ✅ Tokens are memory-only — never persisted to localStorage, sessionStorage, IndexedDB, SQLite, cookies, files, or Tauri storage.
@@ -76,6 +87,7 @@ This is a desktop integration slice only — no real AI, no real billing, no tok
 | Backend files touched | ✅ None |
 | Dependency changes | ✅ None |
 | Tauri/local-service/shared changes | ✅ None |
+| PR #16 `pg-integration` | ✅ Passed |
 
 ### Manual Verification Results (2026-06-01, iteration 2)
 
@@ -125,7 +137,7 @@ Manual verification steps:
 
 ## Related Docs
 
-- Task sheet: `tasks/current-task.md`
+- Task sheet at implementation time: `tasks/current-task.md` (now advanced to Task-06 draft after merge)
 - Module context: `docs/module-context/sprint-02-task-05-desktop-mock-ai-client/context.md`
 - Desktop guide: `docs/09-desktop-app-guide.md`
 - Sprint summary: `docs/sprint-02-summary.md`
