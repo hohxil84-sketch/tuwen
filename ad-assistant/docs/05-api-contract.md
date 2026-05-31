@@ -235,6 +235,52 @@ Sprint-01 当前实现允许普通用户查询自己的 Provider 调用日志；
 }
 ```
 
+### Mock AI
+
+Sprint-02 Task-04 ✅ Implemented (`feature/sprint-02-task-04-mock-ai-api`):
+
+`POST /api/v1/mock-ai/ad-copy`
+
+Purpose:
+
+- authenticated, device-bound mock AI ad-copy generation;
+- calls backend `MockProvider` through the Provider layer;
+- writes `provider_call_log`;
+- returns deterministic mock output for future desktop MVP integration.
+
+Request:
+
+```json
+{
+  "product_name": "A4 poster printing",
+  "selling_points": ["same-day pickup", "waterproof material"],
+  "platform": "douyin",
+  "tone": "direct"
+}
+```
+
+Response `data`:
+
+```json
+{
+  "feature": "mock_ad_copy",
+  "provider": "mock",
+  "model": "mock-text-v1",
+  "text": "Mock generated text ...",
+  "estimated_cost": 0.0,
+  "credits_charged": 0
+}
+```
+
+Rules:
+
+- requires auth and bound active device;
+- does not expose `raw_usage`;
+- does not accept provider, model, cost, credits, user_id, device_id, or final permission decisions from the client;
+- `credits_charged=0`;
+- does not write `credit_ledger`;
+- mock-only, no real provider calls.
+
 ## 禁止
 
 禁止前端提交：

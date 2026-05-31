@@ -71,3 +71,13 @@ Implemented on branch `feature/sprint-02-task-03-provider-mock`:
 - mock provider logs record `credits_charged=0`;
 - mock provider calls do not write `credit_ledger`;
 - real credit deduction and product pricing remain separate approved tasks.
+
+## Sprint-02 Task-04: Mock AI API Endpoint ✅ Implemented
+
+Implemented on branch `feature/sprint-02-task-04-mock-ai-api`:
+
+- `POST /api/v1/mock-ai/ad-copy` — first authenticated, mock-only AI endpoint;
+- endpoint logs provider calls with `credits_charged=0`;
+- endpoint does not write `credit_ledger`;
+- endpoint does not expose `raw_usage` or raw user text;
+- mock cost values remain mock-only — not real billing.

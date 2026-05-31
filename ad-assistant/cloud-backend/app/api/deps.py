@@ -175,6 +175,8 @@ def verify_plan(user: User) -> None:
 FEATURE_PLAN_REQUIREMENTS: dict[str, set[str]] = {
     # OCR is available on all plans
     "ocr": {"standard", "expert", "enterprise"},
+    # Mock AI ad-copy — Sprint-02 Task-04
+    "mock_ad_copy": {"standard", "expert", "enterprise"},
 }
 
 
