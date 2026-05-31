@@ -9,6 +9,9 @@ Future work that extends or modifies this module must read this file before read
 ## Current State
 
 - Current verified local `main`/`HEAD` at review start: `bdf08ed` (`Merge pull request #9 from hohxil84-sketch/docs/module-context-rule`)
+- Task-02 implementation merged to `main`: `fc1c271` (`Merge pull request #10 from hohxil84-sketch/feature/sprint-02-task-02-credit-ledger`)
+- Implementation commit: `63cdf2f` (`feat(credits): add credit account and ledger foundation`)
+- Implementation PR: `#10`
 - Earlier task-sheet merge note: `da3b31e`
 - Task sheet PR: `#8`
 - Task sheet branch: `docs/sprint-02-task-02-credit-ledger`
@@ -109,6 +112,14 @@ Known review risks:
 
 - PostgreSQL migration assertions were reviewed from user-provided local execution output rather than reproduced in the Codex environment.
 - The task touches confirmed major-change areas: new database schema, read-only Credit API, and credit service logic. No client-write credit API should be added in this task.
+
+## 2026-05-31 Merge Notes
+
+- PR #10 was reviewed and allowed to merge.
+- PR #10 merged to `main` as `fc1c271`.
+- Follow-up infra task prepared: GitHub Actions PostgreSQL service-container coverage for `tests/test_migrations_integration.py`.
+- The follow-up infra task must not modify credit runtime behavior, DDL, API contracts, provider logic, or auth/device logic.
+- **2026-05-31 CI infra follow-up**: implemented on branch `ci-postgres-integration-tests`. Added `.github/workflows/postgres-integration-tests.yml` (repo root `D:/Project`) with `postgres:16` service container, `pg_isready` health check, `TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres`. No credit runtime, DDL, or application code was changed. CI run pending PR open.
 
 ## Update Rule
 
