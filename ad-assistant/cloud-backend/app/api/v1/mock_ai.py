@@ -1,0 +1,89 @@
+"""Mock AI API routes — Sprint-02 Task-04.
+
+受保护 endpoint：POST /api/v1/mock-ai/ad-copy
+
+- 需要 auth + 活跃设备绑定
+- 调用 MockProvider 通过 execute_provider_call
+- 写入 provider_call_log
+- 不暴露 raw_usage
+- credits_charged 固定为 0
+- 不写 credit_ledger
+"""
+
+import uuid as _uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import (
+    get_current_user_with_device,
+    verify_feature,
+    verify_plan,
+)
+from app.database import get_db
+from app.models.device import Device
+from app.models.user import User
+from app.providers.base import ProviderRequest
+from app.providers.mock_provider import MockProvider
+from app.schemas.common import success_response
+from app.schemas.mock_ai import MockAdCopyData, MockAdCopyRequest
+from app.services.provider_service import execute_provider_call
+
+router = APIRouter(prefix="/api/v1", tags=["Mock AI"])
+
+FEATURE_NAME = "mock_ad_copy"
+
+
+@router.post(
+    "/mock-ai/ad-copy",
+    response_model=None,
+    status_code=status.HTTP_200_OK,
+)
+async def generate_ad_copy(
+    body: MockAdCopyRequest,
+    request: Request,
+    user_and_device: Annotated[tuple[User, Device], Depends(get_current_user_with_device)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """生成 mock 广告文案（mock-only，非真实 AI）。
+
+    需要有效 access token + 活跃设备绑定 + 有效 plan + mock_ad_copy 权限。
+    """
+    user, device = user_and_device
+
+    # Steps 5-6: plan validity + feature permission
+    verify_plan(user)
+    verify_feature(user, FEATURE_NAME)
+
+    # 获取或生成 request_id（优先使用 middleware 注入的 X-Request-ID）
+    request_id: str = getattr(request.state, "request_id", None) or f"req_{_uuid.uuid4().hex[:12]}"
+
+    # 构建 ProviderRequest —— 不含原始用户文本（product_name/selling_points）
+    provider_request = ProviderRequest(
+        feature=FEATURE_NAME,
+        message="",  # 不记录用户原始内容到 raw_usage / provider_call_log
+    )
+
+    # 执行 Provider 调用并写入 provider_call_log
+    provider = MockProvider()
+    result = await execute_provider_call(
+        db=db,
+        provider=provider,
+        request=provider_request,
+        user_id=user.id,
+        device_id=device.id,
+        request_id=request_id,
+    )
+
+    # 构建响应 —— 不暴露 raw_usage
+    response_data = MockAdCopyData(
+        feature=FEATURE_NAME,
+        provider=result.provider,
+        model=result.model,
+        text=result.result.get("text", "Mock default response."),
+        estimated_cost=result.estimated_cost,
+        credits_charged=0,
+    )
+
+    return success_response(data=response_data.model_dump(), request_id=request_id)

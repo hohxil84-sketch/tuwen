@@ -96,3 +96,14 @@ Implemented on branch `feature/sprint-02-task-03-provider-mock`:
 
 This task did not add real provider SDKs, public provider routes, provider API keys,
 credit deduction, or database migrations.
+
+## Sprint-02 Task-04: Mock AI API Endpoint ✅ Implemented
+
+Implemented on branch `feature/sprint-02-task-04-mock-ai-api`:
+
+- added `POST /api/v1/mock-ai/ad-copy` — first authenticated provider-backed endpoint;
+- endpoint calls `MockProvider` through `execute_provider_call`;
+- writes `provider_call_log` with `credits_charged=0`;
+- propagates `X-Request-ID` to response and provider log;
+- does not expose `raw_usage` to clients;
+- 21 focused tests + 147 regression pass.

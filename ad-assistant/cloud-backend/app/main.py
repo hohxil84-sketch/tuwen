@@ -95,8 +95,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
-    """Inject a unique request_id into every JSON response."""
+    """Inject a unique request_id into every JSON response and request.state."""
     rid = request.headers.get("X-Request-ID") or f"req_{_uuid.uuid4().hex[:12]}"
+    request.state.request_id = rid
     start = _time.perf_counter()
 
     response = await call_next(request)
@@ -132,12 +133,14 @@ async def add_request_id(request: Request, call_next):
 from app.api.v1.auth import router as auth_router
 from app.api.v1.credits import router as credits_router
 from app.api.v1.devices import router as devices_router
+from app.api.v1.mock_ai import router as mock_ai_router
 from app.api.v1.provider_log import router as provider_log_router
 from app.api.v1.usage import router as usage_router
 
 app.include_router(auth_router)
 app.include_router(credits_router)
 app.include_router(devices_router)
+app.include_router(mock_ai_router)
 app.include_router(usage_router)
 app.include_router(provider_log_router)
 
