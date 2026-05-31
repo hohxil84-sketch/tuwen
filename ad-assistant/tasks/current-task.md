@@ -1,272 +1,327 @@
-# Current Task: Infra - GitHub Actions PostgreSQL Integration Tests
+# Current Task: Sprint-02 Task-03 Provider Mock Foundation
 
 ## Status
 
-`COMPLETED` — implementation complete, CI passed (PR #11), awaiting Codex merge approval.
+`IMPLEMENTED` — implementation complete on branch `feature/sprint-02-task-03-provider-mock`. 24 focused tests pass, 126 regression pass. Awaiting Codex Review before commit and merge.
 
 ## Suggested Branch
 
-`chore/ci-postgres-integration-tests`, based on latest `main`.
+`feature/sprint-02-task-03-provider-mock`, based on latest `main`.
 
-If a local Git ref permission or slash-name issue occurs, use the flat branch name `ci-postgres-integration-tests`.
+If a local Git ref permission or slash-name issue occurs, use the flat branch name `sprint-02-task-03-provider-mock`.
 
 ## Prerequisites
 
-- Sprint-02 Task-02 was merged to `main` by PR #10.
-- Current verified merge commit: `fc1c271` (`Merge pull request #10 from hohxil84-sketch/feature/sprint-02-task-02-credit-ledger`).
-- PostgreSQL migration integration tests already exist in `cloud-backend/tests/test_migrations_integration.py`.
-- The PG fixture reads `TEST_DATABASE_URL` in `cloud-backend/tests/conftest_pg.py`.
-- Local manual PG evidence for Task-02 was `55 passed` against Docker `postgres:16` on `localhost:5433`.
-- Codex could not reproduce that local result because Codex's environment cannot reach a developer-machine Docker service on `localhost:5433`.
+- Sprint-02 Task-02 credit ledger was merged to `main` by PR #10.
+- Infra PostgreSQL CI was merged to `main` by PR #11.
+- Latest verified PR #11 merge commit: `96f5d283322ec973db841cf3e10d11f930cd5e09`.
+- PR #11 CI evidence: PostgreSQL integration workflow passed with `55 passed, 1 warning`.
+- `provider_call_log` exists and has PostgreSQL integration coverage.
+- `credit_accounts` and `credit_ledger` exist, but real credit deduction is not part of this task.
+- `cloud-backend/app/providers/base.py` is currently only a placeholder.
 
 ## Background
 
-The project now has real PostgreSQL DDL integration tests, but they only run when `TEST_DATABASE_URL` points to a reachable PostgreSQL instance. On developer machines this can be handled with local Docker. In Codex or CI, `localhost:5433` does not refer to the developer machine, so PostgreSQL assertions may be skipped or fail during connection setup.
+The backend already has durable tables for provider call logs and credit ledger entries. The next useful foundation is a real Provider interface plus a deterministic mock provider. This gives future AI features one cloud-side execution path before any real provider SDK, API key, queue, or billing deduction is introduced.
 
-This task adds CI-owned PostgreSQL infrastructure so GitHub Actions can run the PostgreSQL integration suite in the same network namespace as a temporary PostgreSQL service container.
+This task must prove that a provider call can:
+
+- use a unified Provider result shape;
+- calculate a traceable mock estimated cost;
+- write `provider_call_log`;
+- avoid logging raw prompts, API keys, or secrets;
+- leave `credit_ledger` untouched.
 
 ## Major Change Proposal
 
-This task modifies CI/project infrastructure by adding `.github/workflows/**`. It does not modify application runtime behavior, database schema, API contract, provider logic, auth logic, credit logic, shared DTO, desktop code, or dependencies.
-
-User confirmation is still required before implementation because this introduces a new GitHub Actions workflow and affects PR validation.
+This task modifies the Provider abstraction and cost-estimation foundation. User confirmation is required before implementation.
 
 1. Reason
-   - Remove dependence on a developer's local Docker PostgreSQL instance for PG integration tests.
-   - Make `tests/test_migrations_integration.py` run automatically on PRs and pushes.
-   - Prevent future DDL tasks from being accepted without a real PostgreSQL execution path.
+   - Replace the placeholder Provider skeleton with a minimal typed interface.
+   - Add a deterministic mock provider for local tests and future feature wiring.
+   - Prove the provider logging path without real third-party API calls.
+   - Prepare for future real provider and credit deduction tasks without combining them.
 
 2. Risks
-   - CI runtime may increase.
-   - Workflow YAML mistakes can create false red/green CI signals.
-   - Service container health checks or connection strings can be flaky if not configured explicitly.
-   - CI secrets must not be used for this test database.
+   - A poorly shaped Provider interface can cause churn when real providers are added.
+   - Mock cost values can be mistaken for real billing if docs and names are unclear.
+   - Provider logging can accidentally persist raw prompt text or secrets.
+   - Adding a public route too early can freeze an API contract before the product flow is ready.
 
 3. Impact
-   - Adds a GitHub Actions workflow under `.github/workflows/`.
-   - Runs existing backend tests against a temporary PostgreSQL service container.
-   - Does not change production code or production database behavior.
+   - Backend provider/service test foundation only.
+   - No public API route is required.
+   - No database schema change is required.
+   - No frontend, desktop, shared DTO, OpenAPI, auth, or device behavior change is required.
 
 4. Rollback
-   - Delete the new workflow file.
+   - Restore `cloud-backend/app/providers/base.py` to the previous placeholder.
+   - Delete the mock provider, cost/provider service helpers, and focused tests.
+   - Revert the docs added for this task.
    - No database rollback is needed.
-   - No application code rollback is needed.
 
 5. Backward Compatibility
-   - Compatible. Existing local test commands remain unchanged.
-   - If `TEST_DATABASE_URL` is not set locally, PG tests continue to skip by design.
+   - Compatible. Existing API behavior and database schema must remain unchanged.
+   - Existing tests should continue to pass.
 
 6. Database Migration
    - None. This task must not add, remove, or edit DDL files.
 
 ## What To Build
 
-### 1. Add GitHub Actions workflow
-
-Add a new workflow file relative to Git repository root (`D:/Project`):
-
-- `.github/workflows/postgres-integration-tests.yml`
-  (resolves to `D:/Project/.github/workflows/postgres-integration-tests.yml`;
-  NOT `ad-assistant/.github/workflows/...` — GitHub Actions only triggers
-  from the repository root where `.github/` resides.)
-
-Required behavior:
-
-- Trigger on pull requests targeting `main`.
-- Trigger on pushes to this task's implementation branches:
-  `ci-postgres-integration-tests` and `chore/ci-postgres-integration-tests`.
-  (Narrow scope — broader push trigger matrix is a separate task.)
-- Use `ubuntu-latest`.
-- Use Python 3.12.
-- Start PostgreSQL service container using `postgres:16`.
-- Configure PostgreSQL service health check (hard requirement):
-  use `pg_isready` options (e.g. `pg_isready -U postgres -d postgres`)
-  so CI waits for the database to accept connections. Without this,
-  race conditions between service startup and test execution can
-  produce false CI failures.
-- Use only temporary CI test credentials, for example:
-  - database: `postgres`
-  - user: `postgres`
-  - password: `test`
-  - port: `5432`
-- Set:
-
-```text
-TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres
-```
-
-- Install backend package with dev dependencies from existing project metadata.
-- Run:
-
-```bash
-cd ad-assistant/cloud-backend
-pytest tests/test_migrations_integration.py -v
-```
-
-Recommended install command:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-### 2. Keep SQLite test behavior unchanged
-
-This task does not need to move the existing SQLite/API suite into CI unless explicitly confirmed later. The narrow goal is PostgreSQL integration coverage.
-
-### 3. Document CI behavior
+### 1. Formalize the Provider base interface
 
 Update:
 
-- `docs/21-ci-postgres-integration-tests.md`
-- `docs/module-context/ci-postgres-integration-tests/context.md`
+- `cloud-backend/app/providers/base.py`
 
-The docs must explain:
+Required behavior:
 
-- why CI owns the PG service container;
-- why Codex cannot reach a developer-machine `localhost:5433`;
-- how `TEST_DATABASE_URL` is set in CI;
-- that no production database or real secret is used;
-- how to run the same test locally.
+- Define a minimal request/result structure for internal provider calls.
+- Preserve the unified result fields already documented:
+  - `provider`
+  - `model`
+  - `input_units`
+  - `output_units`
+  - `image_units`
+  - `gpu_seconds`
+  - `raw_cost`
+  - `estimated_cost`
+  - `currency`
+  - `result`
+  - `raw_usage`
+- Define an async provider call interface.
+- Validate that usage and cost fields cannot be negative.
+- Do not add real provider SDK imports.
+- Do not require API keys or environment variables.
 
-### 4. Preserve module context
+Implementation may use standard-library dataclasses or Pydantic models, but must stay consistent with the existing backend style and tests.
 
-Update `docs/module-context/ci-postgres-integration-tests/context.md` with:
+### 2. Add MockProvider
 
-- implementation branch;
-- changed files;
-- exact workflow filename;
-- test command and result;
-- CI status or local workflow validation evidence;
-- known risks.
+Add:
 
-If this task touches Task-02 credit-ledger docs after implementation, update `docs/module-context/sprint-02-task-02-credit-ledger/context.md` with only the new CI-related fact.
+- `cloud-backend/app/providers/mock_provider.py`
+
+Required behavior:
+
+- Deterministic and network-free.
+- Uses provider name `mock`.
+- Uses a clearly fake model name, for example `mock-text-v1`.
+- Produces stable success output for tests.
+- Supports a narrow test-only failure path so error logging can be tested.
+- Returns usage values and mock cost fields through the unified Provider result shape.
+- Does not store raw prompt text inside `raw_usage`.
+- Does not read or require provider API keys.
+
+### 3. Add mock cost estimation foundation
+
+Add:
+
+- `cloud-backend/app/services/cost_service.py`
+
+Required behavior:
+
+- Provide a small, explicit mock pricing calculation.
+- Make clear in naming/docs that values are mock estimates, not real provider pricing.
+- Reject negative units/cost inputs.
+- Return nonnegative `estimated_cost`.
+- Do not perform credit deduction.
+- Do not write `credit_ledger`.
+
+For this task, provider logs may record `credits_charged=0` because real deduction is a later approved task.
+
+### 4. Add provider execution/logging helper
+
+Add:
+
+- `cloud-backend/app/services/provider_service.py`
+
+Required behavior:
+
+- Call `MockProvider`.
+- Write `provider_call_log` through the existing provider log service.
+- Log both success and controlled mock error cases.
+- Include `user_id`, `device_id`, `request_id`, `feature`, provider/model, units, estimated cost, status, error code, and latency where available.
+- Do not bypass existing validation in `provider_log_service.py`.
+- Do not write `credit_ledger`.
+- Do not expose a public HTTP API.
+
+### 5. Add focused tests
+
+Add:
+
+- `cloud-backend/tests/test_provider_mock.py`
+
+Required coverage:
+
+- Provider result has the unified shape.
+- MockProvider success is deterministic.
+- MockProvider controlled failure is logged with `status="error"` and an `error_code`.
+- Provider success writes one `provider_call_log` row.
+- `raw_usage` and logged metadata do not contain raw prompt text, API keys, or secrets.
+- Cost estimation rejects negative values.
+- No `credit_ledger` entry is created by mock provider calls.
+
+Tests should use the existing SQLite test harness unless a current fixture makes that impossible. Do not require PostgreSQL for this task.
+
+### 6. Update documentation
+
+Update or add:
+
+- `docs/06-provider-architecture.md`
+- `docs/07-ai-cost-control.md`
+- `docs/22-provider-mock-foundation.md`
+- `docs/module-context/sprint-02-task-03-provider-mock/context.md`
+- `tasks/current-task.md`
+
+Docs must clearly state:
+
+- mock provider is not a real AI provider;
+- mock cost estimates are not real billing;
+- credit deduction is intentionally out of scope;
+- no real provider keys or SDKs are introduced;
+- provider calls must be logged through `provider_call_log`.
 
 ## What Not To Build
 
-- Do not modify application code.
-- Do not modify `cloud-backend/app/**`.
-- Do not modify `cloud-backend/migrations/ddl/**`.
-- Do not modify `cloud-backend/tests/test_migrations_integration.py` unless Codex explicitly confirms a narrow fixture/test bug.
-- Do not modify `cloud-backend/tests/conftest_pg.py` unless Codex explicitly confirms a narrow fixture bug.
-- Do not add or change dependencies.
-- Do not add production secrets.
-- Do not connect to any production, staging, or developer-shared database.
-- Do not add real provider calls.
-- Do not implement credit deduction, recharge, payment, orders, grants, or admin features.
-- Do not modify desktop, frontend, official website, shared DTO, OpenAPI, Tauri, auth, device, usage, provider, or credit runtime behavior.
-- Do not implement future provider or cost tasks.
+- Do not add OpenAI, DeepSeek, Claude, ComfyUI, OCR, image, or vector provider implementations.
+- Do not add real provider SDK dependencies.
+- Do not add API keys, secrets, `.env` changes, or new environment variables.
+- Do not add a public provider HTTP route.
+- Do not modify OpenAPI or shared DTO files.
+- Do not modify frontend, desktop, official website, or Tauri files.
+- Do not modify auth, device binding, token, or risk-control behavior.
+- Do not implement credit deduction, recharge, payment, order, grant, monthly quota, expiration, admin, or invoice features.
+- Do not edit database DDL or add migrations.
+- Do not broaden GitHub Actions workflows.
+- Do not implement provider routing across real vendors.
+- Do not add queues, Celery, background workers, or retry infrastructure.
 
 ## Allowed Files
 
 Implementation task may modify only:
 
-- `.github/workflows/postgres-integration-tests.yml` (new file, relative to Git repo root `D:/Project`)
-- `docs/21-ci-postgres-integration-tests.md`
-- `docs/module-context/ci-postgres-integration-tests/context.md`
-- `docs/module-context/sprint-02-task-02-credit-ledger/context.md` (only if adding CI follow-up fact)
+- `cloud-backend/app/providers/base.py`
+- `cloud-backend/app/providers/mock_provider.py` (new)
+- `cloud-backend/app/providers/__init__.py`
+- `cloud-backend/app/services/cost_service.py` (new)
+- `cloud-backend/app/services/provider_service.py` (new)
+- `cloud-backend/tests/test_provider_mock.py` (new)
+- `docs/06-provider-architecture.md`
+- `docs/07-ai-cost-control.md`
+- `docs/22-provider-mock-foundation.md`
+- `docs/module-context/sprint-02-task-03-provider-mock/context.md`
 - `tasks/current-task.md`
+
+If implementation proves a narrow helper export is required, CC must report it before committing and explain why.
 
 ## Forbidden Files
 
 Do not modify:
 
-- `cloud-backend/app/**`
 - `cloud-backend/migrations/ddl/**`
-- `cloud-backend/tests/**` unless Codex explicitly confirms a narrow fixture/test bug before implementation
+- `cloud-backend/app/routes/**`
+- `cloud-backend/app/main.py`
+- `cloud-backend/app/models.py`
+- `cloud-backend/app/services/credit_service.py`
+- `cloud-backend/app/services/provider_log_service.py` unless a narrow existing validation bug is found and Codex confirms it before commit
+- `cloud-backend/tests/test_migrations_integration.py`
+- `cloud-backend/tests/conftest_pg.py`
+- `cloud-backend/pyproject.toml`
+- dependency files or lockfiles
+- `.github/workflows/**`
+- `.env` or `.env.example`
 - `desktop-app/**`
 - `official-website/**`
 - `shared/**`
-- `cloud-backend/pyproject.toml`
-- dependency files or lockfiles
-- `.env` or `.env.example`
-- provider, auth, device, usage, credit runtime services or routes
 
 ## Acceptance Criteria
 
-- A GitHub Actions workflow exists at `.github/workflows/postgres-integration-tests.yml`
-  (relative to Git repo root `D:/Project`; must NOT be placed under `ad-assistant/`).
-- Workflow starts PostgreSQL `postgres:16` as a service container.
-- Workflow configures PostgreSQL health check (`pg_isready`) so tests
-  do not start before the database accepts connections.
-- Workflow sets `TEST_DATABASE_URL` to the CI-local PostgreSQL service.
-- Workflow runs `pytest tests/test_migrations_integration.py -v` from `ad-assistant/cloud-backend`.
-- Workflow uses temporary CI credentials only.
-- Workflow does not require repository secrets.
-- Workflow does not connect to production, staging, or developer-local databases.
-- No application runtime files are changed.
-- No dependencies are added or upgraded.
-- Documentation explains local vs CI PostgreSQL behavior.
-- Module context is updated with implementation facts and test evidence.
+- `BaseProvider` or equivalent interface exists and is asynchronous.
+- Provider result includes the documented unified usage/cost/result fields.
+- `MockProvider` is deterministic and does not perform network access.
+- Mock provider success path writes `provider_call_log`.
+- Mock provider controlled error path writes `provider_call_log` with `status="error"` and an `error_code`.
+- Mock provider logs do not include raw prompt text, API keys, tokens, or secrets.
+- Mock cost calculation is explicit, nonnegative, and documented as mock-only.
+- No `credit_ledger` row is created by mock provider calls.
+- No real provider dependency, SDK, key, or environment variable is added.
+- No database DDL or migration file changes.
+- No public API route, OpenAPI, or shared DTO changes.
+- Focused provider tests pass.
+- Existing backend tests pass.
 - `git diff --check` passes.
-- PR shows the PostgreSQL integration workflow running, or the implementer explains why GitHub Actions could not be observed yet.
+- Module context is updated with implementation facts and test evidence.
 
 ## Test Method
 
-Local static checks:
+Focused tests:
+
+```bash
+cd D:/Project/ad-assistant/cloud-backend
+python -m pytest tests/test_provider_mock.py -v
+```
+
+Backend regression tests:
+
+```bash
+cd D:/Project/ad-assistant/cloud-backend
+python -m pytest tests/ -v --ignore=tests/test_migrations_integration.py
+```
+
+Whitespace check:
 
 ```bash
 cd D:/Project/ad-assistant
-git status --short --branch
 git diff --check
 ```
 
-Local optional PG verification:
-
-```bash
-cd cloud-backend
-$env:TEST_DATABASE_URL='postgresql+asyncpg://postgres:test@localhost:5433/postgres'
-pytest tests/test_migrations_integration.py -v
-```
-
-CI verification:
-
-- Open PR to `main`.
-- Confirm the GitHub Actions workflow starts PostgreSQL service container successfully.
-- Confirm `tests/test_migrations_integration.py` passes in CI.
+PostgreSQL migration integration tests are not required for this task because no DDL changes are allowed. Existing PR CI should continue to cover the migration suite.
 
 ## Dependency Permission
 
 No new dependencies are allowed.
 
-The workflow may install existing project dependencies from `cloud-backend/pyproject.toml`.
-
 ## Major Change Status
 
-Yes, this is an infrastructure/project workflow change because it adds `.github/workflows/**`.
+Yes. This changes the Provider abstraction and introduces a mock provider execution/logging foundation.
 
-It does not touch database schema, API contracts, provider interfaces, auth/token logic, credit/payment runtime logic, shared DTO, OpenAPI, Tauri permissions, or production deployment credentials.
+It does not change database schema, public API contracts, real provider integrations, auth/token logic, credit/payment runtime logic, shared DTO, OpenAPI, Tauri permissions, or CI infrastructure.
 
 User confirmation of this task sheet is required before implementation.
 
 ## Security Requirements
 
-- Use only ephemeral PostgreSQL service container credentials inside GitHub Actions.
-- Do not use repository secrets for the PostgreSQL test database.
-- Do not log passwords beyond the non-secret local test value `test`.
-- Do not connect to production or staging databases.
-- Do not add API keys, provider keys, tokens, refresh tokens, or device fingerprints.
-- Do not add remote command execution capability beyond standard CI test commands.
+- Never log raw prompt text into `provider_call_log`, `raw_usage`, metadata, exceptions, or test assertions.
+- Never add real provider API keys or secret handling.
+- Never add client-visible provider credentials.
+- Never add network access to third-party AI providers.
+- Keep mock error messages sanitized.
+- Keep `credits_charged=0` for mock provider logs unless a later approved task implements real deduction.
+- Do not expose a public route for arbitrary prompt submission.
 
 ## Review Instructions For Codex
 
-Review Sprint-02 Infra Task: GitHub Actions PostgreSQL Integration Tests.
+Review Sprint-02 Task-03 Provider Mock Foundation.
 
 Focus on:
 
-1. Workflow scope: only PG integration CI, no business changes.
-2. Service container correctness: `postgres:16`, health check, local CI URL.
-3. Secret safety: no production DB, no repository secret dependency.
-4. Test command: runs `tests/test_migrations_integration.py -v`.
-5. File scope: only allowed files.
-6. Documentation: local vs CI behavior is clear.
-7. Existing local workflow remains unchanged.
+1. Provider interface shape and future compatibility.
+2. Mock-only scope: no real SDKs, keys, network calls, or provider routing.
+3. Provider log correctness and sanitized `raw_usage`.
+4. Credit safety: no deduction and no `credit_ledger` writes.
+5. Cost safety: mock estimates only, nonnegative values, no real pricing claims.
+6. File scope and forbidden-file compliance.
+7. Test coverage for success, error, logging, and no-ledger behavior.
 
 Output:
 
 - scope check;
 - security check;
-- CI/test reliability risks;
+- cost/credit check;
+- provider interface concerns;
+- test gaps;
 - whether commit is allowed.
 
 ## Completion Output Required
@@ -274,10 +329,12 @@ Output:
 Implementer must report:
 
 - changed files;
-- workflow name and trigger;
-- exact `TEST_DATABASE_URL` used in CI;
-- test command and result;
-- whether GitHub Actions actually ran;
-- any residual risks;
+- provider interface summary;
+- mock provider behavior;
+- cost calculation summary;
+- exact test commands and results;
+- confirmation that no DDL/API/dependency files were changed;
+- confirmation that no real provider keys/SDKs/network calls were added;
+- residual risks;
 - whether module context was updated;
 - wait for Codex Review, do not self-merge.

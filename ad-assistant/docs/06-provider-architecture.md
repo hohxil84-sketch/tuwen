@@ -84,3 +84,15 @@ cloud-backend/app/providers/
 - error_code
 - created_at
 
+## Sprint-02 Task-03: Provider Mock Foundation ✅ Implemented
+
+Implemented on branch `feature/sprint-02-task-03-provider-mock`:
+
+- formalized backend Provider base interface (`ProviderRequest`, `ProviderResult`, `AsyncProvider`);
+- added deterministic `MockProvider` (`mock` / `mock-text-v1`);
+- added mock-only cost estimation (`app/services/cost_service.py`);
+- added provider execution/logging helper (`app/services/provider_service.py`);
+- 24 focused tests + 126 regression pass.
+
+This task did not add real provider SDKs, public provider routes, provider API keys,
+credit deduction, or database migrations.

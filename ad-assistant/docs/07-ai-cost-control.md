@@ -61,3 +61,13 @@ Provider 原始 usage，不直接暴露给普通客户端。
 - 失败调用成本
 - 用户毛利估算
 
+## Sprint-02 Task-03: Mock Cost Estimate ✅ Implemented
+
+Implemented on branch `feature/sprint-02-task-03-provider-mock`:
+
+- mock-only cost estimation helper (`app/services/cost_service.py`);
+- mock estimates are deterministic test values, not real provider pricing;
+- estimates are nonnegative and traceable in tests;
+- mock provider logs record `credits_charged=0`;
+- mock provider calls do not write `credit_ledger`;
+- real credit deduction and product pricing remain separate approved tasks.
