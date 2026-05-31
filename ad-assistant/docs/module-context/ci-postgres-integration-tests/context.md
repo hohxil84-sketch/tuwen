@@ -62,6 +62,7 @@ pytest tests/test_migrations_integration.py -v
 ## Implementation Evidence (2026-05-31)
 
 - **Implementation branch**: `ci-postgres-integration-tests`
+- **Head commit**: `9860946` (`fix(ci): harden postgres health check and dependency install`)
 - **Workflow file**: `.github/workflows/postgres-integration-tests.yml` (at Git repo root `D:/Project`)
 - **Changed files**:
   - `.github/workflows/postgres-integration-tests.yml` (new)
@@ -71,9 +72,13 @@ pytest tests/test_migrations_integration.py -v
   - `tasks/current-task.md`
 - **Exact TEST_DATABASE_URL in CI**: `postgresql+asyncpg://postgres:test@localhost:5432/postgres`
 - **Test command**: `cd ad-assistant/cloud-backend && pytest tests/test_migrations_integration.py -v`
-- **CI status**: pending — GitHub Actions will trigger when PR is opened to `main`
+- **CI status**: ✅ passed
+- **PR**: [#11](https://github.com/hohxil84-sketch/tuwen/pull/11)
+- **PR #11 pull_request run**: `26715540044`
+- **PR #11 push run**: `26715539485`
+- **Test result**: `55 passed, 1 warning in 1.87s`
 - **Local static check**: `git diff --check` passed
-- **PG service health check**: `pg_isready` configured with 10s interval, 5s timeout, 5 retries
+- **PG service health check**: `pg_isready -U postgres -d postgres` configured with 10s interval, 5s timeout, 5 retries
 - **Residual risks**:
   - First CI run surfaced editable-install issue; fixed by switching to explicit
     `pip install` of individual deps from `pyproject.toml` (no `pip install -e`)

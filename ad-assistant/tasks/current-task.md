@@ -2,7 +2,7 @@
 
 ## Status
 
-`IMPLEMENTED` — implementation complete on branch `ci-postgres-integration-tests`. Awaiting Codex Review before commit and merge.
+`COMPLETED` — implementation complete, CI passed (PR #11), awaiting Codex merge approval.
 
 ## Suggested Branch
 

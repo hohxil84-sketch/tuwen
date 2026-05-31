@@ -89,5 +89,10 @@ The PR should show GitHub Actions running `tests/test_migrations_integration.py`
 
 - **Workflow file**: `.github/workflows/postgres-integration-tests.yml` (repo root `D:/Project`)
 - **Branch**: `ci-postgres-integration-tests`
-- **CI status**: pending PR open to `main` to observe GitHub Actions execution
+- **Head commit**: `9860946`
+- **PR**: [#11](https://github.com/hohxil84-sketch/tuwen/pull/11)
+- **CI status**: ✅ passed
+- **PR #11 pull_request run**: `26715540044`
+- **PR #11 push run**: `26715539485`
+- **Test result**: `55 passed, 1 warning in 1.87s` (against `postgres:16` service container)
 - **Local static checks**: `git diff --check` passed
