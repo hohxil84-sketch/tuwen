@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, ForeignKey, String, func
+from sqlalchemy import DateTime, JSON, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -28,6 +28,7 @@ class RiskLog(Base):
     severity: Mapped[str] = mapped_column(String(20), default="low", server_default="'low'")
     details: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )

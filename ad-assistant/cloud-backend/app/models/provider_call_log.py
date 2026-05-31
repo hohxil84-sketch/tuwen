@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, String, Integer, Numeric, func
+from sqlalchemy import DateTime, ForeignKey, String, Integer, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -41,6 +41,7 @@ class ProviderCallLog(Base):
     credits_charged: Mapped[int | None] = mapped_column(Integer, default=0)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )

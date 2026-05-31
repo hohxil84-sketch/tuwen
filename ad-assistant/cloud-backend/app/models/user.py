@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, func
+from sqlalchemy import DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -22,10 +22,12 @@ class User(Base):
     plan_code: Mapped[str] = mapped_column(String(50), default="standard", server_default="'standard'")
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="'active'")
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
         onupdate=lambda: datetime.now(timezone.utc),
