@@ -68,6 +68,8 @@ onBeforeUnmount(() => {
   --bg-sidebar: #081322;
   --bg-panel: #101d31;
   --bg-panel-soft: #13233a;
+  --bg-card: #101d31;
+  --bg-muted: #13233a;
   --border-subtle: rgba(148, 163, 184, 0.14);
   --border-active: rgba(47, 111, 237, 0.45);
   --text-main: #e5edf7;

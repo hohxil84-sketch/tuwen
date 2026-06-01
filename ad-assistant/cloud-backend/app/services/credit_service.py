@@ -1,7 +1,7 @@
 """Credit service — 用户 AI 算力账户与流水基础操作.
 
-本模块提供余额查询、账户创建、流水查询、扣费操作。
-不实现充值、支付或套餐发放。
+本模块提供余额查询、账户创建、流水查询、扣费操作、积分授予。
+不实现真实支付或套餐发放（见 recharge_service）。
 """
 
 import uuid
@@ -215,9 +215,13 @@ async def deduct_credits(
 ) -> int:
     """Atomically deduct credits from the user's balance.
 
-    Reads the current balance, deducts up to ``amount`` (partial deduction
-    if insufficient), writes a ``consume`` entry to ``credit_ledger``, and
-    returns the number of credits actually deducted.
+    Uses a **conditional UPDATE** (``WHERE balance >= :amount``) so that
+    concurrent deductions cannot drive the balance below zero.  The DB-level
+    ``CHECK (balance >= 0)`` constraint is a second line of defence.
+
+    If the full *amount* cannot be covered, a second attempt deducts whatever
+    remains (partial deduction).  A ``consume`` entry is written to
+    ``credit_ledger`` after a successful deduction.
 
     All operations happen within the caller's transaction (``db`` session).
 
@@ -243,20 +247,45 @@ async def deduct_credits(
     # Get or create the credit account
     account = await get_or_create_credit_account(db=db, user_id=user_id)
 
-    # Determine actual deduction (partial if balance insufficient)
-    actual_deduct = min(amount, account.balance)
-    if actual_deduct <= 0:
-        return 0
-
-    new_balance = account.balance - actual_deduct
-
-    # Atomic update: SET balance = balance - actual_deduct
-    await db.execute(
+    # ── First attempt: full deduction with conditional UPDATE ──────────
+    # The WHERE clause guarantees we never set balance < 0, even under
+    # concurrent writes (PostgreSQL READ COMMITTED + row-level locking).
+    result = await db.execute(
         update(CreditAccount)
-        .where(CreditAccount.id == account.id)
-        .values(balance=new_balance)
+        .where(CreditAccount.id == account.id, CreditAccount.balance >= amount)
+        .values(balance=CreditAccount.balance - amount)
+        .returning(CreditAccount.balance)
     )
-    # Update the in-memory object to stay consistent
+    row = result.fetchone()
+
+    if row is not None:
+        new_balance: int = row[0]
+        actual_deduct = amount
+    else:
+        # ── Second attempt: partial deduction (balance < amount) ──────
+        await db.refresh(account)
+        actual_deduct = account.balance
+        if actual_deduct <= 0:
+            return 0
+
+        result = await db.execute(
+            update(CreditAccount)
+            .where(
+                CreditAccount.id == account.id,
+                CreditAccount.balance >= actual_deduct,
+            )
+            .values(balance=CreditAccount.balance - actual_deduct)
+            .returning(CreditAccount.balance)
+        )
+        row = result.fetchone()
+        if row is not None:
+            new_balance = row[0]
+        else:
+            # Balance changed again (rare race); give up safely
+            await db.refresh(account)
+            return 0
+
+    # Keep in-memory object consistent
     account.balance = new_balance
 
     # Write the ledger entry
@@ -273,3 +302,73 @@ async def deduct_credits(
     )
 
     return actual_deduct
+
+
+# ---------------------------------------------------------------------------
+# Sprint-04 Task-04: credit grant (充值 / 赠送 / 月度发放)
+# ---------------------------------------------------------------------------
+
+
+async def grant_credits(
+    *,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    amount: int,
+    source_type: str = "system",
+    source_id: str | None = None,
+    description: str | None = None,
+) -> int:
+    """Atomically grant credits to a user's balance.
+
+    Reads the current balance, adds *amount*, writes a ``grant`` entry to
+    ``credit_ledger``, and returns the **new balance** after the grant.
+
+    All operations happen within the caller's transaction (``db`` session).
+
+    Args:
+        db: Active database session.
+        user_id: User receiving the credits.
+        amount: Credits to grant (must be > 0).
+        source_type: Ledger source type — ``"system"`` (monthly grant),
+                     ``"order"`` (recharge), or ``"manual"`` (admin).
+        source_id: Optional identifier (e.g. order_id) for the ledger entry.
+        description: Optional human-readable description.
+
+    Returns:
+        int: The new balance after granting credits.
+
+    Raises:
+        ValueError: If ``amount`` is not positive.
+    """
+    if amount <= 0:
+        raise ValueError(f"amount must be > 0, got {amount}")
+
+    # Get or create the credit account
+    account = await get_or_create_credit_account(db=db, user_id=user_id)
+
+    # Atomic update: server-side arithmetic + RETURNING gives us the true
+    # post-update balance, safe under concurrent grants.
+    result = await db.execute(
+        update(CreditAccount)
+        .where(CreditAccount.id == account.id)
+        .values(balance=CreditAccount.balance + amount)
+        .returning(CreditAccount.balance)
+    )
+    new_balance = result.scalar_one()
+    # Update the in-memory object to stay consistent
+    account.balance = new_balance
+
+    # Write the ledger entry
+    await record_credit_ledger(
+        db=db,
+        user_id=user_id,
+        account_id=account.id,
+        change_type="grant",
+        amount=amount,
+        balance_after=new_balance,
+        source_type=source_type,
+        source_id=source_id,
+        description=description or f"Grant: {amount} credits",
+    )
+
+    return new_balance

@@ -12,6 +12,7 @@ Implements the **6-step auth verification chain** from the confirmed plan:
 Each step returns the appropriate HTTP error on failure.
 """
 
+import uuid
 from typing import Annotated
 
 import jwt
@@ -70,7 +71,6 @@ async def get_current_user(
             detail={"code": ErrorCode.AUTH_REQUIRED, "message": "Invalid token payload"},
         )
 
-    import uuid
     try:
         user_id = uuid.UUID(user_id_str)
     except ValueError:
@@ -110,7 +110,6 @@ async def get_current_device(
             detail={"code": ErrorCode.DEVICE_NOT_BOUND, "message": "Device ID missing in token"},
         )
 
-    import uuid
     try:
         device_id = uuid.UUID(device_id_str)
     except ValueError:
@@ -159,6 +158,9 @@ async def get_current_user_with_device(
 # Plan & feature checks (called from route handlers as needed)
 # ---------------------------------------------------------------------------
 
+# NOTE: Must stay in sync with active plan codes in the ``plans`` table.
+# Used as a fast in-process guard (no DB query per request). When adding
+# new plans via seed data / admin, update this set accordingly.
 VALID_PLANS = frozenset({"standard", "expert", "enterprise"})
 
 
@@ -203,3 +205,35 @@ def verify_feature(user: User, feature: str) -> None:
                 "message": f"Feature '{feature}' requires a higher plan",
             },
         )
+
+
+# ---------------------------------------------------------------------------
+# Admin auth (Sprint-04 Task-04)
+# ---------------------------------------------------------------------------
+
+
+async def get_admin_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Admin-only dependency — checks user ID against ADMIN_USER_IDS config.
+
+    Raises 403 if the user is not in the admin whitelist.
+    """
+    admin_ids: set[str] = set(settings.ADMIN_USER_IDS)
+    if not admin_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FORBIDDEN",
+                "message": "Admin access is not configured",
+            },
+        )
+    if str(user.id) not in admin_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FORBIDDEN",
+                "message": "Admin access required",
+            },
+        )
+    return user

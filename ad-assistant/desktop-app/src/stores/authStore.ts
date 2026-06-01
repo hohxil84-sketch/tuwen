@@ -137,6 +137,17 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   /**
+   * Update the local user plan_code (e.g. after a successful plan upgrade).
+   * The backend JWT still carries the old plan until next login, but the DB
+   * and in-memory UI state must be consistent.
+   */
+  function updatePlanCode(planCode: string): void {
+    if (user.value) {
+      user.value = { ...user.value, plan_code: planCode };
+    }
+  }
+
+  /**
    * Fetch dashboard summary data from the cloud backend.
    * Stores result in dashboardData; on failure sets dashboardError
    * and leaves dashboardData null so callers can fall back to mock data.
@@ -181,5 +192,6 @@ export const useAuthStore = defineStore("auth", () => {
     initFromService,
     callMockAdCopy,
     fetchDashboardSummary,
+    updatePlanCode,
   };
 });

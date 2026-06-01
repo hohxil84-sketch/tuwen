@@ -41,6 +41,11 @@ const router = createRouter({
       name: "ai-ad-copy",
       component: () => import("./pages/AdCopyPage.vue"),
     },
+    {
+      path: "/membership",
+      name: "membership",
+      component: () => import("./pages/MembershipPage.vue"),
+    },
   ],
 });
 

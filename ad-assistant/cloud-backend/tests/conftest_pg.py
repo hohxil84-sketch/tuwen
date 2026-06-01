@@ -81,7 +81,7 @@ async def pg_engine():
 
     # ---- Setup: apply all DDL in order -------------------------------------
     ddl_files = sorted(DDL_DIR.glob("*.sql"))
-    assert len(ddl_files) == 8, f"Expected 8 DDL files, found {len(ddl_files)}"
+    assert len(ddl_files) == 10, f"Expected 10 DDL files, found {len(ddl_files)}"
 
     async with engine.begin() as conn:
         for ddl_path in ddl_files:

@@ -281,6 +281,90 @@ export async function dashboardSummary(): Promise<DashboardSummaryData> {
 }
 
 // ---------------------------------------------------------------------------
+// Credits / Membership (Sprint-04 Task-04)
+// ---------------------------------------------------------------------------
+
+export interface PlanData {
+  id: string;
+  name: string;
+  code: string;
+  price_cny: number;
+  monthly_credits: number;
+  features: string[];
+  sort_order: number;
+  status: string;
+}
+
+export interface PlanListData {
+  items: PlanData[];
+  total: number;
+}
+
+export interface RechargeResponseData {
+  order_id: string;
+  plan_code: string | null;
+  amount_cny: number;
+  credits: number;
+  new_balance: number;
+  status: string;
+  payment_method: string;
+  plan_changed: boolean;
+}
+
+export interface OrderItemData {
+  id: string;
+  plan_code: string | null;
+  amount_cny: number;
+  credits: number;
+  payment_method: string;
+  status: string;
+  description: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface OrderListData {
+  items: OrderItemData[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** List all active membership plans. No auth required. */
+export async function listPlans(): Promise<PlanListData> {
+  const response = await request<PlanListData>("/api/v1/plans", {
+    method: "GET",
+  });
+  return response.data;
+}
+
+/** Recharge credits by purchasing a plan or custom amount. Requires auth. */
+export async function rechargeCredits(
+  planCode: string,
+): Promise<RechargeResponseData> {
+  const response = await request<RechargeResponseData>(
+    "/api/v1/credits/recharge",
+    {
+      method: "POST",
+      body: JSON.stringify({ plan_code: planCode }),
+    },
+  );
+  return response.data;
+}
+
+/** List the authenticated user's recharge orders. Requires auth. */
+export async function listOrders(
+  limit: number = 50,
+  offset: number = 0,
+): Promise<OrderListData> {
+  const response = await request<OrderListData>(
+    `/api/v1/orders?limit=${limit}&offset=${offset}`,
+    { method: "GET" },
+  );
+  return response.data;
+}
+
+// ---------------------------------------------------------------------------
 // Error sanitization (shared)
 // ---------------------------------------------------------------------------
 

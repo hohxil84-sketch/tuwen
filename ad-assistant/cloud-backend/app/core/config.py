@@ -35,7 +35,13 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL: str = "deepseek-chat"
 
     # ---- Credit / Cost conversion -------------------------------------------
-    CREDITS_PER_CNY: int = 100  # 1 credit = ¥0.01, ceiling after multiply
+    CREDITS_PER_CNY: int = 100  # 1 credit = ¥0.01 (100 credits per 1 CNY)
+
+    # ---- Admin ---------------------------------------------------------------
+    ADMIN_USER_IDS: list[str] = []  # whitelist of admin user UUIDs
+
+    # ---- Simulated payment ---------------------------------------------------
+    ENABLE_SIMULATED_PAYMENT: bool = False  # dev/test only — must be False in production
 
     # ---- Pre-flight balance check -------------------------------------------
     MIN_CREDIT_BALANCE_FOR_PROVIDER_CALL: int = 1  # absolute floor
