@@ -81,3 +81,42 @@ Implemented on branch `feature/sprint-02-task-04-mock-ai-api`:
 - endpoint does not write `credit_ledger`;
 - endpoint does not expose `raw_usage` or raw user text;
 - mock cost values remain mock-only — not real billing.
+
+## Sprint-03 Task-03: Real Credit Deduction ✅ Implemented
+
+Implemented on branch `feature/sprint-03-task-03-credit-deduction`:
+
+- added `CREDITS_PER_CNY: int = 100` to `Settings` (1 credit = ¥0.01);
+- added `cny_to_credits()` in `cost_service.py` — converts CNY cost to integer credits with `ceil` rounding;
+- added `deduct_credits()` in `credit_service.py` — atomically deducts from `CreditAccount.balance` and writes `credit_ledger`;
+- wired deduction into `execute_provider_call()` — after successful provider call, cost is converted to credits and deducted;
+- `credits_charged` in `provider_call_log` and API response now reflects actual deduction;
+- partial deduction on insufficient balance (balance goes to 0, remaining cost is logged);
+- `user_id=None` calls skip deduction (system/internal usage);
+- 19 focused deduction tests + 211 total regression pass.
+
+### CNY → credits conversion
+
+```
+credits = ceil(estimated_cost_cny × CREDITS_PER_CNY)
+```
+
+Default: `CREDITS_PER_CNY = 100` → 1 credit = ¥0.01. Always rounds UP (ceil) because the provider has already consumed resources.
+
+### Deduction flow
+
+```
+execute_provider_call()
+  → provider.call()          # AI call succeeds
+  → cost_service             # Calculate CNY cost
+  → cny_to_credits()         # Convert to credits
+  → deduct_credits()         # Atomic: UPDATE balance, INSERT credit_ledger
+  → record_provider_call()   # credits_charged = actual deduction
+```
+
+### What's not yet implemented
+
+- Pre-flight balance check (block calls when balance is too low) — future task
+- Plan-level cost multipliers — future task
+- Monthly grant auto-replenish — future task
+- Refund logic — future task

@@ -7,8 +7,8 @@
   选择 Provider（不再直接实例化 MockProvider）
 - 写入 provider_call_log
 - 不暴露 raw_usage
-- credits_charged 固定为 0
-- 不写 credit_ledger
+- credits_charged 由 provider_service 计算（Sprint-03 Task-03）
+- 不写 credit_ledger（由 provider_service 负责）
 - Sprint-02 Task-08: 绑定 ``response_model=APIResponse[MockAdCopyData]``，
   使 FastAPI 自动生成正确的 OpenAPI schema 并在运行时校验响应。
 """
@@ -94,7 +94,7 @@ async def generate_ad_copy(
         model=result.model,
         text=result.result.get("text", "Mock default response."),
         estimated_cost=result.estimated_cost,
-        credits_charged=0,
+        credits_charged=result.credits_charged,
     )
 
     # Sprint-02 Task-08: 传入 Pydantic model 实例，由 FastAPI 通过

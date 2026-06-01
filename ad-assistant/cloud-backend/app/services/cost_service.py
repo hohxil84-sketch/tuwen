@@ -2,9 +2,14 @@
 
 Sprint-02 Task-03: MockProvider 确定性 mock 计价公式。
 Sprint-03 Task-02: DeepSeekProvider 官方定价计算。
+Sprint-03 Task-03: CNY → credits 换算法。
 
 不执行真实扣费，不写 credit_ledger。
 """
+
+import math
+
+from app.core.config import settings
 
 
 # ---------------------------------------------------------------------------
@@ -108,3 +113,26 @@ def calculate_deepseek_cost(
         + (output_units / 1_000_000.0) * _DEEPSEEK_PRICE_PER_1M_OUTPUT
     )
     return round(cost, 8)
+
+
+# ---------------------------------------------------------------------------
+# CNY → credits conversion (Sprint-03 Task-03)
+# ---------------------------------------------------------------------------
+
+
+def cny_to_credits(cost_cny: float) -> int:
+    """Convert CNY cost to integer credits using ceiling rounding.
+
+    Formula: ``math.ceil(cost_cny * CREDITS_PER_CNY)``
+
+    Always rounds UP to the nearest integer because the provider has
+    already consumed resources — rounding down would under-charge.
+
+    Returns 0 if ``cost_cny`` is 0 or negative (free / erroneous call).
+
+    ``CREDITS_PER_CNY`` is read from :attr:`Settings.CREDITS_PER_CNY`
+    (default: 100, i.e. 1 credit = ¥0.01).
+    """
+    if cost_cny <= 0:
+        return 0
+    return math.ceil(cost_cny * settings.CREDITS_PER_CNY)
