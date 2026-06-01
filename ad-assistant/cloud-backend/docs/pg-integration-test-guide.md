@@ -7,22 +7,25 @@ and downgrade path syntax.
 
 ## Quick Start
 
-### 1. Start a local test PostgreSQL container
+### 1. Start or install a local test PostgreSQL service
+
+Local development and local test runs must prefer a local PostgreSQL service
+over Docker.  If PostgreSQL is not installed locally, install it first through
+the OS package manager or the official PostgreSQL installer.  Use Docker only
+for CI service containers or when the user explicitly approves Docker as a
+fallback.
+
+Create or reuse a temporary local test database, never a production or staging
+database.  Example connection string:
 
 ```bash
-docker run -d --name pg-test \
-  -e POSTGRES_PASSWORD=test \
-  -p 5432:5432 \
-  postgres:16
+postgresql+asyncpg://postgres:test@localhost:5432/postgres
 ```
 
-### 2. Wait for PostgreSQL to be ready
+If the local service is not running, start it with the local PostgreSQL service
+manager for the machine.
 
-```bash
-until docker exec pg-test pg_isready -U postgres; do sleep 1; done
-```
-
-### 3. Run the integration tests
+### 2. Run the integration tests
 
 ```bash
 cd cloud-backend
@@ -30,7 +33,7 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
   pytest tests/test_migrations_integration.py -v
 ```
 
-### 4. Run **all** tests (SQLite unit + PG integration)
+### 3. Run **all** tests (SQLite unit + PG integration)
 
 ```bash
 cd cloud-backend
@@ -38,9 +41,16 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
   pytest tests/ -v
 ```
 
-### 5. Tear down the container when done
+### Docker fallback, only when explicitly approved
 
 ```bash
+docker run -d --name pg-test \
+  -e POSTGRES_PASSWORD=test \
+  -p 5432:5432 \
+  postgres:16
+until docker exec pg-test pg_isready -U postgres; do sleep 1; done
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
+  pytest tests/test_migrations_integration.py -v
 docker rm -f pg-test
 ```
 
@@ -114,7 +124,8 @@ export TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postg
 
 ### `could not translate host name` / connection refused
 
-Make sure the Docker container is running and the port is correct:
+Make sure the local PostgreSQL service is running and the port is correct.
+If you are using the explicitly approved Docker fallback, check the container:
 
 ```bash
 docker ps --filter name=pg-test
@@ -123,7 +134,9 @@ docker exec pg-test pg_isready -U postgres
 
 ### Permission denied on Docker
 
-On Linux you may need to add your user to the `docker` group or use `sudo`:
+Local development should not default to Docker.  Prefer installing and starting
+the local PostgreSQL service.  If the user explicitly approved Docker fallback,
+on Linux you may need to add your user to the `docker` group or use `sudo`:
 
 ```bash
 sudo docker run -d --name pg-test -e POSTGRES_PASSWORD=test -p 5432:5432 postgres:16
@@ -135,10 +148,11 @@ The session fixture drops all tables on teardown.  If a previous run crashed
 mid-test, you can manually clean up:
 
 ```bash
-docker exec pg-test psql -U postgres -c "DROP TABLE IF EXISTS provider_call_log, usage_events, risk_logs, auth_sessions, devices, users CASCADE;"
+psql -d postgres -c "DROP TABLE IF EXISTS provider_call_log, usage_events, risk_logs, auth_sessions, devices, users CASCADE;"
 ```
 
-Or simply recreate the container:
+If using the explicitly approved Docker fallback, you can recreate the
+container:
 
 ```bash
 docker rm -f pg-test

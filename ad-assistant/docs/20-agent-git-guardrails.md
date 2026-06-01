@@ -11,8 +11,9 @@ CC 自审是默认提交门禁的第一步，不是最终质量门禁。CC 自�
 进入提交前，CC 必须确认：
 
 - 当前开发分支不是 `main`
-- 当前任务单有效；没有有效任务单时，CC 已先起草或更新 `tasks/current-task.md`
+- 当前任务单有效；没有有效任务单时，CC 已暂停并请求 Codex/用户起草或更新 `tasks/current-task.md`
 - 只修改当前任务相关文件
+- 未自行扩大、重写或弱化 Codex/用户确认的任务单范围
 - 没有混入无关文件
 - 没有未确认的高风险变更
 - 没有 secrets、真实密钥、Token 或生产连接串
@@ -21,6 +22,7 @@ CC 自审是默认提交门禁的第一步，不是最终质量门禁。CC 自�
 - `PROGRESS.md` 已追加更新
 - 自审清单已完成
 - reviewer-mode 自查已完成，且阻塞/高风险发现已修复
+- commit message、PR title、PR body 和交付说明均已准备中文说明
 
 ## Reviewer-mode 自查门禁
 
@@ -34,7 +36,7 @@ Reviewer-mode 结果必须记录：审查范围、发现的问题、已修复内
 
 ## 必须暂停的情况
 
-- 没有有效任务单，且 CC 没有先根据用户目标补齐 `tasks/current-task.md`
+- 没有有效任务单，且 CC 准备绕过 Codex/用户确认直接写代码或提交
 - 任务范围超出 allowed files 且无法证明必要性
 - 触碰 DDL、API、Provider、Auth/Token、credit、payment、Tauri、dependency、CI、security 等边界但没有用户确认
 - 存在 secrets 或真实密钥
@@ -54,6 +56,7 @@ Reviewer-mode 结果必须记录：审查范围、发现的问题、已修复内
 - staged 文件只能包含当前任务单 allowed files 中的文件，或任务单中已明确批准的必要例外。
 - 如果 staged 文件包含 unrelated files、generated files、local databases、logs、依赖/lockfile、Tauri、backend、OCR、CI 等任务外文件，必须停止并取消 stage。
 - 不得把多个任务的改动拆不开地塞进同一个 commit；需要拆分时，先切换或创建对应任务分支。
+- `git commit` 必须使用中文提交说明，且说明本次任务目的；禁止使用 `update`、`fix`、`changes`、`misc`、`wip` 这类空泛说明。
 - 不在 `main` 上提交。
 - 不推 `main`。
 - 不 force push。
@@ -65,10 +68,11 @@ Reviewer-mode 结果必须记录：审查范围、发现的问题、已修复内
 
 - base: `main`
 - head: 当前任务分支
-- PR 内容必须包含：任务范围、测试结果、CC 自审结论、reviewer-mode 自查结果、风险、回滚方式
+- PR title 和 PR body 必须使用中文
+- PR 内容必须包含：任务范围、修改摘要、测试结果、CC 自审结论、reviewer-mode 自查结果、风险、回滚方式
 - CC 可以创建 PR 或 draft PR
 - CC 不能未经用户明确确认 self-merge
-- 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并记录确认来源和合并结果
+- 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并用中文记录确认来源、PR 编号、合并方式、合并结果和后续注意事项
 - 高风险任务、失败测试、范围不确定或用户要求时，PR 前召回 Codex 复核；CC 自审和 reviewer-mode 自查不能替代 Codex 高风险复核
 
 ## Codex 复核触发条件
