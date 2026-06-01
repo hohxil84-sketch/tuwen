@@ -21,7 +21,7 @@ class RechargeRequest(BaseModel):
 
 
 class RechargeResponse(BaseModel):
-    """Response after a successful recharge."""
+    """Response after a recharge (completed or pending)."""
 
     order_id: str
     plan_code: str | None
@@ -29,6 +29,8 @@ class RechargeResponse(BaseModel):
     credits: int
     new_balance: int
     status: str
+    payment_method: str
+    plan_changed: bool = False
 
 
 class OrderItem(BaseModel):
@@ -42,6 +44,7 @@ class OrderItem(BaseModel):
     status: str
     description: str | None
     created_at: str | None
+    completed_at: str | None = None
 
 
 class OrderListData(BaseModel):

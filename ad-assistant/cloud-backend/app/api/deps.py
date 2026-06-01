@@ -12,6 +12,7 @@ Implements the **6-step auth verification chain** from the confirmed plan:
 Each step returns the appropriate HTTP error on failure.
 """
 
+import uuid
 from typing import Annotated
 
 import jwt
@@ -70,7 +71,6 @@ async def get_current_user(
             detail={"code": ErrorCode.AUTH_REQUIRED, "message": "Invalid token payload"},
         )
 
-    import uuid
     try:
         user_id = uuid.UUID(user_id_str)
     except ValueError:
@@ -110,7 +110,6 @@ async def get_current_device(
             detail={"code": ErrorCode.DEVICE_NOT_BOUND, "message": "Device ID missing in token"},
         )
 
-    import uuid
     try:
         device_id = uuid.UUID(device_id_str)
     except ValueError:
@@ -159,6 +158,9 @@ async def get_current_user_with_device(
 # Plan & feature checks (called from route handlers as needed)
 # ---------------------------------------------------------------------------
 
+# NOTE: Must stay in sync with active plan codes in the ``plans`` table.
+# Used as a fast in-process guard (no DB query per request). When adding
+# new plans via seed data / admin, update this set accordingly.
 VALID_PLANS = frozenset({"standard", "expert", "enterprise"})
 
 

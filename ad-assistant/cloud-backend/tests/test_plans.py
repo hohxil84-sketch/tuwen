@@ -57,11 +57,12 @@ async def _seed_plans(db_session):
             monthly_credits=2000,
             features_json=json.dumps(
                 [
-                    "全部 AI 功能无限制",
                     "AI 文案生成",
                     "AI 效果图生成",
+                    "OCR 文字识别",
                     "批量处理",
                     "拼版助手",
+                    "图片改尺寸",
                     "每月 2000 算力额度",
                     "专属客户经理",
                     "API 接口对接",
@@ -167,6 +168,19 @@ class TestGetPlans:
         item = resp.json()["data"]["items"][0]
         assert isinstance(item["features"], list)
         assert len(item["features"]) > 0
+
+    async def test_no_unlimited_wording_in_features(self, client, db_session):
+        """Seed features must not contain unlimited / 无限制 / 不限量 / 无限 wording."""
+        await _seed_plans(db_session)
+
+        resp = await client.get("/api/v1/plans")
+        for item in resp.json()["data"]["items"]:
+            features_text = " ".join(item["features"]).lower()
+            banned = ["unlimited", "无限制", "不限量", "无限 ai", "无限使用"]
+            for word in banned:
+                assert word not in features_text, (
+                    f"Plan '{item['code']}' contains banned wording: '{word}'"
+                )
 
     async def test_plan_fields_complete(self, client, db_session):
         """Each plan should have all expected fields."""

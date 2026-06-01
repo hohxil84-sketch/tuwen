@@ -1,12 +1,21 @@
-"""Recharge service — 用户充值/购买套餐."""
+"""Recharge service — 用户充值/购买套餐.
+
+All operations (order, plan update, credit grant, ledger) happen inside the
+caller's transaction.  The caller (API route) owns the ``db`` session and
+commit/rollback boundary.
+"""
 
 import uuid
+from datetime import datetime, timezone
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models.credit_account import CreditAccount
 from app.models.plan import Plan
 from app.models.recharge_order import RechargeOrder
+from app.models.user import User
 from app.services.credit_service import grant_credits
 from app.services.plan_service import get_plan_by_code
 
@@ -18,28 +27,34 @@ async def create_recharge_order(
     plan_code: str | None = None,
     amount_cny: int | None = None,
 ) -> dict:
-    """Create a recharge order and grant credits to the user.
+    """Create a recharge order and optionally grant credits.
 
-    If *plan_code* is provided, the plan's price and monthly credits are used.
-    Otherwise *amount_cny* must be provided as a custom top-up amount.
+    **Simulated payment gate** — controlled by ``ENABLE_SIMULATED_PAYMENT``:
 
-    Credits are computed as ``amount_cny * CREDITS_PER_CNY``.
-    Payment is simulated — the order is created as ``completed`` immediately.
+    * ``False`` (default / production): creates a **pending** order, does
+      **not** grant credits.  The order awaits a real payment callback.
+    * ``True`` (dev / test): creates a **completed** order and grants
+      credits immediately in the same transaction.
+
+    **Plan purchase** — when *plan_code* is provided and different from the
+    user's current plan, both ``users.plan_code`` and
+    ``credit_accounts.plan_code`` are updated atomically.
 
     Args:
-        db: Active database session.
+        db: Active database session (caller owns transaction).
         user_id: User making the recharge.
         plan_code: Optional plan code to purchase.
         amount_cny: Custom recharge amount in CNY (used when plan_code is None).
 
     Returns:
         dict with keys: ``order_id``, ``plan_code``, ``amount_cny``,
-        ``credits``, ``new_balance``, ``status``.
+        ``credits``, ``new_balance``, ``status``, ``payment_method``,
+        ``plan_changed``.
 
     Raises:
         ValueError: If plan_code not found, amount invalid, or missing both params.
     """
-    # Resolve amount and credits
+    # ── Resolve amount and credits ──────────────────────────────────────
     plan: Plan | None = None
     if plan_code is not None:
         plan = await get_plan_by_code(db=db, code=plan_code)
@@ -57,28 +72,70 @@ async def create_recharge_order(
     else:
         raise ValueError("Either plan_code or amount_cny must be provided")
 
-    # Create the recharge order
+    # ── Determine payment method and status ─────────────────────────────
+    simulated_enabled = settings.ENABLE_SIMULATED_PAYMENT
+    payment_method = "simulated"
+    order_status = "completed" if simulated_enabled else "pending"
+
+    # ── Create the recharge order ───────────────────────────────────────
+    now = datetime.now(timezone.utc)
     order = RechargeOrder(
         user_id=user_id,
         plan_code=_plan_code,
         amount_cny=_amount_cny,
         credits=_credits,
-        payment_method="simulated",
-        status="completed",
-        description=f"Recharge: {_plan_code or 'custom'} — {_amount_cny} CNY → {_credits} credits",
+        payment_method=payment_method,
+        status=order_status,
+        description=(
+            f"Recharge: {_plan_code or 'custom'} — "
+            f"{_amount_cny} CNY → {_credits} credits"
+        ),
+        created_at=now,
+        completed_at=now if order_status == "completed" else None,
     )
     db.add(order)
     await db.flush()
 
-    # Grant credits atomically
-    new_balance = await grant_credits(
-        db=db,
-        user_id=user_id,
-        amount=_credits,
-        source_type="order",
-        source_id=str(order.id),
-        description=order.description,
-    )
+    # ── Grant credits + plan upgrade (only when simulated payment is on) ─
+    plan_changed = False
+    new_balance: int = 0
+    if simulated_enabled:
+        # Grant credits atomically
+        new_balance = await grant_credits(
+            db=db,
+            user_id=user_id,
+            amount=_credits,
+            source_type="order",
+            source_id=str(order.id),
+            description=order.description,
+        )
+
+        # Plan upgrade: only when payment is completed
+        if plan is not None:
+            from sqlalchemy import select as _select
+
+            user_result = await db.execute(
+                _select(User).where(User.id == user_id)
+            )
+            user_row = user_result.scalar_one_or_none()
+            if user_row is not None and user_row.plan_code != plan.code:
+                await db.execute(
+                    update(User)
+                    .where(User.id == user_id)
+                    .values(plan_code=plan.code)
+                )
+                await db.execute(
+                    update(CreditAccount)
+                    .where(CreditAccount.user_id == user_id)
+                    .values(plan_code=plan.code)
+                )
+                plan_changed = True
+    else:
+        # Return current balance without granting credits or changing plan
+        from app.services.credit_service import get_or_create_credit_account
+
+        account = await get_or_create_credit_account(db=db, user_id=user_id)
+        new_balance = account.balance
 
     return {
         "order_id": str(order.id),
@@ -87,4 +144,6 @@ async def create_recharge_order(
         "credits": _credits,
         "new_balance": new_balance,
         "status": order.status,
+        "payment_method": payment_method,
+        "plan_changed": plan_changed,
     }

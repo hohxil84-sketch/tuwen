@@ -12,6 +12,8 @@ export interface RechargeResponseDto {
   credits: number;
   new_balance: number;
   status: string;
+  payment_method: string;
+  plan_changed: boolean;
 }
 
 export interface OrderItemDto {
@@ -23,6 +25,7 @@ export interface OrderItemDto {
   status: string;
   description: string | null;
   created_at: string | null;
+  completed_at: string | null;
 }
 
 export interface OrderListDto {

@@ -29,7 +29,7 @@ paths:
                   amount_cny: 100
       responses:
         "200":
-          description: Recharge successful
+          description: Recharge order created (status may be pending or completed)
           content:
             application/json:
               schema:
@@ -89,7 +89,7 @@ components:
 
     RechargeResponse:
       type: object
-      required: [order_id, amount_cny, credits, new_balance, status]
+      required: [order_id, amount_cny, credits, new_balance, status, payment_method, plan_changed]
       properties:
         order_id:
           type: string
@@ -104,6 +104,13 @@ components:
           type: integer
         status:
           type: string
+          description: "'completed' when simulated payment is enabled; 'pending' otherwise"
+        payment_method:
+          type: string
+          description: "Currently always 'simulated'"
+        plan_changed:
+          type: boolean
+          description: "True when the purchase upgraded the user's plan"
 
     OrderListData:
       type: object
@@ -141,5 +148,8 @@ components:
           type: string
           nullable: true
         created_at:
+          type: string
+          nullable: true
+        completed_at:
           type: string
           nullable: true

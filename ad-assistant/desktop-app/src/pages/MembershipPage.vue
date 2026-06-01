@@ -1,7 +1,7 @@
 <template>
   <div class="membership-page">
     <!-- Loading skeleton -->
-    <div v-if="isLoading && !hasData" class="loading-area">
+    <div v-if="isLoading && !hasData" class="loading-area" aria-busy="true">
       <div v-for="i in 4" :key="i" class="skeleton-card">
         <div class="skeleton-line w-60"></div>
         <div class="skeleton-line w-40"></div>
@@ -15,7 +15,7 @@
         <div class="banner-left">
           <h2 class="banner-plan-name">{{ currentPlanLabel }}</h2>
           <p class="banner-plan-desc">
-            当前套餐 · {{ currentPlanCode === 'standard' ? '基础版' : currentPlanCode === 'expert' ? '高级版' : '企业版' }}
+            当前套餐 · {{ currentPlanLabel }}
           </p>
         </div>
         <div class="banner-right">
@@ -50,7 +50,7 @@
             <div class="plan-divider"></div>
             <ul class="plan-features">
               <li v-for="feat in plan.features" :key="feat" class="plan-feature-item">
-                <span class="plan-feature-check">✓</span>
+                <span class="plan-feature-check" aria-hidden="true">✓</span>
                 {{ feat }}
               </li>
             </ul>
@@ -73,7 +73,7 @@
       <section class="orders-section">
         <h3 class="section-title">充值记录</h3>
         <div v-if="orders.length === 0 && !ordersLoading" class="empty-state">
-          <span class="empty-icon">📭</span>
+          <span class="empty-icon" role="img" aria-label="暂无记录">📭</span>
           <p>暂无充值记录</p>
         </div>
         <div v-else class="orders-table-wrap">
@@ -85,12 +85,13 @@
                 <th>获得积分</th>
                 <th>支付方式</th>
                 <th>状态</th>
-                <th>时间</th>
+                <th>创建时间</th>
+                <th>完成时间</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="order in orders" :key="order.id">
-                <td class="order-id">{{ order.id.slice(0, 8) }}...</td>
+                <td class="order-id">{{ String(order.id).slice(0, 8) }}...</td>
                 <td class="order-amount">¥{{ order.amount_cny }}</td>
                 <td class="order-credits">{{ order.credits }}</td>
                 <td>{{ paymentLabel(order.payment_method) }}</td>
@@ -100,6 +101,7 @@
                   </span>
                 </td>
                 <td class="order-time">{{ formatTime(order.created_at) }}</td>
+                <td class="order-time">{{ formatTime(order.completed_at) }}</td>
               </tr>
             </tbody>
           </table>
@@ -109,9 +111,17 @@
 
     <!-- Recharge confirmation dialog -->
     <Teleport to="body">
-      <div v-if="showRechargeConfirm" class="modal-overlay" @click.self="showRechargeConfirm = false">
+      <div
+        v-if="showRechargeConfirm"
+        class="modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recharge-modal-title"
+        @click.self="cancelRecharge"
+        @keydown.escape="cancelRecharge"
+      >
         <div class="modal-content">
-          <h3 class="modal-title">确认充值</h3>
+          <h3 id="recharge-modal-title" class="modal-title">确认充值</h3>
           <div class="modal-body">
             <p class="modal-plan">{{ selectedPlan?.name }}</p>
             <p class="modal-price">¥{{ selectedPlan?.price_cny }} / 月</p>
@@ -119,11 +129,11 @@
             <p v-if="rechargeError" class="modal-error">{{ rechargeError }}</p>
           </div>
           <div class="modal-actions">
-            <button class="modal-btn modal-btn-cancel" :disabled="isRecharging" @click="showRechargeConfirm = false">
+            <button class="modal-btn modal-btn-cancel" :disabled="isRecharging" @click="cancelRecharge">
               取消
             </button>
             <button class="modal-btn modal-btn-confirm" :disabled="isRecharging" @click="executeRecharge">
-              {{ isRecharging ? '处理中...' : '确认支付（模拟）' }}
+              {{ isRecharging ? '处理中...' : '确认下单' }}
             </button>
           </div>
         </div>
@@ -138,6 +148,7 @@ import {
   listPlans,
   rechargeCredits,
   listOrders,
+  dashboardSummary,
   type PlanData,
   type OrderItemData,
 } from "@/services/cloudApi";
@@ -171,7 +182,7 @@ const currentPlanLabel = computed(() => {
   return map[currentPlanCode.value] || currentPlanCode.value;
 });
 
-const creditsUnit = computed(() => `${((creditBalance.value / 100) * 1).toFixed(2)} 元`);
+const creditsUnit = computed(() => `${(creditBalance.value / 100).toFixed(2)} 元`);
 
 function paymentLabel(method: string): string {
   const map: Record<string, string> = {
@@ -218,6 +229,13 @@ function confirmRecharge(plan: PlanData): void {
   showRechargeConfirm.value = true;
 }
 
+function cancelRecharge(): void {
+  showRechargeConfirm.value = false;
+  pendingPlan.value = null;
+  selectedPlan.value = null;
+  rechargeError.value = null;
+}
+
 async function executeRecharge(): Promise<void> {
   if (!selectedPlan.value || isRecharging.value) return;
   isRecharging.value = true;
@@ -229,6 +247,14 @@ async function executeRecharge(): Promise<void> {
     showRechargeConfirm.value = false;
     selectedPlan.value = null;
     pendingPlan.value = null;
+
+    // If plan was upgraded, update the in-memory user state so the
+    // UI reflects the new plan immediately (JWT still carries the old
+    // plan_code until next login, but DB and UI are consistent).
+    if (result.plan_changed && result.plan_code) {
+      auth.updatePlanCode(result.plan_code);
+    }
+
     // Refresh orders
     await loadOrders();
   } catch (err: unknown) {
@@ -236,6 +262,15 @@ async function executeRecharge(): Promise<void> {
     rechargeError.value = apiErr?.message || "充值失败，请稍后再试。";
   } finally {
     isRecharging.value = false;
+  }
+}
+
+async function loadBalance(): Promise<void> {
+  try {
+    const summary = await dashboardSummary();
+    creditBalance.value = summary.credit_balance;
+  } catch {
+    // Balance stays at 0 on failure
   }
 }
 
@@ -262,8 +297,7 @@ async function loadOrders(): Promise<void> {
 
 onMounted(async () => {
   isLoading.value = true;
-  await Promise.all([loadPlans(), loadOrders()]);
-  // Use auth store balance or fallback to 0
+  await Promise.all([loadPlans(), loadOrders(), loadBalance()]);
   isLoading.value = false;
 });
 </script>
@@ -380,7 +414,7 @@ onMounted(async () => {
 }
 
 .plan-card.plan-current {
-  border-color: #2f6fed;
+  border-color: var(--blue);
   box-shadow: 0 0 0 1px rgba(47, 111, 237, 0.2);
 }
 
@@ -418,7 +452,7 @@ onMounted(async () => {
 .plan-price-num {
   font-size: 36px;
   font-weight: 700;
-  color: #2f6fed;
+  color: var(--blue);
 }
 
 .plan-price-unit {
@@ -454,7 +488,7 @@ onMounted(async () => {
 }
 
 .plan-feature-check {
-  color: #4caf50;
+  color: var(--green);
   font-weight: 700;
   margin-right: 8px;
 }
@@ -485,7 +519,7 @@ onMounted(async () => {
 }
 
 .plan-btn-primary {
-  background: linear-gradient(135deg, #2f6fed, #1d55b1);
+  background: linear-gradient(135deg, var(--blue), var(--blue-strong));
   color: #fff;
 }
 
@@ -527,7 +561,7 @@ onMounted(async () => {
 
 .order-credits {
   font-weight: 600;
-  color: #4caf50;
+  color: var(--green);
 }
 
 .order-status {
@@ -538,13 +572,13 @@ onMounted(async () => {
 }
 
 .status-completed {
-  background: rgba(76, 175, 80, 0.12);
-  color: #4caf50;
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--green);
 }
 
 .status-pending {
   background: rgba(255, 152, 0, 0.12);
-  color: #ff9800;
+  color: var(--orange);
 }
 
 .order-time {
@@ -605,7 +639,7 @@ onMounted(async () => {
 .modal-price {
   font-size: 28px;
   font-weight: 700;
-  color: #2f6fed;
+  color: var(--blue);
   margin: 0 0 6px;
 }
 
@@ -616,7 +650,7 @@ onMounted(async () => {
 }
 
 .modal-error {
-  color: #ef5350;
+  color: var(--red);
   font-size: 13px;
   margin-top: 12px;
   padding: 8px 12px;
@@ -651,7 +685,7 @@ onMounted(async () => {
 }
 
 .modal-btn-confirm {
-  background: linear-gradient(135deg, #2f6fed, #1d55b1);
+  background: linear-gradient(135deg, var(--blue), var(--blue-strong));
   color: #fff;
 }
 </style>

@@ -71,15 +71,6 @@ async def recharge_credits(
     """
     user, _device = user_and_device
 
-    if body.plan_code is None and body.amount_cny is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "VALIDATION_ERROR",
-                "message": "Either plan_code or amount_cny must be provided",
-            },
-        )
-
     try:
         result = await create_recharge_order(
             db=db,

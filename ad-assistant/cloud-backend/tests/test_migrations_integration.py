@@ -62,6 +62,8 @@ ALL_TABLES = [
     "provider_call_log",
     "credit_accounts",
     "credit_ledger",
+    "plans",
+    "recharge_orders",
 ]
 
 # Column → expected data-type substring (case-insensitive match against
@@ -160,6 +162,30 @@ _EXPECTED_COLUMNS: dict[str, dict[str, str]] = {
         "source_id": "character varying",
         "description": "character varying",
         "created_at": "timestamp",
+    },
+    "plans": {
+        "id": "uuid",
+        "name": "character varying",
+        "code": "character varying",
+        "price_cny": "integer",
+        "monthly_credits": "integer",
+        "features_json": "text",
+        "sort_order": "integer",
+        "status": "character varying",
+        "created_at": "timestamp",
+        "updated_at": "timestamp",
+    },
+    "recharge_orders": {
+        "id": "uuid",
+        "user_id": "uuid",
+        "plan_code": "character varying",
+        "amount_cny": "integer",
+        "credits": "integer",
+        "payment_method": "character varying",
+        "status": "character varying",
+        "description": "text",
+        "created_at": "timestamp",
+        "completed_at": "timestamp",
     },
 }
 
@@ -261,6 +287,60 @@ _CHECK_TABLES: dict[str, list[dict]] = {
                     (:id, :uid, 'INVALID', 10, 50, 'system')\
             """,
             "expect_error_contains": "chk_credit_ledger_change_type",
+        },
+    ],
+    "recharge_orders": [
+        {
+            "constraint_name": "chk_recharge_orders_amount_cny",
+            "insert_sql": """\
+                INSERT INTO recharge_orders
+                    (id, user_id, amount_cny, credits, payment_method, status)
+                VALUES
+                    (:id, :uid, 0, 100, 'simulated', 'pending')\
+            """,
+            "expect_error_contains": "chk_recharge_orders_amount_cny",
+        },
+        {
+            "constraint_name": "chk_recharge_orders_status",
+            "insert_sql": """\
+                INSERT INTO recharge_orders
+                    (id, user_id, amount_cny, credits, payment_method, status)
+                VALUES
+                    (:id, :uid, 100, 100, 'simulated', 'INVALID')\
+            """,
+            "expect_error_contains": "chk_recharge_orders_status",
+        },
+        {
+            "constraint_name": "chk_recharge_orders_payment_method",
+            "insert_sql": """\
+                INSERT INTO recharge_orders
+                    (id, user_id, amount_cny, credits, payment_method, status)
+                VALUES
+                    (:id, :uid, 100, 100, 'INVALID_METHOD', 'pending')\
+            """,
+            "expect_error_contains": "chk_recharge_orders_payment_method",
+        },
+    ],
+    "plans": [
+        {
+            "constraint_name": "chk_plans_status",
+            "insert_sql": """\
+                INSERT INTO plans
+                    (id, name, code, price_cny, monthly_credits, status)
+                VALUES
+                    (:id, 'test', 'test_code', 100, 100, 'INVALID')\
+            """,
+            "expect_error_contains": "chk_plans_status",
+        },
+        {
+            "constraint_name": "chk_plans_price_cny",
+            "insert_sql": """\
+                INSERT INTO plans
+                    (id, name, code, price_cny, monthly_credits, status)
+                VALUES
+                    (:id, 'test', 'test_code_2', -1, 100, 'active')\
+            """,
+            "expect_error_contains": "chk_plans_price_cny",
         },
     ],
 }
@@ -525,6 +605,28 @@ class TestForeignKeyConstraints:
                     "INSERT INTO credit_ledger "
                     "(id, user_id, change_type, amount, balance_after, source_type) "
                     "VALUES (:id, :uid, 'grant', 100, 100, 'system')"
+                ),
+                {"id": uuid.uuid4(), "uid": fake_user_id},
+            )
+
+        error_text = str(exc_info.value).lower()
+        if exc_info.value.__cause__ is not None:
+            error_text += " " + str(exc_info.value.__cause__).lower()
+        assert "foreign" in error_text, (
+            f"Expected FK violation, got: {str(exc_info.value)[:300]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_recharge_orders_rejects_invalid_user_id(self, pg_db):
+        """recharge_orders FK to users must be enforced."""
+        fake_user_id = "00000000-0000-0000-0000-000000000000"
+
+        with pytest.raises(IntegrityError) as exc_info:
+            await pg_db.execute(
+                text(
+                    "INSERT INTO recharge_orders "
+                    "(id, user_id, amount_cny, credits, payment_method, status) "
+                    "VALUES (:id, :uid, 100, 100, 'simulated', 'pending')"
                 ),
                 {"id": uuid.uuid4(), "uid": fake_user_id},
             )

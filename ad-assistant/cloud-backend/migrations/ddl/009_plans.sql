@@ -36,7 +36,7 @@ INSERT INTO plans (name, code, price_cny, monthly_credits, features_json, sort_o
 ),
 (
     '企业版', 'enterprise', 999, 2000,
-    '["全部 AI 功能无限制", "AI 文案生成", "AI 效果图生成", "批量处理", "拼版助手", "每月 2000 算力额度", "专属客户经理", "API 接口对接"]',
+    '["AI 文案生成", "AI 效果图生成", "OCR 文字识别", "批量处理", "拼版助手", "图片改尺寸", "每月 2000 算力额度", "专属客户经理", "API 接口对接"]',
     3
 );
 

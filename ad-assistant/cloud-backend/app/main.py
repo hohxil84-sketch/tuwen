@@ -154,4 +154,4 @@ app.include_router(provider_log_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "sprint": "01", "mode": "auth-device"}
+    return {"status": "ok", "sprint": "04", "mode": "auth-device"}

@@ -60,6 +60,7 @@ async def get_orders(
             status=r.status,
             description=r.description,
             created_at=r.created_at.isoformat() if r.created_at else None,
+            completed_at=r.completed_at.isoformat() if r.completed_at else None,
         )
         for r in rows
     ]

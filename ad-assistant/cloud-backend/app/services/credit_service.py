@@ -215,9 +215,13 @@ async def deduct_credits(
 ) -> int:
     """Atomically deduct credits from the user's balance.
 
-    Reads the current balance, deducts up to ``amount`` (partial deduction
-    if insufficient), writes a ``consume`` entry to ``credit_ledger``, and
-    returns the number of credits actually deducted.
+    Uses a **conditional UPDATE** (``WHERE balance >= :amount``) so that
+    concurrent deductions cannot drive the balance below zero.  The DB-level
+    ``CHECK (balance >= 0)`` constraint is a second line of defence.
+
+    If the full *amount* cannot be covered, a second attempt deducts whatever
+    remains (partial deduction).  A ``consume`` entry is written to
+    ``credit_ledger`` after a successful deduction.
 
     All operations happen within the caller's transaction (``db`` session).
 
@@ -243,20 +247,45 @@ async def deduct_credits(
     # Get or create the credit account
     account = await get_or_create_credit_account(db=db, user_id=user_id)
 
-    # Determine actual deduction (partial if balance insufficient)
-    actual_deduct = min(amount, account.balance)
-    if actual_deduct <= 0:
-        return 0
-
-    new_balance = account.balance - actual_deduct
-
-    # Atomic update: SET balance = balance - actual_deduct
-    await db.execute(
+    # ── First attempt: full deduction with conditional UPDATE ──────────
+    # The WHERE clause guarantees we never set balance < 0, even under
+    # concurrent writes (PostgreSQL READ COMMITTED + row-level locking).
+    result = await db.execute(
         update(CreditAccount)
-        .where(CreditAccount.id == account.id)
-        .values(balance=new_balance)
+        .where(CreditAccount.id == account.id, CreditAccount.balance >= amount)
+        .values(balance=CreditAccount.balance - amount)
+        .returning(CreditAccount.balance)
     )
-    # Update the in-memory object to stay consistent
+    row = result.fetchone()
+
+    if row is not None:
+        new_balance: int = row[0]
+        actual_deduct = amount
+    else:
+        # ── Second attempt: partial deduction (balance < amount) ──────
+        await db.refresh(account)
+        actual_deduct = account.balance
+        if actual_deduct <= 0:
+            return 0
+
+        result = await db.execute(
+            update(CreditAccount)
+            .where(
+                CreditAccount.id == account.id,
+                CreditAccount.balance >= actual_deduct,
+            )
+            .values(balance=CreditAccount.balance - actual_deduct)
+            .returning(CreditAccount.balance)
+        )
+        row = result.fetchone()
+        if row is not None:
+            new_balance = row[0]
+        else:
+            # Balance changed again (rare race); give up safely
+            await db.refresh(account)
+            return 0
+
+    # Keep in-memory object consistent
     account.balance = new_balance
 
     # Write the ledger entry
@@ -317,14 +346,15 @@ async def grant_credits(
     # Get or create the credit account
     account = await get_or_create_credit_account(db=db, user_id=user_id)
 
-    new_balance = account.balance + amount
-
-    # Atomic update: SET balance = balance + amount
-    await db.execute(
+    # Atomic update: server-side arithmetic + RETURNING gives us the true
+    # post-update balance, safe under concurrent grants.
+    result = await db.execute(
         update(CreditAccount)
         .where(CreditAccount.id == account.id)
-        .values(balance=new_balance)
+        .values(balance=CreditAccount.balance + amount)
+        .returning(CreditAccount.balance)
     )
+    new_balance = result.scalar_one()
     # Update the in-memory object to stay consistent
     account.balance = new_balance
 

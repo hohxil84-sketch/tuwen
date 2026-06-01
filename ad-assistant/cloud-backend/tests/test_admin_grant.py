@@ -184,3 +184,25 @@ class TestAdminGrantAPI:
 
         # Pydantic validation rejects gt=0
         assert resp.status_code == 422
+
+    async def test_grant_nonexistent_user_returns_404(
+        self, client, db_session, test_user, test_device, test_session, monkeypatch
+    ):
+        """Grant to a valid UUID that doesn't match any user returns 404."""
+        monkeypatch.setattr(settings, "ADMIN_USER_IDS", [str(test_user.id)])
+        headers = await _auth_headers(client, db_session, test_user, test_device, test_session)
+
+        fake_user_id = str(uuid.uuid4())
+
+        resp = await client.post(
+            "/api/v1/admin/credits/grant",
+            json={
+                "user_id": fake_user_id,
+                "amount": 100,
+            },
+            headers=headers,
+        )
+
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["error"]["code"] == "USER_NOT_FOUND"

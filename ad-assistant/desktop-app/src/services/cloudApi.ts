@@ -307,6 +307,8 @@ export interface RechargeResponseData {
   credits: number;
   new_balance: number;
   status: string;
+  payment_method: string;
+  plan_changed: boolean;
 }
 
 export interface OrderItemData {
@@ -318,6 +320,7 @@ export interface OrderItemData {
   status: string;
   description: string | null;
   created_at: string | null;
+  completed_at: string | null;
 }
 
 export interface OrderListData {

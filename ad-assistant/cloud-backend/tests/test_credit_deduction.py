@@ -11,7 +11,7 @@ Coverage:
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import Settings, settings
 from app.models.credit_account import CreditAccount
@@ -417,3 +417,100 @@ class TestProviderServiceWithDeduction:
         assert rows[0].credits_charged == 2  # default usage → 2 credits
         assert rows[0].status == "success"
         assert rows[0].estimated_cost > 0
+
+
+# ---------------------------------------------------------------------------
+# 4. Concurrency guard — deduct_credits
+# ---------------------------------------------------------------------------
+
+
+class TestDeductCreditsConcurrency:
+    """Verify conditional UPDATE prevents negative balance.
+
+    SQLite (single-connection, no row-level locking in WAL) cannot truly
+    replicate PostgreSQL concurrent-write behaviour, so these tests validate
+    the conditional-UPDATE logic path (``WHERE balance >= :amount``) with
+    sequential deductions that push the boundary.  PostgreSQL-level
+    concurrency coverage lives in ``test_migrations_integration.py``.
+    """
+
+    @pytest.mark.anyio
+    async def test_sequential_exhaustion_never_goes_negative(
+        self, db_session, test_user,
+    ):
+        """Repeated deductions that sum past the balance must stop at 0."""
+        account = CreditAccount(
+            user_id=test_user.id, plan_code="standard", monthly_grant=0,
+            balance=100, status="active",
+        )
+        db_session.add(account)
+        await db_session.flush()
+
+        total_deducted = 0
+        for i in range(6):
+            d = await deduct_credits(
+                db=db_session, user_id=test_user.id, amount=30,
+                source_id=f"seq-{i}",
+            )
+            total_deducted += d
+
+        # Total deducted must not exceed initial balance
+        assert total_deducted <= 100, (
+            f"Total deducted {total_deducted} exceeds initial balance 100"
+        )
+        await db_session.refresh(account)
+        assert account.balance >= 0
+        assert account.balance == 100 - total_deducted
+
+    @pytest.mark.anyio
+    async def test_conditional_update_rejects_insufficient(
+        self, db_session, test_user,
+    ):
+        """When balance < amount, conditional UPDATE must not set negative."""
+        account = CreditAccount(
+            user_id=test_user.id, plan_code="standard", monthly_grant=0,
+            balance=5, status="active",
+        )
+        db_session.add(account)
+        await db_session.flush()
+
+        d = await deduct_credits(
+            db=db_session, user_id=test_user.id, amount=100,
+            source_id="reject-test",
+        )
+
+        # Should only deduct available 5, not 100
+        assert d == 5
+        await db_session.refresh(account)
+        assert account.balance == 0
+
+    @pytest.mark.anyio
+    async def test_deductions_ledger_consistency(
+        self, db_session, test_user,
+    ):
+        """Each deduction > 0 writes exactly one consume ledger entry."""
+        account = CreditAccount(
+            user_id=test_user.id, plan_code="standard", monthly_grant=0,
+            balance=30, status="active",
+        )
+        db_session.add(account)
+        await db_session.flush()
+
+        results = []
+        for i in range(3):
+            d = await deduct_credits(
+                db=db_session, user_id=test_user.id, amount=20,
+                source_id=f"seq-{i}",
+            )
+            results.append(d)
+
+        non_zero = [r for r in results if r > 0]
+        ledger_count = await db_session.execute(
+            select(func.count())
+            .select_from(CreditLedger)
+            .where(
+                CreditLedger.user_id == test_user.id,
+                CreditLedger.change_type == "consume",
+            )
+        )
+        assert ledger_count.scalar() == len(non_zero)
