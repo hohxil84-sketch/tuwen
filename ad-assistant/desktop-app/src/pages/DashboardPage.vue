@@ -11,7 +11,19 @@
         </div>
       </div>
 
-      <div class="stat-cards">
+      <!-- Loading skeleton for stat cards -->
+      <div v-if="auth.dashboardLoading && !hasData" class="stat-cards">
+        <div v-for="i in 4" :key="i" class="stat-card skeleton-card">
+          <div class="skeleton-icon"></div>
+          <div class="stat-body">
+            <div class="skeleton-line w-60"></div>
+            <div class="skeleton-line w-40"></div>
+            <div class="skeleton-line w-80"></div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="stat-cards">
         <div v-for="stat in stats" :key="stat.label" class="stat-card">
           <div class="stat-icon" :class="`tone-${stat.tone}`">
             {{ stat.icon }}
@@ -40,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import QuickEntryCard from "@/components/dashboard/QuickEntryCard.vue";
 import RecentGeneratedImages from "@/components/dashboard/RecentGeneratedImages.vue";
@@ -50,13 +62,82 @@ import {
   MOCK_QUICK_ENTRIES,
   MOCK_RECENT_ORDERS,
   MOCK_STATS,
+  type RecentOrder,
+  type DashboardStat,
 } from "./dashboardMock";
 
 const auth = useAuthStore();
 
-const stats = MOCK_STATS;
+const planNameMap: Record<string, string> = {
+  standard: "基础版",
+  expert: "高级版",
+  enterprise: "企业版",
+};
+
+// ---- Has data (API or mock) ----
+const hasData = computed(() => auth.dashboardData !== null);
+
+// ---- Stats (API → mock fallback) ----
+const stats = computed<DashboardStat[]>(() => {
+  if (auth.dashboardData) {
+    const d = auth.dashboardData;
+    const planLabel = planNameMap[d.plan_code] || d.plan_code;
+    return [
+      {
+        label: "今日使用次数",
+        value: `${d.today_calls}`,
+        helper: `本月累计 ${d.monthly_calls}`,
+        icon: "📊",
+        tone: "blue",
+      },
+      {
+        label: "剩余额度",
+        value: `${d.credit_balance}`,
+        helper: planLabel,
+        icon: "💰",
+        tone: "green",
+      },
+      {
+        label: "本月调用",
+        value: `${d.monthly_calls}`,
+        helper: `今日 ${d.today_calls} 次`,
+        icon: "📈",
+        tone: "purple",
+      },
+      {
+        label: "会员等级",
+        value: planLabel,
+        helper: `plan: ${d.plan_code}`,
+        icon: "👑",
+        tone: "orange",
+      },
+    ];
+  }
+  return MOCK_STATS;
+});
+
+// ---- Recent orders (API → mock fallback) ----
+const recentOrders = computed<RecentOrder[]>(() => {
+  if (auth.dashboardData && auth.dashboardData.recent_activity.length > 0) {
+    return auth.dashboardData.recent_activity.map((item) => {
+      const statusMap: Record<string, RecentOrder["status"]> = {
+        success: "已完成",
+        error: "待确认",
+      };
+      return {
+        orderNo: item.feature,
+        customerName: item.provider,
+        projectName: item.model,
+        status: statusMap[item.status] || "进行中",
+        updatedAt: item.created_at.replace("T", " ").slice(0, 19),
+      };
+    });
+  }
+  return MOCK_RECENT_ORDERS;
+});
+
+// ---- Static data ----
 const quickEntries = MOCK_QUICK_ENTRIES;
-const recentOrders = MOCK_RECENT_ORDERS;
 const generatedImages = MOCK_IMAGES;
 
 const displayName = computed(() => {
@@ -72,6 +153,13 @@ const greeting = computed(() => {
   if (hour < 14) return "中午好";
   if (hour < 18) return "下午好";
   return "晚上好";
+});
+
+// ---- Fetch on mount ----
+onMounted(() => {
+  if (auth.isLoggedIn) {
+    auth.fetchDashboardSummary();
+  }
 });
 </script>
 
@@ -198,6 +286,54 @@ const greeting = computed(() => {
   color: var(--text-soft);
   font-size: 11px;
 }
+
+/* ---- Loading skeleton ---- */
+.skeleton-card {
+  pointer-events: none;
+}
+
+.skeleton-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: rgba(148, 163, 184, 0.08);
+  animation: shimmer 1.6s infinite;
+}
+
+.skeleton-line {
+  height: 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.08);
+  animation: shimmer 1.6s infinite;
+}
+
+.skeleton-line.w-60 {
+  width: 60%;
+}
+
+.skeleton-line.w-40 {
+  width: 40%;
+}
+
+.skeleton-line.w-80 {
+  width: 80%;
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+/* ---- Rest of styles ---- */
 
 .section-title {
   margin-bottom: 12px;

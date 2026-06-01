@@ -4,6 +4,44 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S04-T02: Dashboard 数据集成 + AI 文案生成入口
+
+### 范围
+
+- 目标：将桌面仪表盘从 mock 数据切换到后端聚合 API，同时启用 AI 文案生成入口。
+- 已实现：
+  - 后端 `GET /api/v1/dashboard/summary` 端点（schema + service + router）
+  - 桌面端 cloudApi + authStore 接入 dashboard summary
+  - DashboardPage.vue stats 卡片/最近订单使用 API 数据 + mock fallback + loading 骨架
+  - AI 文案生成快捷入口启用 + AdCopyPage.vue（表单 → mock_ad_copy API → 结果）
+- 未实现：无（计划内全部完成）
+
+### 主要改动
+
+- 后端新增 4 文件：`app/schemas/dashboard.py`、`app/services/dashboard_service.py`、`app/api/v1/dashboard.py`、`tests/test_dashboard.py`
+- 后端修改 1 文件：`app/main.py`（注册 dashboard router）
+- 桌面端新增 1 文件：`src/pages/AdCopyPage.vue`
+- 桌面端修改 5 文件：`cloudApi.ts`、`authStore.ts`、`DashboardPage.vue`、`dashboardMock.ts`、`router.ts`
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（只读聚合查询 + 已有 API 调用）
+- 未加入密钥或生产凭据：是
+- 触发高风险暂停规则：否
+
+### 测试结果
+
+- 后端聚焦测试：9 passed
+- 后端全量回归：250 passed, 55 skipped
+
+### 风险和后续
+
+- 残余风险：Dashboard summary 4 次 DB 查询 — 当前数据量小无影响，未来可优化
+- 后续任务：Sprint-04 剩余候选（Membership/套餐/充值、快捷入口接入真实功能、Tauri 深色标题栏、Local OCR history cleanup）
+- 回滚方式：revert 对应提交，恢复 mock 数据
+
 ## 记录模板
 
 ```markdown

@@ -16,9 +16,11 @@ import {
   setAccessToken,
   sanitizeApiError,
   mockAdCopy,
+  dashboardSummary,
   type LoginData,
   type UserInfo,
   type DeviceInfo,
+  type DashboardSummaryData,
   type MockAdCopyRequest,
   type MockAdCopyResponse,
   type CloudAPIErrorDetail,
@@ -32,6 +34,11 @@ export const useAuthStore = defineStore("auth", () => {
   const device = ref<DeviceInfo | null>(null);
   const isLoggingIn = ref(false);
   const loginError = ref<string | null>(null);
+
+  // ---- Dashboard state ----
+  const dashboardLoading = ref(false);
+  const dashboardError = ref<string | null>(null);
+  const dashboardData = ref<DashboardSummaryData | null>(null);
 
   // ---- Computed ----
   const isLoggedIn = computed(() => !!accessToken.value);
@@ -129,6 +136,29 @@ export const useAuthStore = defineStore("auth", () => {
     return mockAdCopy(payload);
   }
 
+  /**
+   * Fetch dashboard summary data from the cloud backend.
+   * Stores result in dashboardData; on failure sets dashboardError
+   * and leaves dashboardData null so callers can fall back to mock data.
+   */
+  async function fetchDashboardSummary(): Promise<void> {
+    if (!accessToken.value) {
+      dashboardError.value = "请先登录。";
+      return;
+    }
+    dashboardLoading.value = true;
+    dashboardError.value = null;
+    try {
+      dashboardData.value = await dashboardSummary();
+    } catch (err: unknown) {
+      const apiErr = err as CloudAPIErrorDetail;
+      dashboardError.value = sanitizeApiError(apiErr);
+      dashboardData.value = null;
+    } finally {
+      dashboardLoading.value = false;
+    }
+  }
+
   return {
     // State
     accessToken,
@@ -137,6 +167,10 @@ export const useAuthStore = defineStore("auth", () => {
     device,
     isLoggingIn,
     loginError,
+    // Dashboard state
+    dashboardLoading,
+    dashboardError,
+    dashboardData,
     // Computed
     isLoggedIn,
     userName,
@@ -146,5 +180,6 @@ export const useAuthStore = defineStore("auth", () => {
     clearState,
     initFromService,
     callMockAdCopy,
+    fetchDashboardSummary,
   };
 });

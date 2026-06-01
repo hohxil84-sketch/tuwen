@@ -131,6 +131,7 @@ async def add_request_id(request: Request, call_next):
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.credits import router as credits_router
+from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.devices import router as devices_router
 from app.api.v1.mock_ai import router as mock_ai_router
 from app.api.v1.provider_log import router as provider_log_router
@@ -138,6 +139,7 @@ from app.api.v1.usage import router as usage_router
 
 app.include_router(auth_router)
 app.include_router(credits_router)
+app.include_router(dashboard_router)
 app.include_router(devices_router)
 app.include_router(mock_ai_router)
 app.include_router(usage_router)

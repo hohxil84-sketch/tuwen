@@ -38,7 +38,7 @@ export const MOCK_STATS: DashboardStat[] = [
 
 export const MOCK_QUICK_ENTRIES: QuickEntry[] = [
   { title: "AI 效果图生成", description: "输入描述，生成效果图", icon: "🎨", tone: "purple", disabled: true },
-  { title: "AI 文案生成", description: "生成广告语、店名等", icon: "✍️", tone: "orange", disabled: true },
+  { title: "AI 文案生成", description: "生成广告语、店名等", icon: "✍️", tone: "orange", route: "/ai-ad-copy" },
   { title: "图片改尺寸", description: "修改尺寸、DPI", icon: "📐", tone: "cyan", disabled: true },
   { title: "图片转 SVG", description: "位图转矢量图", icon: "🔷", tone: "blue", disabled: true },
   { title: "印刷检查", description: "检查文件是否适合印刷", icon: "✅", tone: "green", disabled: true },
