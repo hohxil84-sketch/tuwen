@@ -166,6 +166,44 @@ PR：
 
 ## 记录
 
+## 2026-06-02 — S04-T05: 桌面端快捷入口接入已有真实功能
+
+### 范围
+
+- 目标：将 Sidebar 和 Dashboard 快捷入口中已具备后端或页面基础的功能接线，让用户可从工作台直接进入已有真实功能。
+- 已实现：
+  - Sidebar `AI 文案生成` 从 disabled 改为 enabled，路由从 `/` 修正为 `/ai-ad-copy`
+  - 确认 Sidebar OCR (`/ocr`)、会员中心 (`/membership`)、使用日志 (`/history`) 已可正常跳转
+  - 确认 Dashboard 快捷入口 AI 文案生成 (`/ai-ad-copy`) 和 OCR (`/ocr`) 已正确配置
+  - 未实现功能保持 disabled + "即将开放" 视觉
+  - 模块上下文 `docs/module-context/sprint-04-task-05-shortcut-entry-wiring/context.md` 已创建
+- 未实现：无（计划内全部完成）
+
+### 主要改动
+
+- `desktop-app/src/components/dashboard/AppSidebar.vue`：一行改动 — AI 文案生成路由和状态修正
+- `docs/module-context/sprint-04-task-05-shortcut-entry-wiring/context.md`（NEW）：入口映射、路由清单、扩展点
+- 已验证 QuickEntryCard、dashboardMock、DashboardPage、router.ts 均无需修改
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：是
+
+### 测试结果
+
+- `npm run build`（desktop-app）：68 modules, 0 errors
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：无
+- 后续任务：用户从 Sprint-04 候选或新需求中选择下一任务
+- 回滚方式：revert 对应提交，或恢复 AppSidebar.vue 中 AI 文案生成 disabled 状态
+
 ## 2026-06-02 - Sprint-04 Task-01 Provider Reliability (Pre-flight + Fallback/Retry)
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED

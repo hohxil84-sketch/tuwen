@@ -94,7 +94,7 @@ const router = useRouter();
 
 const coreFeatures: NavFeature[] = [
   { label: "AI 效果图生成", icon: "🎨", route: "/", disabled: true },
-  { label: "AI 文案生成", icon: "✍️", route: "/", disabled: true },
+  { label: "AI 文案生成", icon: "✍️", route: "/ai-ad-copy", disabled: false },
   { label: "图片改尺寸", icon: "📐", route: "/", disabled: true },
   { label: "图片转矢量 SVG", icon: "🔷", route: "/", disabled: true },
   { label: "印刷检查", icon: "✅", route: "/", disabled: true },
