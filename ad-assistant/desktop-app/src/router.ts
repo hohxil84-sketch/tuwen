@@ -1,7 +1,8 @@
 /**
- * Vue Router — Sprint-01 skeleton + Sprint-02 Task-05.
+ * Vue Router — Sprint-03 Task-04 Dashboard UI.
  *
  * Pages:
+ * - DashboardPage (new — /)
  * - LoginPage
  * - OcrPage
  * - HistoryPage
@@ -15,7 +16,11 @@ import { createRouter, createWebHashHistory } from "vue-router";
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: "/", redirect: "/login" },
+    {
+      path: "/",
+      name: "dashboard",
+      component: () => import("./pages/DashboardPage.vue"),
+    },
     {
       path: "/login",
       name: "login",
