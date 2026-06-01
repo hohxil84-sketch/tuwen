@@ -2,7 +2,7 @@
 
 ## Status
 
-`READY_FOR_CC_IMPLEMENTATION`
+`IMPLEMENTED_SELF_REVIEW_PASSED`
 
 ## Background
 
@@ -159,3 +159,40 @@ CC must report:
 - whether any dependency was added,
 - whether any forbidden area was touched,
 - screenshots or a concise visual summary if available.
+
+## Implementation Record (2026-06-02)
+
+### Changed Files
+
+- `desktop-app/src/App.vue` — 桌面工作台外壳：左侧导航 + 顶部状态栏 + 内容区 + 底部状态栏，1366px 基准 canvas + scale 等比缩放，无横向滑块。
+- `desktop-app/src/router.ts` — `/` 路由指向 DashboardPage，保留 `/login`、`/ocr`、`/history`。
+- `desktop-app/src/pages/DashboardPage.vue` — 首页主内容：欢迎卡片、统计卡片、快捷入口、最近订单、最近生成效果图。
+- `desktop-app/src/pages/dashboardMock.ts` — 首页 mock 数据（统计、快捷入口、订单、生成图）。
+- `desktop-app/src/components/dashboard/AppSidebar.vue` — 左侧导航栏，4 个分组，当前路由高亮，未实现功能标注"即将开放"。
+- `desktop-app/src/components/dashboard/AppTopbar.vue` — 顶部状态栏：用户头像、昵称、会员等级、在线状态、到期时间、登录/退出。
+- `desktop-app/src/components/dashboard/QuickEntryCard.vue` — 快捷入口卡片，OCR 跳转 `/ocr`，其他 disabled + "即将开放"。
+- `desktop-app/src/components/dashboard/RecentOrders.vue` — Mock 订单表格（5 条），状态标签（已完成/进行中/待确认）。
+- `desktop-app/src/components/dashboard/RecentGeneratedImages.vue` — Mock 生成效果图网格（6 张），暗色渐变占位。
+- `docs/26-desktop-dashboard-ui-redesign.md` — 设计文档（含返工要求）。
+
+### Self-Review
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是（仅 desktop-app/src + docs）
+- 未触碰未确认高风险变更：是（未改 Tauri、backend、package、OCR、credit、auth）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用（纯 UI shell，无独立模块上下文）
+- Bug 根因已记录：不适用
+
+### Test Results
+
+- `npm run build`（desktop-app）：62 modules, 0 errors, built in 1.04s
+- `git diff --check`：通过
+
+### What's Not Implemented
+
+- 快捷入口中除 OCR 外的 5 个功能均为 disabled + "即将开放"。
+- "查看全部"、"检查更新"、"软件设置"、"客户管理" 等为 mock 占位。
+- 底部状态栏连接状态为 mock。
+- 顶部白色窗口栏来自 Tauri 系统 chrome，需单独 Tauri 任务处理。
+- 未接真实后端数据、未实现 AI 调用、未做 credit 扣费。

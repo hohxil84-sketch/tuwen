@@ -507,6 +507,337 @@ type RecentOrder = {
 - 用户不会点了没反应。
 - 未接后端的能力不会伪装成已经可用。
 
+## 返工要求：根据用户截图 1 / 截图 2 修正
+
+用户已提供当前实现截图，文件位于桌面 `UI` 文件夹：
+
+- `C:\Users\123\Desktop\UI\1.png`：全屏效果。
+- `C:\Users\123\Desktop\UI\2.png`：缩小窗口效果。
+
+用户同时提供了新的标准参考图：
+
+- `C:\Users\123\Desktop\123.jpg`：最终目标排版参考。
+
+`123.jpg` 是版式标准，不只是大屏参考。小窗口时也必须保持和 `123.jpg` 一样的整体排版、区域比例和相对位置，只允许整体等比缩小，不允许重新排版成另一种布局。
+
+当前实现不满足用户预期，必须按以下要求返工。
+
+### 1. 全屏时主内容必须居中并合理铺开
+
+截图 1 的问题：
+
+- 主内容整体偏左。
+- 右侧和底部留白过多。
+- 页面像固定宽度内容贴在左边，而不是桌面工作台。
+- 参考图的主工作区应在可用空间内居中，并有稳定的最大宽度。
+
+修改要求：
+
+- `app-main` 或 dashboard 根容器必须提供居中布局。
+- dashboard 内容容器建议使用：
+
+```css
+.dashboard-page {
+  width: min(100%, 1380px);
+  margin: 0 auto;
+  padding: 20px 24px 24px;
+}
+```
+
+- 如果窗口宽度大于设计宽度，内容区居中，不要贴左。
+- 如果窗口宽度在 `1280px` 到 `1600px`，内容应自然填满主要可视区域，不要出现大片空白。
+- 大屏下订单区和生成图区应保持左右双栏，并按比例分配宽度。
+- 不要把所有卡片写死为固定像素宽度后左对齐。
+
+推荐主内容布局：
+
+```css
+.dashboard-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-top {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.3fr) minmax(520px, 1fr);
+  gap: 16px;
+}
+
+.dashboard-bottom {
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) minmax(520px, 1fr);
+  gap: 16px;
+}
+```
+
+### 2. 缩小窗口时整体缩小，不允许出现横向滑块
+
+截图 2 的问题：
+
+- 缩小窗口后页面没有整体适配。
+- 出现明显滚动条/滑块，用户不能接受。
+- 快捷入口和内容卡片像被裁切，而不是自适应。
+- 用户明确要求：窗口缩小时应看到整个界面随窗口一起缩小，而不是出现滑动块让用户拖动查看。
+
+修改要求：
+
+- 不允许出现横向滚动条。
+- 不允许主内容区和 sidebar 同时产生多个刺眼的内部滚动条。
+- 缩小窗口时优先让整个工作台按比例缩小；其次才是少量响应式重排。
+- 不要用固定总宽度撑破窗口。
+- 不要只给外层加 `overflow: auto` 来掩盖布局问题。
+- 不允许把小窗口适配做成“内容宽度不变 + 用户拖横向滚动条”。
+
+核心策略：
+
+- 以桌面工作台设计稿宽度作为基准，例如 `1366px` 或 `1440px`。
+- 当可用宽度低于基准宽度时，计算缩放比例，让整个 dashboard canvas 缩小。
+- 左侧导航、顶部栏、快捷入口、订单、图片区应作为一个整体缩放，而不是局部裁切。
+- 缩放后仍要保持内容在窗口内完整可见。
+- 小窗口版式必须和 `C:\Users\123\Desktop\123.jpg` 完全一致：欢迎区仍在左上，统计卡仍在右上，快捷入口仍为同一横向排列，最近订单仍在左下，最近生成图仍在右下。
+- 不允许在小窗口下把订单区和生成图区改为上下排列。
+- 不允许在小窗口下把快捷入口折成多行后破坏 `123.jpg` 的整体视觉比例。
+- 不允许通过隐藏部分菜单、隐藏卡片、缩短为移动端布局来适配。
+
+建议实现方式之一：
+
+```css
+.app-main {
+  overflow: hidden;
+}
+
+.dashboard-scale-shell {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dashboard-scale-canvas {
+  width: 1366px;
+  min-height: 760px;
+  transform-origin: top left;
+}
+```
+
+在 Vue 中根据容器宽度计算 scale：
+
+```ts
+const DESIGN_WIDTH = 1366;
+const scale = Math.min(1, containerWidth / DESIGN_WIDTH);
+```
+
+应用到 canvas：
+
+```vue
+<div class="dashboard-scale-shell" ref="shellRef">
+  <div
+    class="dashboard-scale-canvas"
+    :style="{ transform: `scale(${scale})`, width: `${DESIGN_WIDTH}px` }"
+  >
+    <!-- dashboard content -->
+  </div>
+</div>
+```
+
+注意：
+
+- 使用 `transform: scale()` 后要同步处理容器高度，避免底部被裁切。
+- 如果实现复杂，也可以使用 CSS `zoom`，但必须验证在 Tauri WebView 和浏览器预览中表现一致。
+- 无论采用 `transform` 还是 `zoom`，验收标准都是：缩小窗口时没有横向滑块，用户能看到整体界面按比例缩小。
+- 不要只依赖媒体查询把内容堆成长页面；用户要的是整体缩小，不是换成移动端长滚动页。
+- 媒体查询只能用于细节微调，例如字号下限、滚动条隐藏、缩放容器高度修正，不能改变 `123.jpg` 的版式结构。
+
+全局约束建议：
+
+```css
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.app-right,
+.app-main,
+.dashboard-page {
+  min-width: 0;
+}
+```
+
+快捷入口建议：
+
+```css
+.quick-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+```
+
+图片网格建议：
+
+```css
+.generated-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+```
+
+断点建议：
+
+```css
+@media (max-width: 1360px) {
+  .dashboard-top,
+  .dashboard-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1180px) {
+  .app-sidebar {
+    width: 208px;
+  }
+
+  .dashboard-page {
+    padding: 16px;
+  }
+}
+```
+
+如果仍然出现横向滚动，必须定位是哪一个元素撑破宽度，并修正该元素的 `width`、`min-width`、`grid-template-columns`、缩放比例或 padding。不要接受“能滚动看到”作为合格结果。
+
+### 3. 降低高饱和高亮，避免 HDR 式刺眼观感
+
+截图 1 和截图 2 的问题：
+
+- 欢迎卡片和菜单高亮蓝色过亮。
+- 纯色图片占位块饱和度过高。
+- 多处图标背景和标签同时发亮，视觉焦点混乱。
+- 整体有类似 HDR 过曝的观感。
+
+修改要求：
+
+- 降低蓝色主高亮的亮度和饱和度。
+- 欢迎卡片不要使用大面积高亮纯蓝，应改为更暗的深蓝渐变。
+- 图片占位块不要使用纯色大色块，应改为暗色渐变、低透明度纹理或真实图片缩略图。
+- disabled / coming soon 标签必须低对比，不要抢视觉。
+- 当前菜单高亮只保留一个强焦点，不要让所有功能卡片都像主按钮。
+
+建议替换色值：
+
+```css
+:root {
+  --blue: #2f6fed;
+  --blue-strong: #1f4fbf;
+  --blue-soft: rgba(47, 111, 237, 0.16);
+  --panel-highlight: linear-gradient(135deg, #132b4d 0%, #183b73 52%, #1d4f9a 100%);
+}
+```
+
+欢迎卡片建议：
+
+```css
+.welcome-card {
+  background:
+    radial-gradient(circle at 18% 28%, rgba(47, 111, 237, 0.22), transparent 34%),
+    linear-gradient(135deg, #10213b 0%, #142b4e 48%, #163f7c 100%);
+}
+```
+
+图片占位卡片建议：
+
+```css
+.generated-thumb {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(135deg, rgba(47, 111, 237, 0.38), rgba(15, 23, 42, 0.92));
+  filter: saturate(0.82);
+}
+```
+
+不要使用下面这种效果：
+
+- 大面积 `#2458ff`、`#2563eb` 纯色填充。
+- 多个高亮卡片同时使用强 box-shadow。
+- 纯红、纯绿、纯紫大块背景。
+- 文本、图标、边框、背景全部同时高亮。
+
+### 4. 顶部白色窗口栏必须处理为和整体色调一致
+
+截图中最上方白色栏会破坏整体观感。
+
+必须先区分来源：
+
+- 如果是在浏览器/Vite preview 中看到的白色顶部栏，那是浏览器或系统窗口 chrome，Vue 页面 CSS 无法改变。
+- 如果是在 Tauri 桌面窗口中看到的白色顶部栏，则需要通过 Tauri 窗口配置或自定义标题栏处理。
+
+当前任务默认禁止修改 Tauri 配置；如果 CC 需要改 `desktop-app/src-tauri/**` 或 `tauri.conf.json` 才能处理顶部窗口栏，必须先停下来说明方案并等待用户确认。
+
+可接受方案：
+
+- 方案 A：本轮只修 Vue 页面，明确说明白色顶部栏来自预览窗口/系统 chrome，打包桌面壳需另开 Tauri 标题栏任务。
+- 方案 B：经用户确认后，使用 Tauri 深色窗口主题或自定义标题栏，让顶部栏背景与 `--bg-sidebar` / `--bg-app` 一致。
+
+不可接受方案：
+
+- 在页面内部加一条深色假标题栏，但原生白色栏仍然存在。
+- 忽略白色顶部栏，声称已经完成视觉统一。
+- 未经确认直接修改 Tauri 权限、窗口配置或打包配置。
+
+### 5. 只保留必要滚动，避免双滚动条
+
+桌面工作台应尽量保持单一滚动策略。
+
+要求：
+
+- 页面主区域可以纵向滚动。
+- 左侧导航如果内容超出，可以有内部滚动，但滚动条必须弱化，不要出现亮灰色粗滑块。
+- 不允许主窗口横向滚动。
+- 不允许内容卡片内部出现不必要滚动条。
+- 缩小窗口时优先整体缩放，其次才是重排和压缩，不允许用横向滚动解决。
+
+滚动条弱化建议：
+
+```css
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.42);
+  border-radius: 999px;
+}
+```
+
+### 6. 返工验收截图要求
+
+CC 返工后必须提供至少两张截图：
+
+- 全屏截图：接近 `C:\Users\123\Desktop\UI\1.png` 的窗口尺寸。
+- 缩小窗口截图：接近 `C:\Users\123\Desktop\UI\2.png` 的窗口尺寸。
+
+验收重点：
+
+- 全屏和缩小窗口都必须保持 `C:\Users\123\Desktop\123.jpg` 的同一排版结构。
+- 全屏主内容居中，不贴左。
+- 大屏没有大片无意义空白。
+- 缩小窗口时整个界面整体缩小，没有横向滑块。
+- 快捷入口、订单、生成图区域没有被硬裁切。
+- 高亮颜色不刺眼。
+- 顶部白色窗口栏的来源和处理方案已说明；如果已经获得 Tauri 修改确认，则必须实际统一为深色。
+
 ## 禁止范围
 
 本任务只做桌面前端 UI。
@@ -530,6 +861,11 @@ type RecentOrder = {
 
 - 首页整体视觉接近参考图的深色桌面工作台。
 - 左侧导航、顶部状态栏、欢迎卡片、统计卡片、快捷入口、最近订单、最近生成图、底部状态栏全部可见。
+- 全屏时主内容在可用区域内居中，不能贴左，不能右侧大面积空白。
+- 缩小窗口时界面整体缩小，并保持和 `C:\Users\123\Desktop\123.jpg` 一样的排版；不能出现横向滑块，不能靠拖动滑块查看被裁切内容，不能改成另一套小屏布局。
+- 高亮颜色降低饱和度，不能出现 HDR 式刺眼观感。
+- 顶部白色窗口栏必须说明来源；如需 Tauri 配置改动，必须先获得用户确认。
+- 滚动策略清晰，不允许多个明显内部滚动条破坏桌面观感。
 - 首页使用 mock 数据，不依赖后端和本地服务。
 - OCR 页面、登录页面、历史记录页面仍能访问。
 - `desktop-app` 下执行 `npm run build` 通过。
@@ -543,6 +879,8 @@ type RecentOrder = {
 ```text
 请按 docs/26-desktop-dashboard-ui-redesign.md 实现桌面端首页 UI 改版。
 
+注意：用户已反馈当前实现不合格，必须优先处理文档中的“返工要求：根据用户截图 1 / 截图 2 修正”。
+
 本任务只做前端 UI 壳，不接后端、不改数据库、不用 Docker、不实现真实 AI 调用。
 
 优先实现：
@@ -551,6 +889,9 @@ type RecentOrder = {
 3. 用 mock 数据实现欢迎卡片、统计卡片、快捷入口、最近订单、最近生成效果图。
 4. OCR 快捷入口跳转现有 `/ocr`，历史或订单入口可暂时跳 `/history` 或显示占位。
 5. 未实现功能必须明确标注“即将开放”或 disabled，不要伪装成可用。
+6. 全屏和缩小窗口都必须保持 `C:\Users\123\Desktop\123.jpg` 的同一排版；缩小窗口时整个界面要整体缩小，不能出现横向滑块。
+7. 降低蓝色和图片占位块饱和度，避免 HDR 式刺眼效果。
+8. 顶部白色窗口栏要说明来源；如需改 Tauri 配置，先停下来等用户确认。
 
 验收前必须运行：
 1. cd desktop-app

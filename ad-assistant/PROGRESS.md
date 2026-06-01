@@ -47,6 +47,53 @@ PR：
 
 ## 记录
 
+## 2026-06-02 - Sprint-03 Task-04 Desktop Dashboard UI Redesign (S03-T04)
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-03-task-04-dashboard-ui`
+
+### 范围
+
+- 目标：桌面端首页 UI 改版 — 深色 SaaS 工作台外壳 + Dashboard 页面 + mock 数据。
+- 已实现：左侧导航栏（4 分组）、顶部状态栏、欢迎卡片、统计卡片、快捷入口（OCR 可用）、最近订单 mock 表格、最近生成效果图 mock 网格、底部状态栏、1366px 基准 scale 等比缩放布局、`/` → DashboardPage 路由。
+- 未实现：快捷入口中除 OCR 外均为 disabled + "即将开放"；订单/图片 "查看全部" 为 mock；底部连接状态为 mock；Tauri 标题栏深色主题需单独任务。
+
+### 主要改动
+
+- `desktop-app/src/App.vue`：桌面工作台外壳（sidebar + topbar + main + footer），1366 canvas + scale 等比缩放。
+- `desktop-app/src/router.ts`：新增 dashboard 路由 `/`。
+- `desktop-app/src/pages/DashboardPage.vue`（NEW）：首页主内容区。
+- `desktop-app/src/pages/dashboardMock.ts`（NEW）：首页 mock 数据。
+- `desktop-app/src/components/dashboard/AppSidebar.vue`（NEW）：左侧导航。
+- `desktop-app/src/components/dashboard/AppTopbar.vue`（NEW）：顶部状态栏。
+- `desktop-app/src/components/dashboard/QuickEntryCard.vue`（NEW）：快捷入口卡片。
+- `desktop-app/src/components/dashboard/RecentOrders.vue`（NEW）：最近订单表格。
+- `desktop-app/src/components/dashboard/RecentGeneratedImages.vue`（NEW）：最近生成效果图。
+- `docs/26-desktop-dashboard-ui-redesign.md`：设计文档（含返工要求与验收标准）。
+- `tasks/current-task.md`：实现记录。
+- `PROGRESS.md`：本条记录。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是（仅 desktop-app/src + docs）
+- 未触碰未确认高风险变更：是（未改 Tauri / backend / package / OCR / credit / auth）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用（纯 UI shell，无独立模块上下文）
+- Bug 根因已记录：不适用
+
+### 测试结果
+
+- `npm run build`（desktop-app）：62 modules, 0 errors
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：顶部白色窗口栏来自 Tauri 系统 chrome，本轮未处理；小窗口（<800px）scale 后字体偏小但可读。
+- 后续任务：Tauri 深色标题栏 / EXE Packaging（单独任务）；快捷入口逐个接入真实功能；Dashboard 数据接入真实 API。
+- 回滚方式：revert 对应提交，恢复 `/` 路由到旧行为。
+
 ## 2026-06-01 - Coding Standards Extensibility Guidelines
 
 状态：MERGED
