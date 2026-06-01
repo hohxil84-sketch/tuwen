@@ -28,15 +28,13 @@ PostgreSQL/SQLite → Cloud Backend → Desktop Login → Mock AI Ad-Copy → Re
 | Desktop dev server | Vite 6.4.2 @ http://127.0.0.1:5173 |
 | Cloud backend | uvicorn @ http://127.0.0.1:8000 |
 
-### Note 1: SQLite for smoke test
+### Note 1: Database choice
 
-PostgreSQL could not be used directly because the current SQLAlchemy models
-use `DateTime` without `timezone=True` (→ `TIMESTAMP WITHOUT TIME ZONE`),
-while `migrations/ddl/*.sql` creates `TIMESTAMPTZ` columns. The ORM sends
-timezone-aware datetimes which asyncpg rejects. Tests pass because they use
-SQLite in-memory (which is timezone-agnostic). For the smoke verification,
-the backend was run with `DATABASE_URL=sqlite+aiosqlite:///dev.db`. This is
-a pre-existing ORM/DDL mismatch to be resolved in a future task.
+As of Sprint-02 Task-07, the ORM `DateTime(timezone=True)` columns are now
+aligned with the DDL `TIMESTAMPTZ` columns. Both SQLite and PostgreSQL paths
+work. The smoke verification below uses SQLite for simplicity
+(`DATABASE_URL=sqlite+aiosqlite:///dev.db`). For PostgreSQL, see the
+"PostgreSQL Alternative" section.
 
 ### API-Level Smoke Results
 
@@ -156,13 +154,37 @@ JWT_SECRET_KEY="dev-secret-key-not-for-production" \
 python scripts/dev_seed_user.py
 ```
 
-### PostgreSQL Alternative (Blocked — DateTime Mismatch)
+### PostgreSQL Alternative
 
-If using PostgreSQL, the DDL creates `TIMESTAMPTZ` columns but models use
-`DateTime` → `TIMESTAMP WITHOUT TIME ZONE`. Workaround: use
-`Base.metadata.create_all()` against PostgreSQL (creates matching columns),
-but the backend ORM will still fail at runtime when it sends timezone-aware
-datetimes. This needs a future fix.
+PostgreSQL is now fully supported after Sprint-02 Task-07 DateTime alignment fix.
+Use the following instead of the SQLite commands above:
+
+```bash
+# Start PostgreSQL
+docker run -d --name pg-dev \
+  -e POSTGRES_PASSWORD=test \
+  -p 5432:5432 \
+  postgres:16
+
+until docker exec pg-dev pg_isready -U postgres; do sleep 1; done
+docker exec pg-dev psql -U postgres -c "CREATE DATABASE ad_assistant_dev;"
+
+# Create tables via DDL files
+cd cloud-backend
+for f in migrations/ddl/0*.sql; do
+  docker exec -i pg-dev psql -U postgres -d ad_assistant_dev < "$f"
+done
+
+# Seed test user + device (ORM writes to PG — verified working as of Task-07)
+DATABASE_URL="postgresql+asyncpg://postgres:test@localhost:5432/ad_assistant_dev" \
+JWT_SECRET_KEY="dev-secret-key-not-for-production" \
+python scripts/dev_seed_user.py
+
+# Start backend against PostgreSQL
+DATABASE_URL="postgresql+asyncpg://postgres:test@localhost:5432/ad_assistant_dev" \
+JWT_SECRET_KEY="dev-secret-key-not-for-production" \
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
 ## Step 4 — Start The Cloud Backend
 
@@ -245,18 +267,13 @@ Open `http://127.0.0.1:5173` in a browser.
 
 ## Known Issues
 
-1. **DDL / ORM DateTime mismatch:** `migrations/ddl/*.sql` uses `TIMESTAMPTZ`
-   but SQLAlchemy models use `DateTime` → `TIMESTAMP WITHOUT TIME ZONE`.
-   Backend ORM writes fail against DDL-created PostgreSQL tables.
-   Smoke test used SQLite as workaround. Should be resolved in future task.
+1. **~~DDL / ORM DateTime mismatch~~:** ✅ Resolved by Sprint-02 Task-07.
+   Models now use `DateTime(timezone=True)`, aligned with DDL `TIMESTAMPTZ`.
 
-2. **`datetime.utcnow()` deprecation:** Seed script uses deprecated method
-   when running against PostgreSQL. Resolved together with issue #1.
-
-3. **OCR requires local Python service:** PaddleOCR local service not in
+2. **OCR requires local Python service:** PaddleOCR local service not in
    scope for this task. OCR upload/display UI stays intact.
 
-4. **Chinese encoding in curl:** Windows/MinGW curl mishandles UTF-8 in
+3. **Chinese encoding in curl:** Windows/MinGW curl mishandles UTF-8 in
    `-d` string. Use `-d @file.json` with UTF-8 encoded file.
 
 ## Related Docs

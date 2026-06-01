@@ -59,6 +59,7 @@ Current verified head: `42dbad8 Merge pull request #16 from hohxil84-sketch/feat
 | Task | Scope | Branch |
 |------|-------|--------|
 | Task-06 draft | Desktop Mock AI E2E Smoke Verification | `feature/sprint-02-task-06-desktop-mock-e2e-smoke` |
+| Task-07 draft | Backend PostgreSQL DateTime Alignment | `feature/sprint-02-task-07-pg-datetime-align` |
 
 Task-06 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
 - Goal: make the merged Task-05 desktop mock MVP path reproducible and manually verified.
@@ -69,9 +70,23 @@ Task-06 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
   - `docs/11-cloud-backend-guide.md` — updated with dev setup section.
   - `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md` — module context.
 - Verification: `npm run build` ✅ (43 modules, 0 errors), `git diff --check` ✅, backend 147 tests ✅.
-- Known issues found: DDL TIMESTAMPTZ / ORM DateTime mismatch (documented, not fixed — out of scope).
+- Known issues found: DDL TIMESTAMPTZ / ORM DateTime mismatch (documented, fixed in Task-07).
 - No production backend/API/DDL/dependency/shared/Tauri/desktop source changes were made.
 - No secrets or real provider integrations were added.
+
+Task-07 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
+- Goal: align SQLAlchemy models `DateTime(timezone=True)` with DDL `TIMESTAMPTZ`.
+- Deliverables:
+  - 8 model files updated — all 18 DateTime columns now `DateTime(timezone=True)`.
+  - `cloud-backend/scripts/dev_seed_user.py` — docstring updated (mismatch resolved).
+  - `docs/25-desktop-mock-e2e-smoke.md` — removed PG bypass, added PG alternative.
+  - `docs/11-cloud-backend-guide.md` — updated PG status.
+  - `docs/12-database-design.md` — added timestamp alignment note.
+  - `docs/sprint-02-summary.md` — this update.
+  - `docs/module-context/sprint-02-task-07-pg-datetime-align/context.md` — new.
+- Verification: SQLite 147 ✅, PG integration 55 ✅, ORM PG read/write ✅, `git diff --check` ✅.
+- This is a major change (model column type declarations) — user confirmed 2026-06-01.
+- No DDL, API, service, provider, shared, desktop, dependency, or .env changes.
 
 ## Next-Stage Candidate Tasks
 

@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, String, Integer, func
+from sqlalchemy import DateTime, ForeignKey, String, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -30,16 +30,18 @@ class CreditAccount(Base):
     )
     monthly_grant: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     balance: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    period_start: Mapped[datetime | None] = mapped_column()
-    period_end: Mapped[datetime | None] = mapped_column()
+    period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(
         String(20), default="active", server_default="'active'"
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
         onupdate=lambda: datetime.now(timezone.utc),

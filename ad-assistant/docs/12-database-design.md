@@ -6,6 +6,10 @@
 
 真正创建或修改数据库表结构属于重大变更，必须先确认。
 
+> Sprint-02 Task-07 已对齐 ORM `DateTime(timezone=True)` 与 DDL `TIMESTAMPTZ`。
+> 所有云端表的时间列统一使用 PostgreSQL `TIMESTAMPTZ`（存储 UTC），
+> SQLAlchemy 模型对应使用 `DateTime(timezone=True)`。
+
 ## MVP 表
 
 Sprint-01 允许设计以下基础表：
