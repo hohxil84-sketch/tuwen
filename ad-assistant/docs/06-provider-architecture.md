@@ -84,6 +84,46 @@ cloud-backend/app/providers/
 - error_code
 - created_at
 
+## Provider 路由层 (Sprint-02 Task-09)
+
+Provider 路由层位于 route handler 和 `execute_provider_call` 之间：
+
+```
+Route Handler → ProviderRouter.route(feature, plan) → AsyncProvider
+                   ↓
+            ProviderRegistry.get(name) → MockProvider / future real providers
+                   ↓
+            execute_provider_call(provider, ...) → ProviderResult
+```
+
+### 核心模块
+
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| `ProviderRegistry` | `app/providers/registry.py` | 按名存取 `AsyncProvider` 实例 |
+| `ProviderRouter` | `app/providers/router.py` | 按 (feature, plan) 选择 provider |
+| `route_and_execute_provider_call` | `app/services/provider_service.py` | 先路由再执行（高层入口） |
+
+### 路由规则
+
+路由规则通过 `DEFAULT_ROUTING_RULES` 字典配置，映射 `{feature: {plan: provider_name}}`。
+当前所有 (feature, plan) 均解析到 `"mock"`。
+未知 feature 或 plan 默认回退到 `"mock"`。
+
+### 使用方式
+
+端点应使用 `route_and_execute_provider_call()` 代替直接实例化：
+
+```python
+result = await route_and_execute_provider_call(
+    db=db, feature="mock_ad_copy", plan=user.plan_code,
+    request=provider_request, user_id=user.id, device_id=device.id,
+    request_id=request_id,
+)
+```
+
+原有 `execute_provider_call(provider=..., ...)` 保持不变，支持显式指定 provider。
+
 ## Sprint-02 Task-03: Provider Mock Foundation ✅ Implemented
 
 Implemented on branch `feature/sprint-02-task-03-provider-mock`:
@@ -107,3 +147,15 @@ Implemented on branch `feature/sprint-02-task-04-mock-ai-api`:
 - propagates `X-Request-ID` to response and provider log;
 - does not expose `raw_usage` to clients;
 - 21 focused tests + 147 regression pass.
+
+## Sprint-02 Task-09: Provider Routing Design ✅ Implemented
+
+Implemented on branch `feature/sprint-02-task-09-provider-routing`:
+
+- added `ProviderRegistry` (`app/providers/registry.py`) — named container with module-level singleton;
+- added `ProviderRouter` (`app/providers/router.py`) — (feature, plan) → provider selection;
+- added `route_and_execute_provider_call()` as high-level entry point;
+- updated `mock_ai.py` to use routing instead of direct `MockProvider()` instantiation;
+- 20 focused routing tests + 147 regression + 21 mock AI tests all pass;
+- all routes still resolve to `MockProvider` — no real provider SDKs/keys/network calls;
+- `execute_provider_call()` unchanged — still accepts explicit `provider`.

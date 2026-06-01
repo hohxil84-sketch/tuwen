@@ -61,6 +61,23 @@ Current verified head: `42dbad8 Merge pull request #16 from hohxil84-sketch/feat
 |------|-------|--------|
 | Task-06 draft | Desktop Mock AI E2E Smoke Verification | `feature/sprint-02-task-06-desktop-mock-e2e-smoke` |
 | Task-08 draft | Mock AI API Contract Formalization | `feature/sprint-02-task-08-mock-ai-api-contract` |
+| Task-09 draft | Provider Routing Design | `feature/sprint-02-task-09-provider-routing` |
+
+Task-09 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
+- Goal: build provider routing infrastructure (ProviderRegistry + ProviderRouter + route_and_execute)
+- Deliverables:
+  - `cloud-backend/app/providers/registry.py` — ProviderRegistry (named container)
+  - `cloud-backend/app/providers/router.py` — ProviderRouter ((feature, plan) → provider)
+  - `cloud-backend/app/services/provider_service.py` — added `route_and_execute_provider_call()`
+  - `cloud-backend/app/api/v1/mock_ai.py` — uses routing (no more direct MockProvider import)
+  - `cloud-backend/app/providers/__init__.py` — updated docstring
+  - `cloud-backend/tests/test_provider_routing.py` — 20 focused tests
+  - `docs/06-provider-architecture.md` — added routing layer section
+  - `docs/sprint-02-summary.md` — this update
+- This is a major change (Provider interface call path per CODEX.md).
+- All routes still resolve to MockProvider — no real provider SDKs/keys/network calls.
+- `execute_provider_call()` unchanged — backward compatible.
+- Wire response unchanged — desktop mock client needs zero changes.
 
 Task-08 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
 - Goal: wire `response_model=APIResponse[MockAdCopyData]`, create `shared/openapi/mock-ai.yaml`, create `shared/dto/mock-ai.ts`
@@ -94,4 +111,3 @@ Task-06 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
 These are candidates only. Create a new task document and new branch before implementation.
 
 - Candidate A: Desktop Mock AI E2E smoke verification and local runbook.
-- Candidate C: Real Provider routing design, still without real billing deduction.

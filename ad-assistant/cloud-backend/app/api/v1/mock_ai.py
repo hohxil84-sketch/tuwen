@@ -1,9 +1,10 @@
-"""Mock AI API routes — Sprint-02 Task-04 / Sprint-02 Task-08.
+"""Mock AI API routes — Sprint-02 Task-04 / Task-08 / Task-09.
 
 受保护 endpoint：POST /api/v1/mock-ai/ad-copy
 
 - 需要 auth + 活跃设备绑定
-- 调用 MockProvider 通过 execute_provider_call
+- Sprint-02 Task-09: 通过 ProviderRouter + route_and_execute_provider_call
+  选择 Provider（不再直接实例化 MockProvider）
 - 写入 provider_call_log
 - 不暴露 raw_usage
 - credits_charged 固定为 0
@@ -27,10 +28,9 @@ from app.database import get_db
 from app.models.device import Device
 from app.models.user import User
 from app.providers.base import ProviderRequest
-from app.providers.mock_provider import MockProvider
 from app.schemas.common import APIResponse, success_response
 from app.schemas.mock_ai import MockAdCopyData, MockAdCopyRequest
-from app.services.provider_service import execute_provider_call
+from app.services.provider_service import route_and_execute_provider_call
 
 router = APIRouter(prefix="/api/v1", tags=["Mock AI"])
 
@@ -67,11 +67,12 @@ async def generate_ad_copy(
         message="",  # 不记录用户原始内容到 raw_usage / provider_call_log
     )
 
-    # 执行 Provider 调用并写入 provider_call_log
-    provider = MockProvider()
-    result = await execute_provider_call(
+    # Sprint-02 Task-09: 通过 ProviderRouter 选择 Provider 并执行，
+    # 不再直接实例化 MockProvider。
+    result = await route_and_execute_provider_call(
         db=db,
-        provider=provider,
+        feature=FEATURE_NAME,
+        plan=user.plan_code,
         request=provider_request,
         user_id=user.id,
         device_id=device.id,
