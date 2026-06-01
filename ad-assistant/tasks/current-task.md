@@ -2,11 +2,12 @@
 
 ## Status
 
-`CONFIRMED_READY_FOR_IMPLEMENTATION`
+`IMPLEMENTED_AWAITING_REVIEW`
 
-Prepared after Sprint-02 Task-05 was merged by PR #16 as `42dbad8`.
+Implementation completed on 2026-06-01 by Claude Code. Waiting for Codex Review.
 
-User confirmed this task sheet on 2026-06-01. Implementation may start on the suggested task branch, but must stay within this task scope and wait for Codex Review before commit.
+Branch: `feature/sprint-02-task-06-desktop-mock-e2e-smoke`
+Base: `main` @ `42dbad8` (PR #16 merge) / Latest: `c5f89a7` (PR #17 merge)
 
 ## Suggested Branch
 
@@ -143,6 +144,7 @@ Update:
 
 Implementation task may modify only:
 
+- `desktop-app/vite.config.ts` (dev-only proxy, approved for browser UI smoke)
 - `docs/25-desktop-mock-e2e-smoke.md` (new)
 - `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md` (new)
 - `docs/09-desktop-app-guide.md`
@@ -266,3 +268,95 @@ Implementer must report:
 - residual risks;
 - whether module context was updated;
 - wait for Codex Review, do not self-merge.
+
+---
+
+## Implementation Record (2026-06-01, updated)
+
+### Changed Files
+
+- `docs/25-desktop-mock-e2e-smoke.md` (new) — E2E smoke runbook with verified results
+- `cloud-backend/scripts/dev_seed_user.py` (new) — Dev-only seed script (ORM-based)
+- `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md` (new) — Module context
+- `docs/09-desktop-app-guide.md` — Added dev runbook reference + quick-start
+- `docs/11-cloud-backend-guide.md` — Added local dev environment section
+- `docs/sprint-02-summary.md` — Updated Task-06 status
+- `desktop-app/vite.config.ts` — Added `/api` proxy for local dev CORS avoidance
+- `tasks/current-task.md` — Status + implementation record
+
+### Build / Check Results
+
+- `npm run build` (desktop-app): ✅ 43 modules, 0 errors
+- `git diff --check`: ✅ Passed
+
+### Existing Test Suite
+
+The project's 147 backend tests run against SQLite in-memory (not PostgreSQL).
+These tests pass and are unchanged by this task.
+PG integration tests (`test_migrations_integration.py`) require `TEST_DATABASE_URL`.
+
+### API Smoke Verification (2026-06-01, curl + live servers)
+
+| Step | Result | Detail |
+|------|--------|--------|
+| PostgreSQL container | ✅ | Docker postgres:16, DB ad_assistant_dev created |
+| Tables (SQLAlchemy) | ✅ | Base.metadata.create_all via SQLite |
+| Seed user + device | ✅ | test@example.com / device-fingerprint-abc |
+| Cloud backend start | ✅ | uvicorn @ :8000, health=ok |
+| Login API | ✅ | access_token, refresh_token, user, device, request_id |
+| Mock AI API (ASCII) | ✅ | provider=mock, model=mock-text-v1, credits_charged=0 |
+| Mock AI API (Chinese) | ✅ | UTF-8 product_name/selling_points accepted |
+| provider_call_log | ✅ | Row: provider=mock, status=success, credits=0 |
+| Logout | ✅ | Refresh token revoked |
+| Token reuse detection | ✅ | TOKEN_REUSE after logout |
+| No-auth → 401 | ✅ | HTTP 401 |
+| Desktop Vite dev server | ✅ | Serves index.html + modules @ :5173 |
+
+### UI Smoke (2026-06-01, live browser ✅)
+
+Tested in browser @ http://127.0.0.1:5173 with live backend + Vite proxy:
+
+| Step | Result | Detail |
+|------|--------|--------|
+| Browser login form | ✅ PASS | Account/password/fingerprint → redirect to /ocr |
+| Mock AI panel after login | ✅ PASS | "Mock AI 广告文案生成（仅 Mock）" visible |
+| Generate mock ad-copy + result | ✅ PASS | provider=mock, model=mock-text-v1, 扣点=0, request_id=req_27a7a33502cb |
+| Page refresh clears tokens | ✅ PASS | F5 → login lost, panel hidden (Pinia memory-only verified) |
+| OCR upload UI | ✅ PASS | Image area visible; recognition blocked (no local OCR service) |
+
+Note: Vite proxy (`/api` → `:8000`) configured in `vite.config.ts`.
+`VITE_CLOUD_API_BASE_URL=http://127.0.0.1:5173` required at dev server start.
+
+### Backend Database Note
+
+API smoke used SQLite (`sqlite+aiosqlite:///dev.db`) because the current
+SQLAlchemy models generate timezone-aware datetimes incompatible with
+DDL-created PostgreSQL `TIMESTAMPTZ` columns. The 147 existing tests
+also use SQLite. This is a pre-existing ORM/DDL mismatch — not caused
+by this task and not fixable within this task's scope (models are under
+`cloud-backend/app/`, which is forbidden).
+
+### Confirmations
+
+- ✅ No production backend/API/DDL changes
+- ✅ No dependency changes
+- ✅ No shared DTO changes
+- ✅ No Tauri permission changes
+- ✅ No desktop source code changes (`src/`, `src-tauri/`)
+- ✅ No local service changes
+- ✅ No secrets or real provider keys added
+- ✅ Dev seed script is clearly dev-only with warnings and known-limitation docs
+
+### Residual Risks
+
+- DDL TIMESTAMPTZ / ORM DateTime mismatch (pre-existing, documented, needs future task)
+- OCR pipeline blocked on local PaddleOCR service (out of scope)
+- `datetime.utcnow()` deprecation in seed script (tied to DateTime mismatch fix)
+
+### Module Context
+
+Updated: `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md`
+
+### Next: Wait for Codex Review
+
+Do NOT commit. Do NOT self-merge. Wait for Codex Review approval.
