@@ -99,7 +99,8 @@ CC 负责维护 `tasks/current-task.md`。每个任务单必须包含：
 - 只 stage 当前任务相关文件，不使用 `git add -A`。
 - 自审通过后，可以提交到当前任务分支并 push 当前任务分支。
 - 不直接 push `main`，不 force push。
-- 可以创建 PR 或 draft PR，但不能 self-merge。
+- 可以创建 PR 或 draft PR；未经用户明确确认，不能 self-merge。
+- 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并在交付说明中记录确认来源和合并结果。
 - 合并只能通过 PR，base 为 `main`，head 为当前任务分支。
 - 高风险任务、测试异常、范围不确定或用户要求时，提交/PR 前先请求 Codex 或用户复核。
 

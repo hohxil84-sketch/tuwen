@@ -49,7 +49,8 @@ CC 自审是默认提交门禁。Codex Review 是按需复核，不再是每次�
 - head: 当前任务分支
 - PR 内容必须包含：任务范围、测试结果、CC 自审结论、风险、回滚方式
 - CC 可以创建 PR 或 draft PR
-- CC 不 self-merge
+- CC 不能未经用户明确确认 self-merge
+- 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并记录确认来源和合并结果
 - 高风险任务、失败测试、范围不确定或用户要求时，PR 前召回 Codex 复核
 
 ## Codex 复核触发条件
