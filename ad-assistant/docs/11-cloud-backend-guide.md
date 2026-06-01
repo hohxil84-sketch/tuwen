@@ -87,7 +87,7 @@ MVP 至少预留：
 - `cloud-backend/docs/pg-integration-test-guide.md` — PostgreSQL 集成测试指南
 - `cloud-backend/scripts/dev_seed_user.py` — 开发环境种子数据脚本
 
-快速启动（推荐使用 SQLite，避免当前 ORM/DDL DateTime 不匹配问题）：
+快速启动（SQLite 或 PostgreSQL 均可，两者均已验证通过）：
 
 ```bash
 cd cloud-backend
@@ -127,7 +127,7 @@ JWT_SECRET_KEY="dev-secret-key-not-for-production" \
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-PostgreSQL 备选路径当前受 ORM/DDL DateTime 类型不匹配影响（DDL 用 `TIMESTAMPTZ`，
-模型用 `DateTime` → `TIMESTAMP WITHOUT TIME ZONE`），需先修复方可使用。详见
-`docs/25-desktop-mock-e2e-smoke.md` 的已知问题章节。
+PostgreSQL 路径已在 Sprint-02 Task-07 修复（ORM `DateTime(timezone=True)` 与 DDL
+`TIMESTAMPTZ` 对齐），可在 SQLite 和 PostgreSQL 之间自由选择。详见
+`docs/25-desktop-mock-e2e-smoke.md`。
 

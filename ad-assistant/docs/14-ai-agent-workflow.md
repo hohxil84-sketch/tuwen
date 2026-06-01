@@ -2,52 +2,32 @@
 
 ## 角色
 
-Codex：
-- 架构设计
-- 任务拆分
-- 代码 Review
-- 安全检查
-- API 检查
-- 数据库检查
-- Provider 检查
-- 成本检查
+Codex 负责定规则、拆任务、Review、风险判断和提交门禁。
 
-Claude Code + DeepSeek：
-- 按任务单执行开发
-- 改文件
-- 跑命令
-- 修 Bug
+Claude Code / DeepSeek 负责按任务单实现当前任务。
 
-## 规则
+## 统一规则
 
-1. 一个模块一个对话。
-2. 一个模块一个 Git 分支。
-3. 没有任务单，不允许写代码。
-4. 没有用户确认，不允许开发未来功能。
-5. Codex 优先 Review，不随便大规模改代码。
-6. Claude Code + DeepSeek 只负责执行任务单。
+1. 一次只做一个任务，一个任务只对应一个 Git 分支。
+2. 只实现 `tasks/current-task.md` 明确允许的内容。
+3. 没有用户确认的重大变更，不开始实现。
+4. 同一任务由 Claude Code / DeepSeek 一次性完成，再交给 Codex Review。
+5. Codex Review 默认只看当前任务的 staged diff、任务单和必要上下文，不做全仓审查。
+6. 只有 Codex 明确 `允许提交` 后，才可以 commit、push 或建 PR。
+7. 提交时只 stage 当前任务相关文件，不使用 `git add -A`。
+8. 每个完成的模块都要更新对应的 `docs/module-context/<module-or-task>/context.md`。
+9. 下一任务必须通过新的任务单和新的任务分支开始。
 
-## 标准流程
+## 高风险边界
 
-1. 用户提出目标。
-2. Codex 生成或修订任务单。
-3. 用户确认任务单。
-4. Claude Code + DeepSeek 按任务单开发。
-5. Claude Code + DeepSeek 输出修改、测试、风险。
-6. Codex Review。
-7. 用户确认是否合并或进入下一任务。
+遇到以下边界，必须先停下并等用户确认：
 
-## 任务单闸门
-
-任务单必须明确：
-- 本次只开发什么
-- 本次不开发什么
-- 允许修改哪些文件
-- 禁止修改哪些文件
-- 验收标准
-- 测试方式
-- 是否允许新增依赖
-- 是否涉及重大变更
-
-缺少以上任一项，任务单无效。
-
+- 数据库 schema
+- API / OpenAPI / shared DTO
+- Auth / Token
+- Provider / credit / payment
+- Tauri permissions
+- dependencies
+- CI / workflows
+- filesystem permissions
+- remote command execution

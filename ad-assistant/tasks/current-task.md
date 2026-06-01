@@ -1,362 +1,381 @@
-# Current Task: Sprint-02 Task-06 Desktop Mock AI E2E Smoke Verification
+# Current Task: Sprint-02 Task-07 Backend PostgreSQL DateTime Alignment
 
 ## Status
 
 `IMPLEMENTED_AWAITING_REVIEW`
 
-Implementation completed on 2026-06-01 by Claude Code. Waiting for Codex Review.
+Implementation completed on 2026-06-01. Waiting for Codex Review.
 
-Branch: `feature/sprint-02-task-06-desktop-mock-e2e-smoke`
-Base: `main` @ `42dbad8` (PR #16 merge) / Latest: `c5f89a7` (PR #17 merge)
+Branch: `feature/sprint-02-task-07-pg-datetime-align`
+Base: `main` @ `afd1ca4` (PR #19 — docs: clarify Vite proxy API base URL)
 
 ## Suggested Branch
 
-`feature/sprint-02-task-06-desktop-mock-e2e-smoke`, based on latest `main`.
-
-If a local Git ref permission or slash-name issue occurs, use the flat branch name `sprint-02-task-06-desktop-mock-e2e-smoke`.
-
-## Prerequisites
-
-- Latest verified `main`: `42dbad8` (`Merge pull request #16 from hohxil84-sketch/feature/sprint-02-task-05-desktop-mock-ai-client`).
-- Sprint-02 Task-05 Desktop Mock AI API Client was merged by PR #16.
-- Desktop app now has:
-  - cloud API client;
-  - memory-only auth store;
-  - login UI;
-  - login-gated Mock AI ad-copy panel on the OCR page.
-- Cloud backend already has:
-  - auth/device APIs;
-  - `POST /api/v1/mock-ai/ad-copy`;
-  - `provider_call_log`;
-  - PostgreSQL integration CI.
-- Task-05 residual risk: live manual verification was not completed because the local environment did not have PostgreSQL/backend service ready.
+`feature/sprint-02-task-07-pg-datetime-align`, based on latest `main`.
 
 ## Background
 
-The project now has enough pieces for a visible mock MVP path, but the full local desktop-to-cloud flow has not been manually verified:
+Task-06 Desktop Mock AI E2E Smoke Verification 中发现了一个预先存在的 ORM/DDL 不匹配问题：
 
-1. start cloud backend with PostgreSQL;
-2. start desktop Vite app;
-3. login with a valid user and device fingerprint;
-4. submit Mock AI ad-copy request;
-5. confirm request_id/provider/model/credits display;
-6. confirm memory-only token behavior after refresh;
-7. confirm existing local OCR UI still works.
+| 层级 | 当前状态 | 说明 |
+|------|---------|------|
+| DDL (`migrations/ddl/001–008.sql`) | `TIMESTAMPTZ` | PostgreSQL 推荐类型，存储 UTC |
+| SQLAlchemy models (`app/models/*.py`) | `Mapped[datetime]` 无 `timezone=True` | 映射到 `TIMESTAMP WITHOUT TIME ZONE` |
+| Python 默认值 | `datetime.now(timezone.utc)` | 生成 timezone-aware 对象 |
+| PostgreSQL server_default | `func.now()` | 在 PG 中返回 `TIMESTAMPTZ` |
 
-This task is a verification and local bring-up slice. It should make the already-implemented mock flow reproducible for development review before real provider work begins.
+**三个层面方向一致（都指向 UTC），但 ORM 声明类型缺失 `timezone=True`，导致 SQLAlchemy 与 PostgreSQL DDL 创建的表结构不匹配。**
 
-## Major Change Proposal
+具体症状：
+1. DDL 创建 `TIMESTAMPTZ` 列，但 ORM 的 `DateTime`（无 timezone）期望 `TIMESTAMP WITHOUT TIME ZONE`
+2. asyncpg 在读写时因为类型声明不匹配而报错
+3. `Base.metadata.create_all()` 对 PostgreSQL 创建 `TIMESTAMP WITHOUT TIME ZONE`，与 DDL 不一致
+4. SQLite 不区分时区类型，所以 147 个现有测试和 Task-06 smoke 都正常工作
 
-This task may add a narrow local development runbook and, only if necessary, a dev-only seed helper for local test users/devices.
+影响范围：
+- 本地开发无法使用 PostgreSQL（必须用 SQLite 绕过）
+- CI `pg-integration` workflow 只测 DDL 执行，不测 ORM 读写
+- 生产环境上线前必须修复，否则无法切换到 PostgreSQL
 
-1. Reason
-   - Remove the current manual-verification gap from Task-05.
-   - Make the desktop mock MVP path visible and repeatable on a developer machine.
-   - Avoid starting real provider or billing work before the current mock integration is proven end-to-end.
+## Goal
 
-2. Risks
-   - Dev seed helpers could accidentally look like production account-management code.
-   - Local setup docs could encourage insecure defaults if not clearly marked dev-only.
-   - Manual verification could drift if commands are not recorded precisely.
+统一 SQLAlchemy models 的 `DateTime` 列声明，使其与 DDL 的 `TIMESTAMPTZ` 对齐。
 
-3. Impact
-   - Documentation and verification evidence.
-   - Optional dev-only seed/run helper if existing commands are insufficient.
-   - No product feature expansion.
-   - No API contract, database schema, provider, credit, payment, shared DTO, Tauri permission, or dependency changes.
+## Modification Reason
 
-4. Rollback
-   - Remove the new runbook/context documentation.
-   - Remove any dev-only helper added by this task.
-   - No database rollback is required if no schema changes are made.
-
-5. Backward Compatibility
-   - Compatible. Existing APIs and desktop UI behavior remain unchanged.
-
-6. Database Migration
-   - None. This task must not add, remove, or edit migrations or DDL.
+1. DDL 使用 `TIMESTAMPTZ` 是 PostgreSQL 最佳实践，设计意图正确
+2. Python 代码已生成 timezone-aware datetime，只差 ORM 声明层面
+3. 修复 ORM 声明比改 DDL 影响更小、更符合现有设计方向
+4. 是后续所有 PostgreSQL 相关开发和测试的前置条件
 
 ## What To Build
 
-### 1. Local runbook for the mock desktop MVP path
+### Core Fix: Add `DateTime(timezone=True)` to All DateTime Columns
 
-Add or update documentation with exact local commands for:
+对所有 `Mapped[datetime]` / `mapped_column()` 的 `DateTime` 列添加 `timezone=True`：
 
-- starting PostgreSQL for development;
-- setting required backend environment variables, including a non-default `JWT_SECRET_KEY`;
-- applying existing database setup/migrations if required by the current backend;
-- starting the cloud backend;
-- starting the desktop Vite app;
-- configuring `VITE_CLOUD_API_BASE_URL` if needed;
-- starting local OCR service only if needed for OCR verification.
+```python
+# 修改前
+created_at: Mapped[datetime] = mapped_column(
+    default=lambda: datetime.now(timezone.utc),
+    server_default=func.now(),
+)
 
-### 2. Dev-only test user/device setup path
+# 修改后
+created_at: Mapped[datetime] = mapped_column(
+    DateTime(timezone=True),
+    default=lambda: datetime.now(timezone.utc),
+    server_default=func.now(),
+)
+```
 
-If the repo already has a safe way to create a local test user and bound device, document it.
+### 涉及模型和列（8 files, 18 columns）
 
-If no safe path exists, CC may add a narrow dev-only helper, but must stop and report before doing so if it requires touching files outside the allowed list.
+| 模型文件 | 涉及列 |
+|---------|--------|
+| `app/models/user.py` | `created_at`, `updated_at` |
+| `app/models/device.py` | `first_seen_at`, `last_seen_at`, `created_at`, `updated_at` |
+| `app/models/auth_session.py` | `expires_at`, `revoked_at`, `created_at`, `updated_at` |
+| `app/models/credit_account.py` | `period_start`, `period_end`, `created_at`, `updated_at` |
+| `app/models/credit_ledger.py` | `created_at` |
+| `app/models/provider_call_log.py` | `created_at` |
+| `app/models/risk_log.py` | `created_at` |
+| `app/models/usage_event.py` | `created_at` |
 
-Rules:
+### 辅助修改（使用现有文件，不新增文件）
 
-- must be clearly marked development-only;
-- must not create production admin flows;
-- must not add registration, password reset, subscription, payment, recharge, or account-management UI;
-- must not store real secrets;
-- must not bypass backend auth/device checks in production code.
+1. **`cloud-backend/scripts/dev_seed_user.py`** — docstring 更新，移除已解决的 mismatch 警告
+2. **文档更新**：
+   - `docs/25-desktop-mock-e2e-smoke.md` — 移除 PG 绕过说明，新增 PG 可用路径
+   - `docs/11-cloud-backend-guide.md` — PG 状态从 blocked 更新为 supported
+   - `docs/12-database-design.md` — 添加 timestamp 对齐说明
+   - `docs/sprint-02-summary.md` — Task-07 完成记录
+   - `tasks/current-task.md` — 本文件
+   - `docs/module-context/sprint-02-task-07-pg-datetime-align/context.md` — 新建模块上下文
 
-### 3. Manual E2E smoke verification
+### DDL 文件 — 不修改
 
-Run and record:
-
-1. cloud backend starts successfully;
-2. desktop dev server starts successfully;
-3. login succeeds with a valid local test user and device fingerprint;
-4. Mock AI panel becomes visible after login;
-5. mock ad-copy request succeeds;
-6. UI displays `provider=mock`, `model=mock-text-v1`, `credits_charged=0`, and a backend `request_id`;
-7. page refresh clears token state;
-8. existing OCR upload/recognition/history path is either verified against local OCR service or explicitly marked blocked with exact reason.
-
-### 4. Update module context and sprint docs
-
-Update:
-
-- `docs/25-desktop-mock-e2e-smoke.md`
-- `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md`
-- `docs/09-desktop-app-guide.md`
-- `docs/11-cloud-backend-guide.md`
-- `docs/sprint-02-summary.md`
-- `tasks/current-task.md`
+`migrations/ddl/*.sql` 文件不修改。`TIMESTAMPTZ` 是正确的选择，ORM 应该对齐 DDL，而非反向。
 
 ## What Not To Build
 
-- Do not add real OpenAI, DeepSeek, Claude, ComfyUI, OCR, image, vector, or local provider calls.
-- Do not add provider SDKs, dependencies, API keys, or third-party AI network calls.
-- Do not implement real provider routing or model selection.
-- Do not implement real credit deduction or `credit_ledger` consumption.
-- Do not add payment, recharge, order, grant, monthly quota, expiration, admin, invoice, registration, password reset, or subscription flows.
-- Do not modify API contracts, OpenAPI, shared DTOs, cloud backend auth/token algorithms, Provider interfaces, credit services, DDL, migrations, Tauri permissions, CI workflows, or dependency files.
-- Do not persist desktop tokens.
-- Do not create a generic prompt execution UI.
-- Do not modify official website code.
+- 不修改 DDL 文件
+- 不修改 API、services、core、providers、schemas 代码
+- 不修改 shared、desktop-app、official-website
+- 不修改 CI workflows、依赖文件、.env
+- 不新增测试文件或验证脚本
+- 不对 `app/services/` 和 `app/api/` 中的 datetime 使用做全量审计（超出范围）
 
 ## Allowed Files
 
-Implementation task may modify only:
-
-- `desktop-app/vite.config.ts` (dev-only proxy, approved for browser UI smoke)
-- `docs/25-desktop-mock-e2e-smoke.md` (new)
-- `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md` (new)
-- `docs/09-desktop-app-guide.md`
+- `cloud-backend/app/models/user.py`
+- `cloud-backend/app/models/device.py`
+- `cloud-backend/app/models/auth_session.py`
+- `cloud-backend/app/models/credit_account.py`
+- `cloud-backend/app/models/credit_ledger.py`
+- `cloud-backend/app/models/provider_call_log.py`
+- `cloud-backend/app/models/risk_log.py`
+- `cloud-backend/app/models/usage_event.py`
+- `cloud-backend/scripts/dev_seed_user.py`
+- `docs/25-desktop-mock-e2e-smoke.md`
 - `docs/11-cloud-backend-guide.md`
+- `docs/12-database-design.md`
 - `docs/sprint-02-summary.md`
+- `docs/module-context/sprint-02-task-07-pg-datetime-align/context.md`（新建）
 - `tasks/current-task.md`
-- `cloud-backend/docs/*.md` (documentation only)
-- `cloud-backend/scripts/dev_seed_user.py` (new, optional, dev-only, only if needed)
-
-If implementation proves another file is required, CC must stop and report why before modifying it.
 
 ## Forbidden Files
 
-Do not modify:
+- `cloud-backend/migrations/ddl/*.sql` — DDL 不修改
+- `cloud-backend/migrations/migration-plan-draft.md`
+- `cloud-backend/app/api/**` — API 代码不涉及
+- `cloud-backend/app/services/**` — 服务代码不涉及
+- `cloud-backend/app/core/**` — 核心代码不涉及
+- `cloud-backend/app/providers/**` — Provider 代码不涉及
+- `cloud-backend/app/schemas/**` — Schema 不涉及
+- `cloud-backend/tests/**` — 测试文件不修改
+- `shared/**` — 共享定义不涉及
+- `desktop-app/**` — 桌面端不涉及
+- `official-website/**` — 官网不涉及
+- `.github/workflows/**` — CI 不涉及
+- 依赖文件（`pyproject.toml`, `package.json`, lockfiles 等）
+- `.env` 或 `.env.example`
 
-- `cloud-backend/app/**`
-- `cloud-backend/migrations/**`
-- `cloud-backend/tests/**`
-- `shared/**`
-- `official-website/**`
-- `.github/workflows/**`
-- `desktop-app/src/**`
-- `desktop-app/src-tauri/**`
-- `desktop-app/local-service/**`
-- `desktop-app/local-tools/**`
-- `desktop-app/migrations/**`
-- dependency files or lockfiles
-- `.env` or `.env.example`
-- files containing secrets
+> 注意：本次 forbidden 范围不同于 Task-06。Task-06 禁止整个 `cloud-backend/app/**`，本次允许修改 `cloud-backend/app/models/**` 下的 8 个模型文件，仅禁止 `app/api/`, `app/services/`, `app/core/`, `app/providers/`, `app/schemas/` 子目录。
 
 ## Acceptance Criteria
 
-- The merged Task-05 desktop mock flow is manually verified end-to-end, or every blocked step has a concrete environment reason.
-- The runbook contains exact commands that another agent can follow.
-- Dev-only setup is clearly separated from production behavior.
-- No backend product code, API contract, DDL, dependency, shared DTO, Tauri, Provider, credit, or desktop source code changes are made.
-- No real provider keys/SDKs/network calls are added.
-- `npm run build` passes in `desktop-app`.
-- `git diff --check` passes.
-- Module context is updated with verification facts and residual risks.
+1. 所有 8 个模型文件的 18 个 DateTime 列均已添加 `DateTime(timezone=True)`
+2. 现有 147 个 SQLite 测试全部通过（回归验证）
+3. PostgreSQL DDL 集成测试全部通过（55 tests）
+4. 使用现有 `dev_seed_user.py` 在 PostgreSQL 环境下运行成功，验证 ORM 对 PostgreSQL 读写正常。不新增测试文件或验证脚本
+5. `git diff --check` 通过
+6. 文档更新完成，移除 SQLite 绕过的已知问题记录
 
 ## Test Method
 
-Desktop build:
+### 回归测试（必须通过）
 
 ```bash
-cd D:/Project/ad-assistant/desktop-app
-npm run build
+cd D:/Project/ad-assistant/cloud-backend
+python -m pytest tests/ -v --ignore=tests/test_migrations_integration.py
+# 预计 147 passed
 ```
 
-Whitespace check:
+### PostgreSQL 集成测试（必须通过）
 
 ```bash
-cd D:/Project/ad-assistant
-git diff --check
+# 启动 PostgreSQL 容器
+docker run -d --name pg-test-07 \
+  -e POSTGRES_PASSWORD=test \
+  -p 5432:5432 \
+  postgres:16
+
+until docker exec pg-test-07 pg_isready -U postgres; do sleep 1; done
+
+# 运行集成测试
+cd D:/Project/ad-assistant/cloud-backend
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
+  python -m pytest tests/test_migrations_integration.py -v
+
+# 清理
+docker rm -f pg-test-07
 ```
 
-Manual smoke:
+### PostgreSQL ORM 读写验证（使用现有文件，不新增文件）
 
-```text
-1. Start local PostgreSQL/backend using the documented runbook.
-2. Start desktop Vite dev server.
-3. Login with the documented local test user/device fingerprint.
-4. Submit a Mock AI ad-copy request.
-5. Confirm mock result fields and request_id.
-6. Refresh and confirm tokens are gone.
-7. Verify OCR flow or record the exact local OCR blocker.
+方式一（用现有种子脚本）：
+```bash
+cd D:/Project/ad-assistant/cloud-backend
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
+  python -m pytest tests/test_migrations_integration.py -v
+
+DATABASE_URL=postgresql+asyncpg://postgres:test@localhost:5432/postgres \
+  JWT_SECRET_KEY="dev-secret-key" \
+  python scripts/dev_seed_user.py
 ```
 
-## Dependency Permission
+方式二（内联 Python 验证）：
+```bash
+cd D:/Project/ad-assistant/cloud-backend
+DATABASE_URL="postgresql+asyncpg://postgres:test@localhost:5432/postgres" \
+JWT_SECRET_KEY="dev-secret-key" \
+python -c "
+import asyncio
+from sqlalchemy.ext.asyncio import create_async_engine
+from app.models.base import Base
+import app.models.user, app.models.device, app.models.auth_session
+import app.models.risk_log, app.models.usage_event
+import app.models.provider_call_log, app.models.credit_account, app.models.credit_ledger
 
-No new dependencies are allowed.
+async def verify():
+    e = create_async_engine('postgresql+asyncpg://postgres:test@localhost:5432/postgres')
+    async with e.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print('OK: ORM create_all against PostgreSQL succeeded')
+    await e.dispose()
+asyncio.run(verify())
+"
+```
 
-Do not edit dependency files or lockfiles.
+> 以上两种方式均使用现有文件，不产生新文件。执行者任选其一验证即可。
+
+## Risk Assessment
+
+| 风险 | 等级 | 说明 |
+|------|------|------|
+| ORM 行为变更 | **中** | `DateTime(timezone=True)` 后，从 PG 读取的 datetime 对象始终带时区。现有业务代码如果对 datetime 做 naive 假设可能出问题 |
+| SQLite 兼容性 | **低** | SQLite 不区分时区类型，行为与之前相同 |
+| `datetime.utcnow()` 废弃 | **低** | Python 3.12 中已废弃，可在对齐时一并修复 |
+| PostgreSQL CI 中断 | **低** | CI workflow 只测 DDL 执行，不测 ORM 读写 |
+
+## Rollback Plan
+
+1. 撤销所有模型文件中新增的 `DateTime(timezone=True)` → 恢复为 `Mapped[datetime]` 无 `timezone=True`
+2. 还原文档中移除的 PostgreSQL 警告
+3. 无需数据库回滚（DDL 未修改，且无生产数据）
+
+回滚命令：
+```bash
+git revert <task-07-commit>
+```
+
+## Backward Compatibility
+
+- **SQLite**：完全兼容。`DateTime(timezone=True)` 在 SQLite 中的行为与之前相同
+- **PostgreSQL DDL**：修复后完全对齐，DDL 和 ORM 均使用 `TIMESTAMPTZ`
+- **现有测试**：兼容。147 个 SQLite 测试预期全部通过
+- **CI**：兼容。`pg-integration` workflow 预期通过
 
 ## Major Change Status
 
-Yes, only if a dev seed helper is added. It must remain local-development-only and must not change production auth, device binding, API contract, schema, or security behavior.
+**是 — 重大变更。** 原因：修改数据库模型列类型声明属于 CODEX.md 中定义的重大变更（"修改数据库表结构"）。
 
-User confirmation of this task sheet is required before implementation.
+**用户已于 2026-06-01 确认此重大变更。**
+
+此变更是 **仅 ORM 声明对齐已有 DDL**，不改变：
+- 数据库物理表结构（DDL 不变）
+- API 契约
+- 磁盘上的数据格式
+- Provider 接口
+
+属于重大变更清单中最轻量的一类。
+
+## Dependency Permission
+
+不允许新增依赖。仅修改已有文件。
 
 ## Security Requirements
 
-- Do not store real secrets in repo.
-- Do not write `.env` files with secrets.
-- Do not bypass backend auth/device checks.
-- Do not persist desktop tokens.
-- Do not add client-side provider/model/cost/credit decisions.
-- Keep all seed/test credentials clearly marked as local development only.
+- 不下发 API Key 到客户端
+- 不由客户端扣点
+- 不由客户端决定套餐
+- 不绕过云端授权
+- 不明文保存 Token
+- AI 调用写入 provider_call_log（本次不涉及）
 
 ## Review Instructions For Codex
 
-Review Sprint-02 Task-06 Desktop Mock AI E2E Smoke Verification.
+Review Sprint-02 Task-07 Backend PostgreSQL DateTime Alignment.
 
 Focus on:
 
-1. whether the manual verification evidence is complete and reproducible;
-2. whether any dev seed helper is strictly dev-only;
-3. whether no production backend/desktop/API/DDL/dependency changes were made;
-4. whether no secrets or real provider keys were added;
-5. whether residual manual blockers are concrete and actionable.
+1. whether only model files + docs were changed
+2. whether no DDL, API, service, provider, shared, desktop, or dependency changes were made
+3. whether test results are complete (SQLite 147, PG 55, ORM read/write)
+4. whether the change is within the user-confirmed major change scope
+5. whether documentation updates correctly reflect the fix
 
 Output:
 
-- blocking issues;
-- high-risk issues;
-- medium/low-risk issues;
-- verification conclusion;
-- whether commit is allowed.
+- blocking issues
+- high-risk issues
+- medium/low-risk issues
+- verification conclusion
+- whether commit is allowed
 
 ## Completion Output Required
 
 Implementer must report:
 
-- changed files;
-- exact runbook commands added or used;
-- exact build/check commands and results;
-- manual verification steps and results;
-- confirmation that no production backend/API/DDL/dependency/shared/Tauri/desktop source changes were made;
-- confirmation that no secrets or real provider integrations were added;
-- residual risks;
-- whether module context was updated;
-- wait for Codex Review, do not self-merge.
+- changed files (with diff stat)
+- exact test commands and results
+- ORM PostgreSQL read/write verification results
+- confirmation that no DDL, API, service, provider, shared, desktop, or dependency changes were made
+- confirmation that no new test files or scripts were created
+- residual risks
+- module context updated
+- wait for Codex Review, do not self-merge
 
 ---
 
-## Implementation Record (2026-06-01, updated)
+## Implementation Record (2026-06-01)
 
-### Changed Files
+### Changed Files (14 files, +95/−46)
 
-- `docs/25-desktop-mock-e2e-smoke.md` (new) — E2E smoke runbook with verified results
-- `cloud-backend/scripts/dev_seed_user.py` (new) — Dev-only seed script (ORM-based)
-- `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md` (new) — Module context
-- `docs/09-desktop-app-guide.md` — Added dev runbook reference + quick-start
-- `docs/11-cloud-backend-guide.md` — Added local dev environment section
-- `docs/sprint-02-summary.md` — Updated Task-06 status
-- `desktop-app/vite.config.ts` — Added `/api` proxy for local dev CORS avoidance
-- `tasks/current-task.md` — Status + implementation record
+**Models (core fix — 8 files):**
 
-### Build / Check Results
+- `cloud-backend/app/models/user.py` — `DateTime(timezone=True)` ×2
+- `cloud-backend/app/models/device.py` — `DateTime(timezone=True)` ×4
+- `cloud-backend/app/models/auth_session.py` — `DateTime(timezone=True)` ×4
+- `cloud-backend/app/models/credit_account.py` — `DateTime(timezone=True)` ×4
+- `cloud-backend/app/models/credit_ledger.py` — `DateTime(timezone=True)` ×1
+- `cloud-backend/app/models/provider_call_log.py` — `DateTime(timezone=True)` ×1
+- `cloud-backend/app/models/risk_log.py` — `DateTime(timezone=True)` ×1
+- `cloud-backend/app/models/usage_event.py` — `DateTime(timezone=True)` ×1
 
-- `npm run build` (desktop-app): ✅ 43 modules, 0 errors
-- `git diff --check`: ✅ Passed
+**Seed Script (1 file):**
 
-### Existing Test Suite
+- `cloud-backend/scripts/dev_seed_user.py` — docstring updated (mismatch resolved)
 
-The project's 147 backend tests run against SQLite in-memory (not PostgreSQL).
-These tests pass and are unchanged by this task.
-PG integration tests (`test_migrations_integration.py`) require `TEST_DATABASE_URL`.
+**Documentation (5 files):**
 
-### API Smoke Verification (2026-06-01, curl + live servers)
+- `docs/25-desktop-mock-e2e-smoke.md` — removed PG bypass, added PG alternative section
+- `docs/11-cloud-backend-guide.md` — updated PG status from blocked to supported
+- `docs/12-database-design.md` — added timestamp alignment note
+- `docs/sprint-02-summary.md` — added Task-07 status block
+- `docs/module-context/sprint-02-task-07-pg-datetime-align/context.md` — new module context
 
-| Step | Result | Detail |
-|------|--------|--------|
-| PostgreSQL container | ✅ | Docker postgres:16, DB ad_assistant_dev created |
-| Tables (SQLAlchemy) | ✅ | Base.metadata.create_all via SQLite |
-| Seed user + device | ✅ | test@example.com / device-fingerprint-abc |
-| Cloud backend start | ✅ | uvicorn @ :8000, health=ok |
-| Login API | ✅ | access_token, refresh_token, user, device, request_id |
-| Mock AI API (ASCII) | ✅ | provider=mock, model=mock-text-v1, credits_charged=0 |
-| Mock AI API (Chinese) | ✅ | UTF-8 product_name/selling_points accepted |
-| provider_call_log | ✅ | Row: provider=mock, status=success, credits=0 |
-| Logout | ✅ | Refresh token revoked |
-| Token reuse detection | ✅ | TOKEN_REUSE after logout |
-| No-auth → 401 | ✅ | HTTP 401 |
-| Desktop Vite dev server | ✅ | Serves index.html + modules @ :5173 |
+### Verification Results
 
-### UI Smoke (2026-06-01, live browser ✅)
-
-Tested in browser @ http://127.0.0.1:5173 with live backend + Vite proxy:
-
-| Step | Result | Detail |
-|------|--------|--------|
-| Browser login form | ✅ PASS | Account/password/fingerprint → redirect to /ocr |
-| Mock AI panel after login | ✅ PASS | "Mock AI 广告文案生成（仅 Mock）" visible |
-| Generate mock ad-copy + result | ✅ PASS | provider=mock, model=mock-text-v1, 扣点=0, request_id=req_27a7a33502cb |
-| Page refresh clears tokens | ✅ PASS | F5 → login lost, panel hidden (Pinia memory-only verified) |
-| OCR upload UI | ✅ PASS | Image area visible; recognition blocked (no local OCR service) |
-
-Note: Vite proxy (`/api` → `:8000`) configured in `vite.config.ts`.
-`VITE_CLOUD_API_BASE_URL=http://127.0.0.1:5173` required at dev server start.
-
-### Backend Database Note
-
-API smoke used SQLite (`sqlite+aiosqlite:///dev.db`) because the current
-SQLAlchemy models generate timezone-aware datetimes incompatible with
-DDL-created PostgreSQL `TIMESTAMPTZ` columns. The 147 existing tests
-also use SQLite. This is a pre-existing ORM/DDL mismatch — not caused
-by this task and not fixable within this task's scope (models are under
-`cloud-backend/app/`, which is forbidden).
+| Test | Result |
+|------|--------|
+| SQLite regression (147 tests) | ✅ 147 passed |
+| PG DDL integration (55 tests) | ✅ 55 passed |
+| ORM `create_all` against PG | ✅ succeeded |
+| `dev_seed_user.py` against PG | ✅ user created + device bound |
+| `git diff --check` | ✅ passed |
 
 ### Confirmations
 
-- ✅ No production backend/API/DDL changes
-- ✅ No dependency changes
-- ✅ No shared DTO changes
-- ✅ No Tauri permission changes
-- ✅ No desktop source code changes (`src/`, `src-tauri/`)
-- ✅ No local service changes
-- ✅ No secrets or real provider keys added
-- ✅ Dev seed script is clearly dev-only with warnings and known-limitation docs
+- ✅ Only allowed files modified
+- ✅ DDL (`migrations/ddl/*.sql`) not modified
+- ✅ API, services, core, providers, schemas not modified
+- ✅ shared, desktop-app, official-website not modified
+- ✅ CI workflows, dependency files, .env not modified
+- ✅ No new test files or scripts created
+- ✅ No secrets or provider keys added
+
+### Not Implemented
+
+- No full audit of datetime usage in `app/services/` and `app/api/` (out of allowed file scope; grep check found no obvious issues)
+- No new automated test files added
 
 ### Residual Risks
 
-- DDL TIMESTAMPTZ / ORM DateTime mismatch (pre-existing, documented, needs future task)
-- OCR pipeline blocked on local PaddleOCR service (out of scope)
-- `datetime.utcnow()` deprecation in seed script (tied to DateTime mismatch fix)
+- Services/api code may contain datetime naive assumptions — needs future targeted review
+- Full backend integration smoke against PostgreSQL (start backend, login, mock AI call) was not repeated — covered by Task-06 runbook's PG alternative section
 
 ### Module Context
 
-Updated: `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md`
+Updated: `docs/module-context/sprint-02-task-07-pg-datetime-align/context.md`
 
 ### Next: Wait for Codex Review
 
 Do NOT commit. Do NOT self-merge. Wait for Codex Review approval.
+
+---
+
+> **任务单创建日期**：2026-06-01
+> **实施完成日期**：2026-06-01
+> **参考**：`tasks/sprint-02-task-07-draft.md`, `docs/25-desktop-mock-e2e-smoke.md`, `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md`

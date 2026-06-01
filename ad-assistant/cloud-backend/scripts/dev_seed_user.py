@@ -15,11 +15,8 @@
     DEV_PASSWORD      默认 correct-password
     DEV_DEVICE_FINGERPRINT  默认 device-fingerprint-abc
 
-已知限制::
-
-    使用 ORM 模型写库，因此在 PostgreSQL 下依赖 DDL 与模型的 DateTime 列类型
-    一致。当前 DDL 使用 TIMESTAMPTZ 而模型使用 TIMESTAMP WITHOUT TIME ZONE，
-    会触发 asyncpg 时区不匹配错误。开发时建议使用 SQLite（见运行手册）。
+Sprint-02 Task-07 已修复 ORM DateTime(timezone=True) 与 DDL TIMESTAMPTZ 对齐，
+本脚本在 SQLite 和 PostgreSQL 下均可正常运行。
 """
 
 import asyncio
