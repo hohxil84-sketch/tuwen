@@ -1,12 +1,13 @@
 """Credit service — 用户 AI 算力账户与流水基础操作.
 
-本模块只提供余额查询、账户创建和流水查询。不实现真实扣费、充值、支付或套餐发放。
+本模块提供余额查询、账户创建、流水查询、扣费操作。
+不实现充值、支付或套餐发放。
 """
 
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.credit_account import CreditAccount
@@ -197,3 +198,78 @@ async def record_credit_ledger(
     db.add(ledger)
     await db.flush()
     return ledger
+
+
+# ---------------------------------------------------------------------------
+# Sprint-03 Task-03: real credit deduction
+# ---------------------------------------------------------------------------
+
+
+async def deduct_credits(
+    *,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    amount: int,
+    source_id: str | None = None,
+    description: str | None = None,
+) -> int:
+    """Atomically deduct credits from the user's balance.
+
+    Reads the current balance, deducts up to ``amount`` (partial deduction
+    if insufficient), writes a ``consume`` entry to ``credit_ledger``, and
+    returns the number of credits actually deducted.
+
+    All operations happen within the caller's transaction (``db`` session).
+
+    Args:
+        db: Active database session.
+        user_id: User whose balance will be deducted.
+        amount: Maximum credits to deduct (must be >= 0).
+        source_id: Optional identifier (e.g. request_id) for the ledger entry.
+        description: Optional human-readable description.
+
+    Returns:
+        int: The number of credits actually deducted (0 if amount <= 0
+        or balance is 0).
+
+    Raises:
+        ValueError: If ``amount`` is negative.
+    """
+    if amount < 0:
+        raise ValueError(f"amount must be >= 0, got {amount}")
+    if amount == 0:
+        return 0
+
+    # Get or create the credit account
+    account = await get_or_create_credit_account(db=db, user_id=user_id)
+
+    # Determine actual deduction (partial if balance insufficient)
+    actual_deduct = min(amount, account.balance)
+    if actual_deduct <= 0:
+        return 0
+
+    new_balance = account.balance - actual_deduct
+
+    # Atomic update: SET balance = balance - actual_deduct
+    await db.execute(
+        update(CreditAccount)
+        .where(CreditAccount.id == account.id)
+        .values(balance=new_balance)
+    )
+    # Update the in-memory object to stay consistent
+    account.balance = new_balance
+
+    # Write the ledger entry
+    await record_credit_ledger(
+        db=db,
+        user_id=user_id,
+        account_id=account.id,
+        change_type="consume",
+        amount=-actual_deduct,
+        balance_after=new_balance,
+        source_type="provider_call",
+        source_id=source_id,
+        description=description or f"Provider call deduction: {actual_deduct} credits",
+    )
+
+    return actual_deduct

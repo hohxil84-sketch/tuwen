@@ -1,10 +1,10 @@
-"""Provider 执行与日志服务 — 调用 Provider、计算成本、写入 provider_call_log。
+"""Provider 执行与日志服务 — 调用 Provider、计算成本、扣费、写入 provider_call_log。
 
-不执行真实扣费，不写 credit_ledger。
 不暴露为公共 HTTP API。
 
 Sprint-02 Task-03: MockProvider 专用执行路径。
 Sprint-02 Task-09: 新增 ``route_and_execute_provider_call`` 路由层入口。
+Sprint-03 Task-03: 真实 credit 扣费（CNY→credits + deduct_credits）。
 """
 
 import time
@@ -17,7 +17,12 @@ from app.providers.base import AsyncProvider, ProviderRequest, ProviderResult
 from app.providers.deepseek_provider import DeepSeekProviderError
 from app.providers.mock_provider import MockProviderError
 from app.providers.router import get_provider_router
-from app.services.cost_service import calculate_deepseek_cost, calculate_mock_cost
+from app.services.cost_service import (
+    calculate_deepseek_cost,
+    calculate_mock_cost,
+    cny_to_credits,
+)
+from app.services.credit_service import deduct_credits
 from app.services.provider_log_service import record_provider_call
 
 
@@ -82,6 +87,47 @@ async def execute_provider_call(
         result.estimated_cost = estimated_cost
 
         # ------------------------------------------------------------------
+        # Sprint-03 Task-03: 真实 credit 扣费
+        # ------------------------------------------------------------------
+        credits_charged = 0
+        if user_id is not None and estimated_cost > 0:
+            credits_to_charge = cny_to_credits(estimated_cost)
+            try:
+                credits_charged = await deduct_credits(
+                    db=db,
+                    user_id=user_id,
+                    amount=credits_to_charge,
+                    source_id=request_id,
+                    description=(
+                        f"AI call: {request.feature} via "
+                        f"{result.provider}/{result.model}"
+                    ),
+                )
+            except Exception:
+                # Deduction failed — record an error log and re-raise
+                latency_ms = int((time.perf_counter() - start_time) * 1000)
+                await record_provider_call(
+                    db=db,
+                    provider=result.provider,
+                    model=result.model,
+                    feature=request.feature,
+                    status="error",
+                    user_id=user_id,
+                    device_id=device_id,
+                    request_id=request_id,
+                    error_code="DEDUCTION_FAILED",
+                    prompt_tokens=result.input_units,
+                    completion_tokens=result.output_units,
+                    total_tokens=result.input_units + result.output_units,
+                    estimated_cost=result.estimated_cost,
+                    credits_charged=0,
+                    latency_ms=latency_ms,
+                )
+                raise
+
+        result.credits_charged = credits_charged
+
+        # ------------------------------------------------------------------
         # 写入成功日志
         # ------------------------------------------------------------------
         latency_ms = int((time.perf_counter() - start_time) * 1000)
@@ -99,7 +145,7 @@ async def execute_provider_call(
             completion_tokens=result.output_units,
             total_tokens=result.input_units + result.output_units,
             estimated_cost=result.estimated_cost,
-            credits_charged=0,  # 扣费在后续任务中实现
+            credits_charged=credits_charged,
             latency_ms=latency_ms,
         )
 

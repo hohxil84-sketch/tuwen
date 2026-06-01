@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     DEEPSEEK_MODEL: str = "deepseek-chat"
 
+    # ---- Credit / Cost conversion -------------------------------------------
+    CREDITS_PER_CNY: int = 100  # 1 credit = ¥0.01, ceiling after multiply
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

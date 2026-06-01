@@ -54,6 +54,7 @@ class ProviderResult(BaseModel):
     gpu_seconds: float = Field(default=0.0, ge=0.0, description="GPU 占用秒数")
     raw_cost: float = Field(default=0.0, ge=0.0, description="Provider 原始成本（人民币）")
     estimated_cost: float = Field(default=0.0, ge=0.0, description="后端估算成本（人民币）")
+    credits_charged: int = Field(default=0, ge=0, description="实际扣除积分数（Sprint-03 Task-03）")
     currency: str = Field(default="CNY", description="币种")
     result: dict[str, Any] = Field(
         default_factory=dict, description="Provider 返回的业务结果"

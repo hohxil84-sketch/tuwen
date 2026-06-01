@@ -133,9 +133,9 @@ PR：#28（已按用户确认合并到 `main` @ `0c1096b`）
 
 ## 2026-06-01 - Sprint-03 Task-02 First Real Provider Integration — DeepSeek (S03-T02)
 
-状态：IMPLEMENTED_SELF_REVIEW_PASSED
+状态：MERGED → `1773ab4` (squash merge of PR #32)
 
-分支：`feature/sprint-03-task-02-deepseek-provider`
+分支：`feature/sprint-03-task-02-deepseek-provider` (deleted)
 
 ### 范围
 
@@ -181,6 +181,49 @@ PR：#28（已按用户确认合并到 `main` @ `0c1096b`）
 - 残余风险：`DEEPSEEK_API_KEY` 为空时 DeepSeekProvider 会抛出 API_KEY_MISSING；需在部署环境配置 `.env`。路由规则可变（dict-of-dicts），后续可随时调整。
 - 后续任务：S03-T03（真实 credit 扣费）、fallback/retry 机制、其他 plan 逐步切到 DeepSeek。
 - 回滚方式：将 `mock_ad_copy/standard` 路由改回 `"mock"`，或从 registry 移除 `"deepseek"`。
+
+## 2026-06-01 - Sprint-03 Task-03 Real Credit Deduction (S03-T03)
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-03-task-03-credit-deduction`
+
+### 范围
+
+- 目标：将 credit 扣费链路接入 Provider 调用，每次成功调用后自动从用户余额扣减积分并写入 credit_ledger。
+- 已实现：`CREDITS_PER_CNY` 配置、`cny_to_credits()` 换算、`deduct_credits()` 原子扣减、`execute_provider_call` 扣费集成、19 focused tests。
+- 未实现：预扣检查（余额不足拦截）、plan 级别倍率、月赠自动补充、退款逻辑、客户端修改。
+
+### 主要改动
+
+- `cloud-backend/app/core/config.py`：新增 `CREDITS_PER_CNY: int = 100`。
+- `cloud-backend/app/providers/base.py`：`ProviderResult` 新增 `credits_charged: int = 0` 字段。
+- `cloud-backend/app/services/cost_service.py`：新增 `cny_to_credits()` — CNY→积分 ceil 换算法。
+- `cloud-backend/app/services/credit_service.py`：新增 `deduct_credits()` — 原子扣减 balance + 写 credit_ledger。
+- `cloud-backend/app/services/provider_service.py`：成功路径增加 CNY→积分换算 + 扣费调用；扣费失败记录 DEDUCTION_FAILED 并重新抛出。
+- `cloud-backend/app/api/v1/mock_ai.py`：`credits_charged` 改为使用 `result.credits_charged`（不再硬编码 0）。
+- `cloud-backend/tests/test_credit_deduction.py`（NEW）：19 focused tests（换算 6 + 扣减 7 + provider_service 集成 6）。
+- `docs/07-ai-cost-control.md`：新增 S03-T03 实现证据和扣费链路说明。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是（base.py 的 ProviderResult 字段新增是必要且向后兼容的）
+- 未触碰未确认高风险变更：是（credit 高风险已由用户确认）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：是（docs/07-ai-cost-control.md）
+
+### 测试结果
+
+- Credit deduction focused：19 passed
+- Full regression：211 passed, 55 skipped
+- `git diff --check`：待运行
+
+### 风险和后续
+
+- 残余风险：余额为 0 的测试用户不会触发扣费（部分扣费返回 0），但测试断言 `credits_charged==0` 仍成立。生产环境用户余额为 0 时，调用仍会成功但不扣费，后续需要预扣检查（pre-flight balance check）。
+- 后续任务：S03-T04（预扣检查 + 余额不足拦截）、fallback/retry、plan 倍率。
+- 回滚方式：设置 `CREDITS_PER_CNY = 0` 使 `cny_to_credits()` 始终返回 0，或 revert 对应提交。
 
 ## 2026-06-01 - Agent Workflow CC Autonomous Handoff
 
