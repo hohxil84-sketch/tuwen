@@ -2,7 +2,7 @@
 
 ## 状态
 
-`IN_PROGRESS` — 任务单已起草，等待用户确认后开始开发。
+`IMPLEMENTED_SELF_REVIEW_PASSED` — 已提交 PR #37，等待 Codex/用户复核。
 
 ## 背景
 
