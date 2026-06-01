@@ -9,6 +9,7 @@ available :class:`AsyncProvider` instances by name.
 from __future__ import annotations
 
 from app.providers.base import AsyncProvider
+from app.providers.mock_provider import MockProvider
 
 
 class ProviderRegistryError(Exception):
@@ -81,8 +82,5 @@ def get_provider_registry() -> ProviderRegistry:
     global _registry
     if _registry is None:
         _registry = ProviderRegistry()
-        # Lazy import to avoid circular imports
-        from app.providers.mock_provider import MockProvider  # noqa: PLC0415
-
         _registry.register("mock", MockProvider())
     return _registry

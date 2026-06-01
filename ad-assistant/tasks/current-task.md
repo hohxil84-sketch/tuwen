@@ -1,130 +1,107 @@
-# Current Task: Sprint-02 Task-09 Provider Routing Design
+# Sprint-03 Planning — Comprehensive Review Findings & Candidate Tasks
 
 ## Status
 
-`MERGED`
-
-Implemented by Claude Code on 2026-06-01. Self-review passed. PR #23 merged to `main`.
-
-## Implementation Evidence
-
-- **Branch**: `feature/sprint-02-task-09-provider-routing`
-- **Commit**: `89fe06f`
-- **PR**: #23, merged to `main` at `37e0430`
-- **Registry**: `ProviderRegistry` with singleton, pre-loaded with `MockProvider` as `"mock"`
-- **Router**: `ProviderRouter` with `DEFAULT_ROUTING_RULES`, all routes → `"mock"`
-- **Service**: `route_and_execute_provider_call()` as high-level entry point
-- **Endpoint**: `mock_ai.py` no longer imports `MockProvider` directly
-- **Tests**: 167 total passed (147 regression + 21 mock AI + 20 routing)
-- **`git diff --check`**: ✅
-- **OpenAPI gen**: unchanged ✅
-- **No real provider SDKs/keys/network calls**: ✅
-- **Wire response unchanged**: ✅
+`PLANNING` — 待用户审阅和确认。
 
 ## Background
 
-The current provider execution path is hardwired: every endpoint instantiates a specific `AsyncProvider` and passes it to `execute_provider_call()`. In `mock_ai.py`:
+Sprint-02 已全部收尾（9 tasks + 2 workflow PRs merged）。代码库经过了全面审查，发现了一系列需要处理的问题。本文档汇总审查发现，并规划 Sprint-03 候选任务。
 
-```python
-provider = MockProvider()
-result = await execute_provider_call(db=db, provider=provider, ...)
+---
+
+## Part 1: 审查发现（C3 汇总）
+
+### 已在当前分支修复
+
+| 文件 | 问题 | 修复 |
+|------|------|------|
+| `cloud-backend/app/api/v1/credits.py` | 未使用导入 `CreditLedgerItem` | 移除 |
+| `cloud-backend/app/services/provider_log_service.py` | 未使用导入 `datetime, timezone` | 移除 |
+| `cloud-backend/app/services/usage_service.py` | 未使用导入 `datetime, timezone` | 移除 |
+| `cloud-backend/app/main.py` | 局部 `import json` | 提升到文件顶部 |
+| `cloud-backend/app/api/v1/auth.py` | 局部 `import hashlib` | 提升到文件顶部 |
+| `cloud-backend/app/providers/registry.py` | 不必要的延迟导入 `MockProvider` | 移到顶部 |
+| `cloud-backend/app/services/provider_service.py` | 不必要的延迟导入 `get_provider_router` | 移到顶部 |
+| `cloud-backend/app/schemas/__init__.py` | 缺少 `credit`、`mock_ai` re-export | 补充完整 |
+| `docs/03-monorepo-structure.md` | 目录列表缺 docs 20-25 | 补充 |
+| `docs/sprint-01-summary.md` | 候选任务从未更新 | 标注已处理 |
+| `docs/development-record.md` | 缺 Task 06-09 记录 | 补充 |
+| `PROGRESS.md` | 缺 Task-06 条目 | 补充 |
+
+### 需要后续任务处理的发现
+
+#### P0 — 安全/可靠性
+
+| # | 来源 | 文件 | 问题 | 建议 Sprint-03 任务 |
+|---|------|------|------|---------------------|
+| D1 | Desktop CRITICAL | `LoginPage.vue`, `authStore.ts` | Device fingerprint 为用户手动输入，完全绕过设备绑定安全机制 | Task: 自动生成 device fingerprint (machine-ID / UUID) |
+| D2 | Desktop WARNING | `authStore.ts` + `cloudApi.ts` | Access token 双源存储 (Pinia store + module-level var)，可能漂移 | Task: 统一 token 管理到 Pinia store |
+| D3 | Desktop WARNING | `ocrService.ts`, `cloudApi.ts` | 所有 `fetch()` 调用无超时/中断 | Task: 添加 AbortController + 超时 |
+| D4 | Backend WARNING | `auth_service.py:_log_risk` | 静默吞没所有异常 (`except Exception: pass`) | Task: 添加 logging.exception |
+
+#### P1 — 类型安全/代码质量
+
+| # | 来源 | 文件 | 问题 | 建议 Sprint-03 任务 |
+|---|------|------|------|---------------------|
+| D5 | Desktop WARNING | 多处 `.vue`, `.ts` | 所有 catch 块使用不安全的 `err as Type` 断言 | Task: 添加 runtime type guard |
+| D6 | Desktop WARNING | `OcrPage.vue` | Blob URL 导航离开时不释放 | Task: onUnmounted cleanup |
+| D7 | Desktop INFO | `router.ts` | 无路由级 auth guard，页面短暂闪烁 | Task: router.beforeEach guard |
+| D8 | Backend WARNING | `router.py:route()` | `async` 方法但无 await | Task: 改为 sync 或保持（低优先级） |
+| D9 | Backend INFO | `core/middleware.py`, `core/auth_deps.py` | 死模块，从未被导入 | Task: 删除或实现 |
+| D10 | Backend WARNING | `cost_service.py` | 冗余输入验证（Pydantic 已验证） | Task: 清理 |
+
+#### P2 — 架构/重构
+
+| # | 来源 | 文件 | 问题 | 建议 |
+|---|------|------|------|------|
+| D11 | Backend CRITICAL | `core/auth_deps.py` | `core` 反向依赖 `api` (架构违规) | Task: 重构 deps 位置 |
+| D12 | Backend INFO | `schemas/__init__.py` vs `module-context` | Task 编号历史碰撞 (credit_ledger 原为 Task-02) | 文档说明，不阻塞 |
+
+---
+
+## Part 2: Sprint-03 候选任务
+
+### P0 — 必须做
+
+| Task | 描述 | 优先级理由 |
+|------|------|-----------|
+| **S03-T01** 修复审查发现 D1-D4 | Device fingerprint、token 双源、fetch 超时、_log_risk 日志 | 安全和可靠性红线 |
+| **S03-T02** 第一个真实 Provider 集成 | DeepSeek / OpenAI SDK 接入，API key 管理，真实网络调用 | 核心商业价值 |
+| **S03-T03** 真实扣费链路 | `credit_ledger` 写入、`estimated_cost` → 算力换算、余额扣除 | 商业模式闭环 |
+
+### P1 — 应该做
+
+| Task | 描述 | 优先级理由 |
+|------|------|-----------|
+| **S03-T04** 修复审查发现 D5-D10 | 类型安全、Blob cleanup、auth guard、死代码清理 | 代码质量和 UX |
+| **S03-T05** Provider fallback/retry | 多 Provider 容错、健康检查、降级策略 | 生产可用性 |
+| **S03-T06** 套餐/支付/充值 | Membership、package、payment、recharge、grant-balance | 商业模式 |
+
+### P2 — 可以做
+
+| Task | 描述 |
+|------|------|
+| **S03-T07** 修复审查发现 D11-D12 | 架构重构、目录名修正 |
+| **S03-T08** 后台管理查询/报表 | Admin query and reporting |
+| **S03-T09** OCR 历史记录隐私策略 | Retention、cleanup、privacy policy |
+| **S03-T10** 其他端点迁移 `response_model` | 将 `response_model=None` 改为 `response_model=APIResponse[X]` |
+
+---
+
+## 建议执行顺序
+
+```
+Sprint-03:
+  Phase 1: S03-T01 (安全修复) → S03-T02 (真实 Provider) → S03-T03 (真实扣费)
+  Phase 2: S03-T04 (代码质量) → S03-T05 (容错) → S03-T06 (支付)
+  Phase 3: S03-T07~T10 (剩余改进)
 ```
 
-This works for a single mock provider but cannot support multiple providers, plan-based routing, or feature-based routing.
+---
 
-We need a provider routing layer between the route handler and `execute_provider_call()`. The router selects which provider to use based on feature + plan.
+## Next Action
 
-**Important**: This task builds the routing infrastructure. No real provider implementations (no SDKs, no API keys, no network calls). All routes still resolve to `MockProvider` — but through the router.
-
-## Goal
-
-1. **Provider Registry** — named container of available providers
-2. **Provider Router** — selects provider based on (feature, plan)
-3. **Update execution path** — endpoints call router instead of instantiating providers directly
-4. **Update existing endpoint** — `mock_ai.py` uses routing
-
-## What To Build
-
-### 1. Provider Registry (`app/providers/registry.py`)
-
-- `ProviderRegistry` class: `register(name, provider)`, `get(name)`, `list_names()`, `__contains__`
-- Module-level singleton `get_provider_registry()` pre-registered with `MockProvider` as `"mock"`
-
-### 2. Provider Router (`app/providers/router.py`)
-
-- `ProviderRouter` class: `route(feature, plan) -> AsyncProvider`
-- Routing rules: dict mapping `(feature, plan)` → `provider_name`
-- All routes resolve to `"mock"` for now; unknown feature/plan falls back to `"mock"`
-- `ProviderNotFoundError` for lookup failures
-- Module-level singleton `get_provider_router()`
-
-### 3. Update `provider_service.py`
-
-- Add `route_and_execute_provider_call()` — routes then executes
-- Existing `execute_provider_call()` unchanged
-
-### 4. Update `mock_ai.py`
-
-- Remove `MockProvider` import
-- Use `route_and_execute_provider_call()` instead of direct instantiation
-
-### 5. Tests (`tests/test_provider_routing.py`)
-
-- Registry unit tests, router unit tests, integration test
-
-### 6. Documentation
-
-- `docs/06-provider-architecture.md`, `docs/sprint-02-summary.md`, `PROGRESS.md`, module context
-
-## What Not To Build
-
-- No real providers (DeepSeek, OpenAI, Claude, etc.)
-- No AI SDK, API key, environment variable, or network call
-- No credit deduction or billing
-- No provider fallback/retry chains (future task)
-- No database tables for routing rules
-- No modification to `ProviderRequest`, `ProviderResult`, or `AsyncProvider`
-- No new API endpoints; no changes to endpoints other than `mock_ai.py`
-- No new dependencies; no DDL, auth, credit, device, or shared contract changes
-
-## Allowed Files
-
-- `cloud-backend/app/providers/__init__.py`
-- `cloud-backend/app/providers/registry.py` — new
-- `cloud-backend/app/providers/router.py` — new
-- `cloud-backend/app/services/provider_service.py`
-- `cloud-backend/app/api/v1/mock_ai.py`
-- `cloud-backend/tests/test_provider_routing.py` — new
-- `docs/06-provider-architecture.md`
-- `docs/sprint-02-summary.md`
-- `tasks/current-task.md`
-- `PROGRESS.md`
-- `docs/module-context/sprint-02-task-09-provider-routing/context.md` — new
-
-## Forbidden Files
-
-- `cloud-backend/app/providers/base.py`, `mock_provider.py`
-- `cloud-backend/app/schemas/**`, `models/**`, `core/**`
-- `cloud-backend/app/services/cost_service.py`
-- `cloud-backend/app/api/v1/auth.py`, `credits.py`, `devices.py`, `usage.py`, `provider_log.py`
-- `cloud-backend/tests/test_mock_ai_api.py`
-- `shared/**`, `desktop-app/**`, `migrations/**`, `.github/workflows/**`
-- dependency files, `.env` files
-
-## Acceptance Criteria
-
-1. `ProviderRegistry` exists with register/get/list_names/contains, pre-loaded with `MockProvider` as `"mock"`
-2. `ProviderRouter` routes (feature, plan) → provider, falls back to `"mock"` for unknown
-3. `route_and_execute_provider_call()` works end-to-end
-4. `mock_ai.py` no longer imports `MockProvider` directly
-5. New routing tests pass; 147 regression + 21 mock AI tests pass
-6. `git diff --check` passes; wire response unchanged
-7. No real provider SDKs, API keys, or network calls
-
-## Major Change Status
-
-**Yes** — touches Provider interface call path (CODEX.md high-risk boundary). User confirmed 2026-06-01.
-
-## Suggested Branch
-
-`feature/sprint-02-task-09-provider-routing`
+请确认：
+1. 当前分支 `review/sprint-02-comprehensive-review` 的修改是否可以提交？
+2. Sprint-03 的优先级排序是否认可？从哪个 Task 开始？

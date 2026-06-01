@@ -1,7 +1,6 @@
 """Usage event service — record and query feature usage events."""
 
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession

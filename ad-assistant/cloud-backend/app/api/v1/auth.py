@@ -3,6 +3,7 @@
 See ``docs/auth-device-plan.md`` and ``docs/api-draft-auth-device.md``.
 """
 
+import hashlib
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
@@ -118,8 +119,6 @@ async def logout(
 
 def _hash_ip(request: Request) -> str | None:
     """Return a SHA-256 hash of the client IP for privacy-preserving audit."""
-    import hashlib
-
     ip = request.client.host if request.client else None
     if ip is None:
         return None

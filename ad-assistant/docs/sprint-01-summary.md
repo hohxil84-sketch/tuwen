@@ -65,12 +65,10 @@ The local SQLite database file is runtime data and is not a committed source fil
 - Backend admin query/reporting capability is not implemented.
 - Local OCR history contains user-sensitive OCR content and image metadata; retention, cleanup, and privacy policy still need explicit product decisions.
 
-## Next-Stage Candidate Tasks
+## Next-Stage Candidate Tasks (historical — addressed in Sprint-02)
 
-These are candidates only. They are not implemented by Sprint-01 Task-06.
+These were candidates at Sprint-01 closeout. All were addressed in Sprint-02:
 
-- Candidate A: Sprint-02 Task-01 AI credit account and `credit_ledger` foundation table.
-- Candidate B: Sprint-02 Task-01 cloud Provider abstraction and mock Provider call.
-- Candidate C: Sprint-02 Task-01 PostgreSQL migration/integration test infrastructure.
-
-Before starting the next module, create a new task document, use a new task branch, and keep the scope limited to the confirmed task.
+- Candidate A (credit_ledger foundation) → Sprint-02 Task-01 ✅
+- Candidate B (mock Provider) → Sprint-02 Task-03 ✅
+- Candidate C (PG integration test) → Sprint-02 Task-02 ✅

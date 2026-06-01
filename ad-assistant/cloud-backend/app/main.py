@@ -1,5 +1,6 @@
 """Cloud Backend FastAPI Application — Sprint-01 Auth/Device implementation."""
 
+import json as _json
 import uuid as _uuid
 import time as _time
 from contextlib import asynccontextmanager
@@ -104,17 +105,15 @@ async def add_request_id(request: Request, call_next):
 
     # Inject into JSON body if possible
     if response.headers.get("content-type") == "application/json":
-        import json
-
         body_bytes = b""
         async for chunk in response.body_iterator:
             body_bytes += chunk
 
         try:
-            body = json.loads(body_bytes)
+            body = _json.loads(body_bytes)
             body["request_id"] = rid
             response = JSONResponse(content=body, status_code=response.status_code)
-        except (json.JSONDecodeError, TypeError):
+        except (_json.JSONDecodeError, TypeError):
             response = JSONResponse(
                 content=body_bytes.decode("utf-8", errors="replace"),
                 status_code=response.status_code,
