@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import select, text
 
 from app.core.security import create_access_token
+from app.models.credit_account import CreditAccount
 from app.models.credit_ledger import CreditLedger
 from app.models.provider_call_log import ProviderCallLog
 
@@ -42,6 +43,18 @@ def _route_mock_ad_copy_standard_to_mock():
     yield
     DEFAULT_ROUTING_RULES["mock_ad_copy"]["standard"] = original
     _router_mod._router = _cached_router
+
+
+@pytest.fixture
+async def _fund_test_user(db_session, test_user):
+    """Give test_user enough credits to pass pre-flight balance check."""
+    account = CreditAccount(
+        user_id=test_user.id, plan_code="standard", monthly_grant=0,
+        balance=100, status="active",
+    )
+    db_session.add(account)
+    await db_session.flush()
+    return account
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +140,9 @@ class TestMockAiAuth:
 class TestMockAiSuccess:
     """成功调用 → 200 + 统一 wrapper."""
 
-    async def test_success_returns_unified_wrapper(self, client, test_user, test_device):
+    async def test_success_returns_unified_wrapper(
+        self, client, test_user, test_device, _fund_test_user,
+    ):
         """成功调用应返回 {success, data, error, request_id}."""
         res = await client.post(
             ENDPOINT,
@@ -141,7 +156,9 @@ class TestMockAiSuccess:
         assert "request_id" in body
         assert body["request_id"].startswith("req_")
 
-    async def test_response_data_has_required_fields(self, client, test_user, test_device):
+    async def test_response_data_has_required_fields(
+        self, client, test_user, test_device, _fund_test_user,
+    ):
         """响应 data 包含 feature/provider/model/text/estimated_cost/credits_charged."""
         res = await client.post(
             ENDPOINT,
@@ -156,9 +173,12 @@ class TestMockAiSuccess:
         assert isinstance(data["text"], str)
         assert len(data["text"]) > 0
         assert data["estimated_cost"] >= 0.0
-        assert data["credits_charged"] == 0
+        # Sprint-03 Task-03: real credit deduction → credits_charged > 0
+        assert data["credits_charged"] == 2  # mock default usage ~2 credits
 
-    async def test_response_does_not_expose_raw_usage(self, client, test_user, test_device):
+    async def test_response_does_not_expose_raw_usage(
+        self, client, test_user, test_device, _fund_test_user,
+    ):
         """响应 data 中不得包含 raw_usage."""
         res = await client.post(
             ENDPOINT,
@@ -177,7 +197,9 @@ class TestMockAiSuccess:
 class TestMockAiProviderLog:
     """成功调用写入 provider_call_log 且不写 credit_ledger."""
 
-    async def test_writes_provider_call_log_success_row(self, client, db_session, test_user, test_device):
+    async def test_writes_provider_call_log_success_row(
+        self, client, db_session, test_user, test_device, _fund_test_user,
+    ):
         """成功调用应在 provider_call_log 中写入一行 status=success."""
         # 调用前的记录数
         count_before = (
@@ -212,11 +234,14 @@ class TestMockAiProviderLog:
         assert row.model == "mock-text-v1"
         assert row.user_id == test_user.id
         assert row.device_id == test_device.id
-        assert row.credits_charged == 0
+        # Sprint-03 Task-03: real deduction → credits_charged > 0
+        assert row.credits_charged == 2  # mock default usage ~2 credits
         assert row.error_code is None
 
-    async def test_no_credit_ledger_row_created(self, client, db_session, test_user, test_device):
-        """成功调用不创建 credit_ledger 记录."""
+    async def test_credit_ledger_row_created_by_deduction(
+        self, client, db_session, test_user, test_device, _fund_test_user,
+    ):
+        """Sprint-03: 成功调用后 credit_ledger 记录 consume 流水."""
         count_before = (
             await db_session.execute(
                 select(CreditLedger).where(
@@ -240,7 +265,11 @@ class TestMockAiProviderLog:
             )
         ).scalars().all()
 
-        assert len(count_after) == len(count_before)
+        # Now credit_ledger IS written (real deduction since S03-T03)
+        assert len(count_after) == len(count_before) + 1
+        ledger_entry = count_after[-1]
+        assert ledger_entry.change_type == "consume"
+        assert ledger_entry.source_type == "provider_call"
 
 
 # ---------------------------------------------------------------------------
@@ -251,7 +280,9 @@ class TestMockAiProviderLog:
 class TestMockAiRequestId:
     """X-Request-ID 传播到 response 和 provider_call_log."""
 
-    async def test_request_id_propagates_to_response(self, client, test_user, test_device):
+    async def test_request_id_propagates_to_response(
+        self, client, test_user, test_device, _fund_test_user,
+    ):
         """自定义 X-Request-ID → response.request_id 与之匹配."""
         custom_rid = "req-custom-test-123"
         headers = _auth_header(test_user, test_device)
@@ -262,7 +293,9 @@ class TestMockAiRequestId:
         body = res.json()
         assert body["request_id"] == custom_rid
 
-    async def test_request_id_propagates_to_provider_call_log(self, client, db_session, test_user, test_device):
+    async def test_request_id_propagates_to_provider_call_log(
+        self, client, db_session, test_user, test_device, _fund_test_user,
+    ):
         """自定义 X-Request-ID → provider_call_log.request_id 与之匹配."""
         custom_rid = "req-log-propagation-456"
         headers = _auth_header(test_user, test_device)
@@ -282,7 +315,9 @@ class TestMockAiRequestId:
         assert len(rows) == 1
         assert rows[0].request_id == custom_rid
 
-    async def test_auto_generated_request_id_propagates(self, client, db_session, test_user, test_device):
+    async def test_auto_generated_request_id_propagates(
+        self, client, db_session, test_user, test_device, _fund_test_user,
+    ):
         """无 X-Request-ID → middleware 自动生成，response 与 provider log 一致."""
         res = await client.post(
             ENDPOINT,
@@ -468,7 +503,9 @@ class TestMockAiDevice:
 class TestMockAiNoClientControl:
     """验证响应字段由后端决定，客户端不可覆盖."""
 
-    async def test_client_cannot_submit_provider_cost_or_credits(self, client, test_user, test_device):
+    async def test_client_cannot_submit_provider_cost_or_credits(
+        self, client, test_user, test_device, _fund_test_user,
+    ):
         """请求中包含额外字段不应影响后端计算的值."""
         body = {
             **VALID_BODY,
@@ -490,5 +527,6 @@ class TestMockAiNoClientControl:
         # 后端决定的值不应被客户端提交覆盖
         assert data["provider"] == "mock"
         assert data["model"] == "mock-text-v1"
-        assert data["credits_charged"] == 0
+        # Sprint-03 Task-03: real deduction → credits_charged > 0
+        assert data["credits_charged"] == 2  # mock default usage ~2 credits
         assert data["estimated_cost"] >= 0.0

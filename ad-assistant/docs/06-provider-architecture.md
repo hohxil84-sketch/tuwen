@@ -176,3 +176,40 @@ Implemented on branch `feature/sprint-03-task-02-deepseek-provider`:
 
 **Security**: API key read from `Settings().DEEPSEEK_API_KEY`, never hardcoded, never sent to client,
 never logged in `raw_usage` or `provider_call_log`.
+
+## Sprint-04 Task-01: Fallback & Retry ✅ Implemented
+
+Implemented on branch `feature/sprint-04-task-01-provider-reliability`:
+
+### Fallback chain
+
+- ``FALLBACK_RULES: dict[str, str]`` in ``provider_service.py`` maps provider → fallback provider (one level).
+  - Default: ``"deepseek" → "mock"``.
+  - ``"mock"`` has no fallback (it never fails).
+- Implemented in ``route_and_execute_provider_call()``:
+  1. Resolve primary provider name via ``router.resolve_name(feature, plan)``;
+  2. Build chain: ``[primary_name, fallback_name]``;
+  3. Try each provider via ``execute_provider_call()``;
+  4. On success → return immediately;
+  5. On ``InsufficientBalanceError`` → propagate (never fallback for balance issues);
+  6. On other controlled errors → log & try next;
+  7. All providers fail → raise last error.
+- Each attempt writes its own ``provider_call_log`` entry (error for failed primary, success/error for fallback).
+
+### Retry on transient errors
+
+- ``_call_with_retry()`` wraps ``provider.call()`` with up to 2 retries.
+- Retryable error codes: ``TIMEOUT``, ``CONNECTION_ERROR``, ``API_ERROR`` (5xx).
+- Non-retryable: ``AUTH_ERROR``, ``BAD_REQUEST``, ``RATE_LIMITED``, etc.
+- Exponential backoff: 1s → 2s between retries.
+
+### Router enhancements
+
+- ``ProviderRouter.resolve_name(feature, plan) → str`` — returns provider name without instantiating.
+- ``ProviderRouter.registry`` property — exposes the underlying ``ProviderRegistry`` for fallback lookup.
+
+### What's still not implemented
+
+- Circuit breaker / health-check endpoint.
+- Multi-level fallback chains (>2 levels).
+- DB-driven routing configuration.

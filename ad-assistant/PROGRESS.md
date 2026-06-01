@@ -47,6 +47,57 @@ PR：
 
 ## 记录
 
+## 2026-06-02 - Sprint-04 Task-01 Provider Reliability (Pre-flight + Fallback/Retry)
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-04-task-01-provider-reliability`
+
+### 范围
+
+- 目标：补齐 Sprint-03 已知的两个安全/可靠性缺口——余额不足拦截 + Provider 降级/重试。
+- 已实现：
+  - **两级余额门禁**：absolute min (1 积分) + feature min (FEATURE_MIN_CREDITS dict)。
+  - **InsufficientBalanceError**：余额不足时写入 provider_call_log + API 返回 402 + 中文提示。
+  - **Provider 降级链**：deepseek → mock 一级降级，InsufficientBalanceError 不触发降级。
+  - **瞬时故障重试**：TIMEOUT/CONNECTION_ERROR/API_ERROR 最多 2 次重试，指数退避 1s→2s。
+  - **Router 增强**：`resolve_name()` 方法 + `registry` 属性。
+- 未实现：熔断器、健康检查端点、多级降级链、DB 动态路由、动态 token 预估。
+
+### 主要改动
+
+- `cloud-backend/app/core/config.py`：新增 `MIN_CREDIT_BALANCE_FOR_PROVIDER_CALL` + `FEATURE_MIN_CREDITS`。
+- `cloud-backend/app/services/provider_service.py`：新增 `InsufficientBalanceError`、`_check_balance()`、`_is_retryable()`、`_call_with_retry()`；`execute_provider_call` 增加预扣检查步骤；`route_and_execute_provider_call` 增加降级链。
+- `cloud-backend/app/providers/router.py`：新增 `resolve_name()` + `registry` property。
+- `cloud-backend/app/api/v1/mock_ai.py`：INSUFFICIENT_BALANCE → 402 JSONResponse + 中文提示。
+- `cloud-backend/tests/test_provider_reliability.py`（NEW）：29 focused tests。
+- `cloud-backend/tests/test_credit_deduction.py`：更新预扣检查受影响测试。
+- `cloud-backend/tests/test_provider_mock.py`：fund user 以通过预扣检查；更新 credit_ledger 断言。
+- `cloud-backend/tests/test_provider_routing.py`：user_id=None 跳过余额检查。
+- `cloud-backend/tests/test_mock_ai_api.py`：新增 `_fund_test_user` fixture；更新 credits_charged/credit_ledger 断言。
+- `docs/07-ai-cost-control.md`：S04-T01 预扣检查实现证据。
+- `docs/06-provider-architecture.md`：S04-T01 降级/重试实现证据。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（重大变更已在任务单中声明）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：是（docs/07 + docs/06）
+
+### 测试结果
+
+- Focused tests (test_provider_reliability.py)：29 passed
+- Full regression：241 passed, 55 skipped
+- `git diff --check`：待运行
+
+### 风险和后续
+
+- 残余风险：FEATURE_MIN_CREDITS 为静态配置，未来新增 feature 需手动更新；实际成本超过最低阈值时 partial deduction 仍为安全网。
+- 后续任务：熔断器/健康检查、多级降级链、DB 动态路由、动态 token 预估、Tauri 深色标题栏、Dashboard 数据接入。
+- 回滚方式：设置 `MIN_CREDIT_BALANCE_FOR_PROVIDER_CALL=0` + 清空 `FEATURE_MIN_CREDITS` 恢复旧行为，或 revert 对应提交。
+
 ## 2026-06-02 - Sprint-03 Closeout
 
 状态：MERGED

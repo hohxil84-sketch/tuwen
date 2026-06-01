@@ -73,25 +73,35 @@ class ProviderRouter:
         self._registry = registry or get_provider_registry()
         self._rules = rules or DEFAULT_ROUTING_RULES
 
+    def resolve_name(self, feature: str, plan: str) -> str:
+        """Resolve *(feature, plan)* to a provider **name** string.
+
+        This is the pure name-resolution half of :meth:`route`.  Callers
+        that need to build fallback chains can use this to learn the
+        primary provider name without obtaining the instance yet.
+
+        Returns:
+            str: provider name (never ``None`` — unknown combinations
+            fall back to ``"mock"``).
+        """
+        provider_name = (
+            self._rules.get(feature, {}).get(plan)
+            or self._rules.get(feature, {}).get("default")
+        )
+        if provider_name is None:
+            provider_name = "mock"
+        return provider_name
+
     async def route(self, feature: str, plan: str) -> AsyncProvider:
-        """Resolve *(feature, plan)* to a concrete provider.
+        """Resolve *(feature, plan)* to a concrete provider instance.
 
         Returns:
             An :class:`AsyncProvider` instance from the registry.
 
         Raises:
-            ProviderNotFoundError: if no rule matches and the fallback
-                provider is not registered.
+            ProviderNotFoundError: if the resolved name is not registered.
         """
-        # Look up (feature, plan) → provider_name
-        provider_name = (
-            self._rules.get(feature, {}).get(plan)
-            or self._rules.get(feature, {}).get("default")
-        )
-
-        if provider_name is None:
-            # Fallback: unknown feature or plan → "mock"
-            provider_name = "mock"
+        provider_name = self.resolve_name(feature, plan)
 
         if provider_name not in self._registry:
             raise ProviderNotFoundError(
@@ -102,6 +112,11 @@ class ProviderRouter:
             )
 
         return self._registry.get(provider_name)
+
+    @property
+    def registry(self) -> ProviderRegistry:
+        """Expose the underlying :class:`ProviderRegistry` for fallback logic."""
+        return self._registry
 
 
 # ---------------------------------------------------------------------------

@@ -14,12 +14,29 @@ import uuid
 import pytest
 from sqlalchemy import func, select
 
+from app.models.credit_account import CreditAccount
 from app.models.credit_ledger import CreditLedger
 from app.models.provider_call_log import ProviderCallLog
 from app.providers.base import ProviderRequest, ProviderResult
 from app.providers.mock_provider import MockProvider, MockProviderError
 from app.services.cost_service import calculate_mock_cost
 from app.services.provider_service import execute_provider_call
+
+
+# ---------------------------------------------------------------------------
+# Helper — 给 test_user 充值，通过预扣检查
+# ---------------------------------------------------------------------------
+
+
+async def _fund_user(db_session, test_user, balance: int = 100) -> CreditAccount:
+    """Create a credit account with sufficient balance for testing."""
+    account = CreditAccount(
+        user_id=test_user.id, plan_code="standard", monthly_grant=0,
+        balance=balance, status="active",
+    )
+    db_session.add(account)
+    await db_session.flush()
+    return account
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +220,8 @@ class TestProviderServiceSuccess:
 
     async def test_success_writes_provider_call_log(self, db_session, test_user, test_device):
         """成功调用应写入 provider_call_log 且 status='success'。"""
+        await _fund_user(db_session, test_user, balance=100)
+
         provider = MockProvider()
         request = ProviderRequest(feature="text_gen")
         request_id = "req-success-001"
@@ -237,15 +256,17 @@ class TestProviderServiceSuccess:
         assert row.completion_tokens > 0
         assert row.total_tokens == row.prompt_tokens + row.completion_tokens
         assert row.estimated_cost is not None and row.estimated_cost > 0
-        assert row.credits_charged == 0  # 扣费在后续任务实现
+        # Sprint-03: real credit deduction → credits_charged > 0
+        assert row.credits_charged > 0
         assert row.latency_ms is not None and row.latency_ms >= 0
 
-    async def test_success_does_not_write_credit_ledger(self, db_session, test_user, test_device):
-        """成功调用不应写入 credit_ledger。"""
+    async def test_success_writes_credit_ledger(self, db_session, test_user, test_device):
+        """Sprint-03: 成功调用后写入 credit_ledger consume 流水。"""
+        await _fund_user(db_session, test_user, balance=100)
+
         provider = MockProvider()
         request = ProviderRequest(feature="text_gen")
 
-        # 记录调用前的 credit_ledger 计数
         count_before = (
             await db_session.execute(select(func.count()).select_from(CreditLedger))
         ).scalar() or 0
@@ -262,7 +283,8 @@ class TestProviderServiceSuccess:
             await db_session.execute(select(func.count()).select_from(CreditLedger))
         ).scalar() or 0
 
-        assert count_after == count_before, "execute_provider_call 不应写入 credit_ledger"
+        # 现在 credit_ledger 应该被写入了（S03-T03 真实扣费）
+        assert count_after == count_before + 1
 
     async def test_auto_generates_request_id(self, db_session):
         """未提供 request_id 时自动生成。"""
@@ -293,6 +315,8 @@ class TestProviderServiceError:
         self, db_session, test_user, test_device
     ):
         """可控失败应写入 provider_call_log 且 status='error'，含 error_code。"""
+        await _fund_user(db_session, test_user, balance=100)
+
         provider = MockProvider()
         request = ProviderRequest(feature="test-error")
         request_id = "req-error-001"
@@ -322,6 +346,8 @@ class TestProviderServiceError:
 
     async def test_error_does_not_write_credit_ledger(self, db_session, test_user, test_device):
         """失败调用不应写入 credit_ledger。"""
+        await _fund_user(db_session, test_user, balance=100)
+
         provider = MockProvider()
         request = ProviderRequest(feature="test-error")
 
@@ -346,6 +372,8 @@ class TestProviderServiceError:
 
     async def test_error_log_has_no_raw_prompt(self, db_session, test_user):
         """错误日志中不包含原始 prompt 文本。"""
+        await _fund_user(db_session, test_user, balance=100)
+
         provider = MockProvider()
         request = ProviderRequest(feature="test-error")
         request_id = "req-error-noprompt"
