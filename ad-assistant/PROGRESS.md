@@ -151,11 +151,11 @@ PR：#20（已合并到 `main` @ `1a3602f`）
 
 ## 2026-06-01 - Sprint-02 Task-08 Mock AI API Contract Formalization
 
-状态：IMPLEMENTED_SELF_REVIEW_PASSED
+状态：MERGED
 
 分支：`feature/sprint-02-task-08-mock-ai-api-contract`
 提交：`6d763e6`
-PR：#22
+PR：#22（已按用户确认合并到 `main` @ `6fc40a8`）
 
 ### 范围
 
@@ -200,11 +200,11 @@ PR：#22
 
 ## 2026-06-01 - Sprint-02 Task-09 Provider Routing Design
 
-状态：IMPLEMENTED_SELF_REVIEW_PASSED
+状态：MERGED
 
 分支：`feature/sprint-02-task-09-provider-routing`
-提交：（待提交）
-PR：（待创建）
+提交：`89fe06f`
+PR：#23（已按用户确认合并到 `main` @ `37e0430`）
 
 ### 范围
 

@@ -2,13 +2,15 @@
 
 ## Status
 
-`IMPLEMENTED_SELF_REVIEW_PASSED`
+`MERGED`
 
-Implemented by Claude Code on 2026-06-01. Self-review passed. Awaiting commit + push + PR.
+Implemented by Claude Code on 2026-06-01. Self-review passed. PR #23 merged to `main`.
 
 ## Implementation Evidence
 
 - **Branch**: `feature/sprint-02-task-09-provider-routing`
+- **Commit**: `89fe06f`
+- **PR**: #23, merged to `main` at `37e0430`
 - **Registry**: `ProviderRegistry` with singleton, pre-loaded with `MockProvider` as `"mock"`
 - **Router**: `ProviderRouter` with `DEFAULT_ROUTING_RULES`, all routes → `"mock"`
 - **Service**: `route_and_execute_provider_call()` as high-level entry point

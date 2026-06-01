@@ -152,7 +152,7 @@ AI 扣费链路：
 6. 自审通过后提交并 push 当前任务分支。
 7. 创建 PR 或 draft PR，PR 记录范围、测试、自审结论、风险和回滚方式。
 8. 高风险、范围不确定、测试失败或用户要求时，召回 Codex 专项复核。
-9. `main` 只能通过 PR 合并，Claude Code + DeepSeek 不 self-merge。
+9. `main` 只能通过 PR 合并；Claude Code + DeepSeek 不能未经用户确认 self-merge，用户明确确认后可以通过 GitHub PR 合并。
 
 Bug 修复必须先复现或确认现象，再定位根因、制定方案、按计划修改、运行测试并反馈结果。根因不明确时，不直接试改。
 

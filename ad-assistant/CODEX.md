@@ -54,7 +54,8 @@ Codex Review 输出按以下顺序：
 ## Git 建议
 
 - CC 可以在任务分支自审通过后提交和 push。
-- CC 不直接 push `main`，不 force push，不 self-merge。
+- CC 不直接 push `main`，不 force push；未经用户明确确认，不 self-merge。
+- 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并，并记录确认来源和合并结果。
 - PR base 必须是 `main`，head 必须是当前任务分支。
 - 高风险任务、失败测试、范围不确定或用户要求时，建议 PR 前召回 Codex 复核。
 
