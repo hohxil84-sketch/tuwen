@@ -7,6 +7,18 @@
 
 const BASE_URL = "http://127.0.0.1:9100";
 
+/** Default request timeout in ms (30s — OCR can be slower). */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+function createTimeout(timeoutMs: number = REQUEST_TIMEOUT_MS): {
+  controller: AbortController;
+  timer: ReturnType<typeof setTimeout>;
+} {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return { controller, timer };
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -69,12 +81,29 @@ export interface HistoryListData {
 // ---------------------------------------------------------------------------
 
 async function request<T>(url: string, options?: RequestInit): Promise<APIResponse<T>> {
-  const response = await fetch(url, {
+  const { controller, timer } = createTimeout();
+  const mergedOptions: RequestInit = {
     ...options,
-    headers: {
-      ...(options?.headers || {}),
-    },
-  });
+    signal: controller.signal,
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(url, mergedOptions);
+  } catch (err: unknown) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw {
+        code: "REQUEST_TIMEOUT",
+        message: "OCR 请求超时，请稍后重试。",
+      } as OCRErrorDetail;
+    }
+    throw {
+      code: "NETWORK_ERROR",
+      message: "本地 OCR 服务连接失败，请确认服务已启动。",
+    } as OCRErrorDetail;
+  }
+  clearTimeout(timer);
 
   const body = await response.json();
 

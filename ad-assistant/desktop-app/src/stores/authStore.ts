@@ -14,7 +14,6 @@ import {
   login as cloudLogin,
   logout as cloudLogout,
   setAccessToken,
-  getAccessToken,
   sanitizeApiError,
   mockAdCopy,
   type LoginData,
@@ -105,13 +104,13 @@ export const useAuthStore = defineStore("auth", () => {
 
   /**
    * Initialize token state from the cloudApi service (e.g. on app mount).
-   * Currently, tokens are only in memory, so this always starts fresh.
+   *
+   * DEPRECATED: tokens are memory-only per security rules.
+   * Kept as a no-op for backward compatibility with any future
+   * hydration needs.
    */
   function initFromService(): void {
-    const token = getAccessToken();
-    if (token) {
-      accessToken.value = token;
-    }
+    // Tokens are memory-only — no persistent hydration needed.
   }
 
   /**
