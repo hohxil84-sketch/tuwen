@@ -6,7 +6,7 @@
 
 ## 产品边界
 
-当前只允许开发 `tasks/current-task.md` 明确列出的功能。
+当前只允许开发 `tasks/current-task.md` 明确列出的功能。没有现成任务单时，由 Claude Code + DeepSeek 根据用户目标先起草或更新任务单。
 
 ## 当前已验证进度
 
@@ -144,14 +144,21 @@ AI 扣费链路：
 
 ## 开发流程
 
-1. Codex 准备任务单 → `tasks/current-task.md`
-2. 用户确认任务单（重大变更需额外确认）
-3. 从 `main` 创建任务分支
-4. Claude Code + DeepSeek 一次性完整实现（不拆多轮交付）
-5. Codex Review
-6. Review 通过后提交、推送、建 PR 合并
+1. 用户给出目标。
+2. Claude Code + DeepSeek 根据目标起草或更新 `tasks/current-task.md`。
+3. Claude Code + DeepSeek 读取任务单、相关 docs 和模块上下文。
+4. 从 `main` 创建任务分支。
+5. Claude Code + DeepSeek 独立实现、测试、自审，更新模块上下文和 `PROGRESS.md`。
+6. 自审通过后提交并 push 当前任务分支。
+7. 创建 PR 或 draft PR，PR 记录范围、测试、自审结论、风险和回滚方式。
+8. 高风险、范围不确定、测试失败或用户要求时，召回 Codex 专项复核。
+9. `main` 只能通过 PR 合并，Claude Code + DeepSeek 不 self-merge。
+
+Bug 修复必须先复现或确认现象，再定位根因、制定方案、按计划修改、运行测试并反馈结果。根因不明确时，不直接试改。
+
+每完成一个模块或任务，Claude Code + DeepSeek 必须追加更新 `PROGRESS.md`，写清楚模块进度、自审是否通过、主要实现功能、测试结果、风险和回滚方式。
 
 详细规则：
-- `CLAUDE.md` — 执行边界、工作方式、Git 规则、输出要求
-- `CODEX.md` — Codex 职责、Review 规则、高风险边界清单
-- `docs/20-agent-git-guardrails.md` — Git 门禁、阻断条件、PR 规则
+- `CLAUDE.md` — CC 起草任务单、独立开发、自审、高风险暂停、Git 规则、输出要求
+- `CODEX.md` — Codex 按需复核规则和高风险审查边界
+- `docs/20-agent-git-guardrails.md` — CC 自审门禁、阻断条件、PR 规则

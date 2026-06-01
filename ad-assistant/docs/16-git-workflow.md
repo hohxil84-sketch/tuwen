@@ -3,32 +3,50 @@
 ## 基本原则
 
 - 一任务一分支，一模块一分支。
-- 当前分支不能是 `main`。
+- 开发分支不能是 `main`。
 - 只提交当前任务相关文件。
+- CC 自审通过后可以提交和 push 当前任务分支。
+- `main` 只能通过 PR 合并。
+
+## 开始开发前
+
+1. 运行 `git status --short --branch`。
+2. 如果没有有效任务单，CC 先根据用户目标起草或更新 `tasks/current-task.md`。
+3. 确认任务单有效。
+4. 从 `main` 创建或切换到任务分支。
+5. 确认没有未处理的无关改动。
+6. 判断是否触碰高风险边界；如果触碰，先等用户确认。
 
 ## 提交前
 
-1. 运行 `git status --short --branch`
-2. 确认任务单有效
-3. 确认没有未确认的重大变更
-4. 确认测试结果已记录
-5. 先做 Codex Review，再考虑提交
+1. 确认只修改当前任务相关文件。
+2. 运行任务单要求的测试。
+3. 完成 CC 自审清单。
+4. 更新模块上下文。
+5. 只 stage 当前任务相关文件。
 
 ## 提交规则
 
-- 不要用 `git add -A`
-- 不要把无关文件混进同一个 commit
-- Codex Review 未通过，不提交
-- 提交目标只能是当前任务分支，推送命令只能是 `git push -u origin <current-branch>`
-- 不要 `git push origin main`
-- 不要 force push
+- 不使用 `git add -A`。
+- 不把无关文件混进同一个 commit。
+- 不在 `main` 上提交。
+- 不 `git push origin main`。
+- 不 force push。
+- 提交目标只能是当前任务分支。
+- 推送命令只能指向当前任务分支，例如 `git push -u origin <current-branch>`。
+
+## PR 规则
+
+- PR base 为 `main`。
+- PR head 为当前任务分支。
+- PR 内容必须包含任务范围、测试结果、CC 自审结论、风险和回滚方式。
+- 高风险任务、失败测试、范围不确定或用户要求时，PR 前召回 Codex 复核。
 
 ## 合并规则
 
-- `main` 只能通过 PR 合并
-- PR base 为 `main`
-- PR head 为当前任务分支
-- PR 通过前必须有任务单、测试记录和 Codex Review 结论
+- CC 不 self-merge。
+- PR 合并由用户、仓库管理员或明确授权的流程完成。
+- 合并前必须有任务单、测试记录、CC 自审结论和风险说明。
 
 ## 相关规则
 
