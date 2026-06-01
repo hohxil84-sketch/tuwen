@@ -241,7 +241,7 @@ Open `http://127.0.0.1:5173` in a browser.
 |----------|---------|-------------|
 | `DATABASE_URL` | DB connection string | `sqlite+aiosqlite:///dev.db` (smoke) |
 | `JWT_SECRET_KEY` | HS256 signing key (MUST override default) | Set explicitly |
-| `VITE_CLOUD_API_BASE_URL` | Desktop cloud API target | `http://127.0.0.1:8000` |
+| `VITE_CLOUD_API_BASE_URL` | Desktop cloud API base URL. **Two paths:**<br>① API curl / direct backend requests: `http://127.0.0.1:8000`<br>② Browser UI smoke / Vite proxy path: **must** use `http://127.0.0.1:5173` so the browser sends same-origin requests to the Vite dev server, which proxies `/api` → backend `:8000` (avoids CORS) | `http://127.0.0.1:8000` (direct) / `http://127.0.0.1:5173` (proxy) |
 
 ## Known Issues
 
