@@ -2,9 +2,9 @@
 
 Date: 2026-06-01
 Base branch: `main`
-Current verified head: `4708379 Merge pull request #24 from hohxil84-sketch/docs/cc-confirmed-merge-rule`
+Current verified head: `0c1096b` (Sprint-02 closeout merged at `cb3abef`; S03-T01 merged at `0c1096b`)
 
-**Sprint-02 is closed.** All 9 tasks + 2 workflow/docs PRs merged to `main`.
+**Sprint-02 is closed.** All planned Sprint-02 tasks and workflow adjustments have been merged to `main`.
 
 ## Completed Modules
 
