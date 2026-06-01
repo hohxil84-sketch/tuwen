@@ -9,5 +9,16 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    // Proxy /api → cloud backend so the browser sends same-origin requests
+    // (avoids CORS errors during local development).
+    // Requires VITE_CLOUD_API_BASE_URL=http://127.0.0.1:5173 at dev-server start.
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+    },
+  },
 });

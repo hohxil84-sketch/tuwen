@@ -81,3 +81,20 @@ Sprint-02 Task-05 新增：
 - 通用 Prompt 执行 UI
 - Provider/Model 选择器
 
+## 本地开发运行手册
+
+完整的桌面端 Mock MVP 端到端验证流程见：
+
+- `docs/25-desktop-mock-e2e-smoke.md` — 本地运行手册
+
+快速启动：
+
+```bash
+cd desktop-app
+npm install
+npm run dev       # Vite 开发服务器 → http://127.0.0.1:5173
+```
+
+默认云端 API 地址为 `http://127.0.0.1:8000`，可通过 `VITE_CLOUD_API_BASE_URL` 覆盖。
+测试账号及种子数据脚本见运行手册。
+

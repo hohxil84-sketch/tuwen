@@ -60,10 +60,18 @@ Current verified head: `42dbad8 Merge pull request #16 from hohxil84-sketch/feat
 |------|-------|--------|
 | Task-06 draft | Desktop Mock AI E2E Smoke Verification | `feature/sprint-02-task-06-desktop-mock-e2e-smoke` |
 
-Task-06 status (2026-06-01): `CONFIRMED_READY_FOR_IMPLEMENTATION`
+Task-06 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
 - Goal: make the merged Task-05 desktop mock MVP path reproducible and manually verified.
-- Scope: local runbook, optional dev-only seed helper if needed, manual smoke evidence.
-- No real provider routing, real billing, API contract, DDL, dependency, Tauri, shared DTO, or desktop source changes are allowed by the draft.
+- Deliverables:
+  - `docs/25-desktop-mock-e2e-smoke.md` — E2E smoke runbook with exact commands.
+  - `cloud-backend/scripts/dev_seed_user.py` — dev-only seed script.
+  - `docs/09-desktop-app-guide.md` — updated with dev runbook reference.
+  - `docs/11-cloud-backend-guide.md` — updated with dev setup section.
+  - `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md` — module context.
+- Verification: `npm run build` ✅ (43 modules, 0 errors), `git diff --check` ✅, backend 147 tests ✅.
+- Known issues found: DDL TIMESTAMPTZ / ORM DateTime mismatch (documented, not fixed — out of scope).
+- No production backend/API/DDL/dependency/shared/Tauri/desktop source changes were made.
+- No secrets or real provider integrations were added.
 
 ## Next-Stage Candidate Tasks
 
