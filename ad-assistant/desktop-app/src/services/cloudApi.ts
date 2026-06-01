@@ -248,6 +248,39 @@ export async function mockAdCopy(
 }
 
 // ---------------------------------------------------------------------------
+// Dashboard (Sprint-04 Task-02)
+// ---------------------------------------------------------------------------
+
+export interface RecentActivityItem {
+  feature: string;
+  provider: string;
+  model: string;
+  status: string;
+  credits_charged: number;
+  created_at: string;
+}
+
+export interface DashboardSummaryData {
+  credit_balance: number;
+  today_calls: number;
+  monthly_calls: number;
+  plan_code: string;
+  recent_activity: RecentActivityItem[];
+}
+
+/**
+ * Fetch aggregated dashboard summary from the cloud backend.
+ * Requires a valid access token set via setAccessToken().
+ */
+export async function dashboardSummary(): Promise<DashboardSummaryData> {
+  const response = await request<DashboardSummaryData>(
+    "/api/v1/dashboard/summary",
+    { method: "GET" },
+  );
+  return response.data;
+}
+
+// ---------------------------------------------------------------------------
 // Error sanitization (shared)
 // ---------------------------------------------------------------------------
 

@@ -36,6 +36,11 @@ const router = createRouter({
       name: "history",
       component: () => import("./pages/HistoryPage.vue"),
     },
+    {
+      path: "/ai-ad-copy",
+      name: "ai-ad-copy",
+      component: () => import("./pages/AdCopyPage.vue"),
+    },
   ],
 });
 
