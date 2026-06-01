@@ -8,9 +8,9 @@ The project already has real PostgreSQL tests in `cloud-backend/tests/test_migra
 
 ## Problem
 
-A developer can run PostgreSQL locally with Docker, for example on `localhost:5433`. Codex and GitHub Actions do not share that developer-machine network namespace. For them, `localhost` means their own execution environment, not the developer's computer.
+A developer may have PostgreSQL running locally, for example on `localhost:5433`. Codex and GitHub Actions do not share that developer-machine network namespace. For them, `localhost` means their own execution environment, not the developer's computer.
 
-Therefore, a URL like this is valid only on the machine where Docker is running:
+Therefore, a URL like this is valid only on the machine where that local PostgreSQL service is running:
 
 ```text
 postgresql+asyncpg://postgres:test@localhost:5433/postgres
@@ -50,7 +50,7 @@ pytest tests/test_migrations_integration.py -v
 
 ## Local Behavior
 
-Developers can still run the same suite manually against local Docker:
+Developers can still run the same suite manually against a local PostgreSQL service. Local development must prefer a locally installed PostgreSQL service over Docker; if PostgreSQL is not installed, install it through the OS package manager or official PostgreSQL installer. Docker is reserved for CI service containers or explicit user-approved fallback.
 
 ```powershell
 cd cloud-backend

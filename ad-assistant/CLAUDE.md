@@ -1,12 +1,12 @@
 # Claude Code + DeepSeek 执行规则
 
-Claude Code + DeepSeek 是本项目的一线开发与自审执行者。默认根据用户目标独立起草任务单，并完成开发、测试、自审、提交到任务分支和准备 PR；只有触碰高风险边界、范围不清、测试失败无法自行解决，或用户明确要求时，才暂停并请求用户或 Codex 介入。
+Claude Code + DeepSeek 是本项目的一线开发与自审执行者。默认根据 Codex 编写或用户确认的任务单完成开发、测试、自审、提交到任务分支和准备 PR；只有触碰高风险边界、范围不清、测试失败无法自行解决，或用户明确要求时，才暂停并请求用户或 Codex 介入。
 
 ## 必须先读
 
 1. `README.md`
 2. `CLAUDE.md`
-3. `tasks/current-task.md`（如果没有有效任务单，先由 CC 起草或更新）
+3. `tasks/current-task.md`（今后任务单默认由 Codex 起草或更新；没有有效任务单时，CC 必须暂停并请求 Codex/用户补齐）
 4. 相关 `docs/*.md`
 5. 如果任务涉及已有模块的扩展或修改，读取对应的 `docs/module-context/<module-or-task>/context.md`
 6. 需要 Codex 专项复核时，再读取 `CODEX.md`
@@ -14,7 +14,8 @@ Claude Code + DeepSeek 是本项目的一线开发与自审执行者。默认根
 ## 执行边界
 
 - 只实现 `tasks/current-task.md` 明确允许的内容。
-- 没有有效任务单时，先根据用户目标起草或更新 `tasks/current-task.md`，再写业务代码。
+- 没有有效任务单时，先暂停并请求 Codex/用户起草或更新 `tasks/current-task.md`，再写业务代码。
+- CC 不得自行扩大、重写或弱化 Codex/用户确认的任务单范围；如发现任务单缺失、冲突或不可执行，必须先反馈并等待更新。
 - 不自行开发 BACKLOG、FUTURE、BLOCKED 或任务单未写明的功能。
 - 遇到需要修改 allowed files 之外的文件，先判断是否属于任务必要范围；如果会扩大任务目标，立即停止并报告。
 - 不保存真实 API Key、Token、密码、生产数据库连接串或用户隐私数据。
@@ -36,7 +37,7 @@ Claude Code + DeepSeek 是本项目的一线开发与自审执行者。默认根
 ## 工作方式
 
 - 一次只做一个任务，一个任务只用一个分支。
-- 用户只给目标时，CC 先把目标转成完整任务单。
+- 用户只给目标时，先由 Codex 把目标转成完整任务单；CC 只根据已确认任务单执行。
 - 从 `main` 创建任务分支后再开发。
 - 完整实现当前任务，不把同一任务拆成多轮小交付。
 - 运行任务单要求的测试并记录结果。
@@ -57,24 +58,13 @@ Claude Code + DeepSeek 是本项目的一线开发与自审执行者。默认根
 
 如果根因不明确，先继续调查；不能用猜测性修改替代根因分析。
 
-## 任务单生成规则
+## 任务单执行规则
 
-CC 负责维护 `tasks/current-task.md`。每个任务单必须包含：
+任务单默认由 Codex 按 `CODEX.md` 的“Codex 从无到有起草任务单规则”起草或更新。
 
-- 任务目标和背景
-- What To Build
-- What Not To Build
-- Allowed Files
-- Forbidden Files
-- Acceptance Criteria
-- Test Method
-- Dependency Permission
-- Major Change Status
-- Security Requirements
-- Rollback Plan
-- Completion Output Required
+CC 负责读取并执行 `tasks/current-task.md`，不得在未经 Codex/用户确认的情况下自行改写任务目标、Allowed Files、Forbidden Files、Acceptance Criteria、Test Method、Security Requirements 或 Rollback Plan。
 
-如果用户目标不完整，CC 应先做保守拆解；只有目标无法判断、会触碰高风险边界或存在互斥选择时，才暂停询问用户。
+如果任务单缺字段、范围冲突、不可执行，或需要修改 allowed files 之外的文件，CC 必须暂停并请求 Codex/用户更新任务单，不能自行补齐后继续开发。
 
 ## Reviewer-mode 自查
 
@@ -91,7 +81,7 @@ Reviewer-mode 交付说明必须包含：实际审查范围、发现的问题和
 完成任务前，必须自审并在交付说明中明确结论：
 
 - 是否只实现了 `tasks/current-task.md`
-- 是否任务单由 CC 起草或更新且字段完整
+- 是否任务单由 Codex 起草或更新，或已由用户明确确认，且字段完整
 - 是否只修改了 allowed files 或已说明必要例外
 - 是否没有混入无关文件
 - 是否没有新增未授权依赖
@@ -118,6 +108,15 @@ Reviewer-mode 交付说明必须包含：实际审查范围、发现的问题和
 - 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并在交付说明中记录确认来源和合并结果。
 - 合并只能通过 PR，base 为 `main`，head 为当前任务分支。
 - 高风险任务、测试异常、范围不确定或用户要求时，提交/PR 前先请求 Codex 或用户复核；CC 自审和 reviewer-mode 自查不能替代 Codex 高风险复核。
+
+## Git 与交付说明语言
+
+- CC 提交、推送、创建 PR、更新 PR、合并 PR 和最终交付说明时，面向用户和项目记录的文字必须使用中文。
+- 必须使用中文说明的内容包括：commit message、PR title、PR body、自审结论、reviewer-mode 结果、测试结果、风险说明、回滚说明、用户确认来源、合并方式和合并结果。
+- `git commit` 前必须先写清楚中文提交说明；禁止使用空泛说明，例如 `update`、`fix`、`changes`、`misc`、`wip`。
+- PR 创建或更新时必须写中文正文，至少包含任务范围、修改摘要、测试结果、风险、回滚方式和是否需要用户确认。
+- 合并 PR 后必须用中文报告 PR 编号、用户确认来源、合并方式、合并结果和后续注意事项。
+- 允许保留英文的内容仅限命令、路径、文件名、分支名、commit hash、PR 编号、错误码、API 名称、第三方协议术语和工具原始输出。
 
 ## 输出要求
 

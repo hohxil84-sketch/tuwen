@@ -92,24 +92,30 @@ This ensures the browser sends requests to `http://127.0.0.1:5173/api/...`
 
 | Tool | Required | Check Command |
 |------|----------|---------------|
-| Docker | Yes (for PostgreSQL) | `docker --version` |
+| PostgreSQL | Optional | Prefer local service when testing PostgreSQL |
 | Python | 3.11+ | `python --version` |
 | Node.js | 18+ | `node --version` |
 | npm | 9+ | `npm --version` |
 
-## Step 1 — Start PostgreSQL (Docker)
+## Step 1 — Start Database
+
+SQLite is the recommended smoke-test database for this runbook. If PostgreSQL
+is required, use a locally installed PostgreSQL service first. If PostgreSQL is
+not installed, install it through the OS package manager or official installer.
+Do not default to Docker for local service startup; Docker is only a fallback
+when the user explicitly approves it or when running CI service containers.
+
+### PostgreSQL local-service option
 
 ```bash
-docker run -d --name pg-dev \
-  -e POSTGRES_PASSWORD=test \
-  -p 5432:5432 \
-  postgres:16
-
-until docker exec pg-dev pg_isready -U postgres; do sleep 1; done
-docker exec pg-dev psql -U postgres -c "CREATE DATABASE ad_assistant_dev;"
+createdb ad_assistant_dev
 ```
 
-**Tear down:** `docker rm -f pg-dev`
+Use a local connection string such as:
+
+```bash
+postgresql+asyncpg://postgres:test@localhost:5432/ad_assistant_dev
+```
 
 ## Step 2 — Install Cloud Backend Dependencies
 
@@ -160,19 +166,13 @@ PostgreSQL is now fully supported after Sprint-02 Task-07 DateTime alignment fix
 Use the following instead of the SQLite commands above:
 
 ```bash
-# Start PostgreSQL
-docker run -d --name pg-dev \
-  -e POSTGRES_PASSWORD=test \
-  -p 5432:5432 \
-  postgres:16
-
-until docker exec pg-dev pg_isready -U postgres; do sleep 1; done
-docker exec pg-dev psql -U postgres -c "CREATE DATABASE ad_assistant_dev;"
+# Start local PostgreSQL and create the database
+createdb ad_assistant_dev
 
 # Create tables via DDL files
 cd cloud-backend
 for f in migrations/ddl/0*.sql; do
-  docker exec -i pg-dev psql -U postgres -d ad_assistant_dev < "$f"
+  psql -d ad_assistant_dev < "$f"
 done
 
 # Seed test user + device (ORM writes to PG — verified working as of Task-07)
