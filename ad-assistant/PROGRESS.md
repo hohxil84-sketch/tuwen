@@ -290,3 +290,39 @@ PR：#23（已按用户确认合并到 `main` @ `37e0430`）
 - 残余风险：所有路由仍解析到 MockProvider，未来加入真实 provider 时需验证路由规则正确性；fallback/retry 机制尚未实现。
 - 后续任务：Candidate A — Desktop Mock AI E2E Smoke Verification（或用户指定的其他任务）。
 - 回滚方式：revert 对应提交，`mock_ai.py` 恢复 `MockProvider()` 直接调用，移除 registry/router 模块和新测试。
+
+## 2026-06-01 - Sprint-02 Documentation Cleanup & Closeout
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`docs/sprint-02-closeout`
+
+### 范围
+
+- 目标：清理 `docs/sprint-02-summary.md` 状态不一致，正式关闭 Sprint-02。
+- 已实现：所有 Task 06~09 移入 "Completed Modules"，移除 "In Progress" 段，更新验证记录，新增 Sprint-03 候选。
+- 未实现：无代码变更；Sprint-03 候选仅作参考，未启动开发。
+
+### 主要改动
+
+- `docs/sprint-02-summary.md`：完成表增补 Task 06~09 + 2 workflow PR；移除 In Progress 段；新增 Closeout 和 Sprint-03 候选；更新 verified head 到 `4708379`。
+- `PROGRESS.md`：本条记录。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（纯文档）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用（文档整理）
+- Bug 根因已记录（如适用）：不适用
+
+### 测试结果
+
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：无
+- 后续任务：全面代码审查/文档整理（用户指定的下一阶段 C）；Sprint-03 规划（阶段 B）。
+- 回滚方式：revert 对应提交，恢复 `sprint-02-summary.md` 旧版。
