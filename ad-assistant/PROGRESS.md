@@ -204,6 +204,51 @@ PR：
 - 后续任务：用户从 Sprint-04 候选或新需求中选择下一任务
 - 回滚方式：revert 对应提交，或恢复 AppSidebar.vue 中 AI 文案生成 disabled 状态
 
+## 2026-06-02 — S04-T06: Tauri 深色标题栏审计与最小修复
+
+状态：BLOCKED_NEEDS_TAURI_SOURCE
+
+分支：`feature/sprint-04-task-06-tauri-dark-titlebar`
+
+### 范围
+
+- 目标：审计 `desktop-app/src-tauri/` 目录，确认是否存在可提交的 Tauri 源配置文件；如存在则修复深色标题栏，如不存在则记录阻塞原因。
+- 已实现：
+  - 完整审计 `desktop-app/src-tauri/` 目录
+  - 确认 Tauri 源配置文件（`tauri.conf.json`、`Cargo.toml`、`src/main.rs`、`src/lib.rs`、`capabilities/*.json`）全部不存在
+  - 确认 `package.json` 无 Tauri CLI/API 依赖
+  - 任务标记为 `BLOCKED_NEEDS_TAURI_SOURCE`
+  - 模块上下文已创建
+- 未实现：
+  - 深色标题栏修复（因 Tauri 源配置缺失）
+  - Tauri 工程初始化（超出任务范围，需单独任务单）
+
+### 主要改动
+
+- `docs/module-context/sprint-04-task-06-tauri-dark-titlebar/context.md`（NEW）：模块上下文，记录审计结果、阻塞原因、未采用方案、后续建议
+- `PROGRESS.md`：本条记录
+- `tasks/current-task.md`：状态更新为 `BLOCKED_NEEDS_TAURI_SOURCE`，简短完成摘要
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是（仅 docs + tasks）
+- 未触碰未确认高风险变更：是（未修改任何代码）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：是
+
+### 测试结果
+
+- `npm run build`（desktop-app）：68 modules, 0 errors
+- `git diff --check`：通过
+- `npm run tauri dev`：不可用（无 Tauri CLI，无 Tauri 源配置）
+
+### 风险和后续
+
+- 残余风险：桌面端 Windows 顶部白色标题栏与深色 UI 不一致（已在 sprint-03-summary 和 26-desktop-dashboard-ui-redesign 中记录）
+- 后续任务：Tauri 工程初始化任务（安装 CLI/API、生成源配置、配置深色标题栏），需 Codex/用户单独起草任务单
+- 回滚方式：无需回滚 — 本任务未修改任何代码或配置文件
+
 ## 2026-06-02 - Sprint-04 Task-01 Provider Reliability (Pre-flight + Fallback/Retry)
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
