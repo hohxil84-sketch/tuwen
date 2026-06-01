@@ -144,16 +144,14 @@ AI 扣费链路：
 
 ## 开发流程
 
-1. 先写任务单。
-2. 用户确认任务单。
-3. 一个模块一个 Git 分支。
-4. Claude Code + DeepSeek 执行任务单。
-5. Codex Review 做架构、安全、API、数据库、Provider、成本审查。
-6. Codex Review 通过后才允许提交。
-7. 通过验收后再进入下一个任务。
+1. Codex 准备任务单 → `tasks/current-task.md`
+2. 用户确认任务单（重大变更需额外确认）
+3. 从 `main` 创建任务分支
+4. Claude Code + DeepSeek 一次性完整实现（不拆多轮交付）
+5. Codex Review
+6. Review 通过后提交、推送、建 PR 合并
 
-没有任务单，不允许写代码。
-没有用户确认，不允许开发未来功能。
-没有 Codex Review 通过结论，不允许提交。
-
-Git 详细规则见 `docs/20-agent-git-guardrails.md`。
+详细规则：
+- `CLAUDE.md` — 执行边界、工作方式、Git 规则、输出要求
+- `CODEX.md` — Codex 职责、Review 规则、高风险边界清单
+- `docs/20-agent-git-guardrails.md` — Git 门禁、阻断条件、PR 规则
