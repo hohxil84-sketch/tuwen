@@ -5,7 +5,7 @@
 - 一任务一分支，一模块一分支。
 - 开发分支不能是 `main`。
 - 只提交当前任务相关文件。
-- CC 自审通过后可以提交和 push 当前任务分支。
+- CC 自审和 reviewer-mode 自查通过后可以提交和 push 当前任务分支。
 - `main` 只能通过 PR 合并。
 
 ## 开始开发前
@@ -22,10 +22,13 @@
 1. 确认只修改当前任务相关文件。
 2. 运行任务单要求的测试。
 3. 完成 CC 自审清单。
-4. 更新模块上下文。
-5. 只 stage 当前任务相关文件。
-6. 如果工作区存在无关改动，必须运行并展示 `git status --short --branch` 和 `git diff --cached --name-status`。
-7. 用户或 Codex 确认 staged 文件列表前，不得提交。
+4. 执行 reviewer-mode 自查：停止继续写功能代码，按代码审查标准查找 bug、行为回归、安全/隐私风险、测试缺口、范围越界和高风险边界。
+5. 如果 reviewer-mode 发现阻塞或高风险问题，必须先修复、补测、重新运行测试，并再次执行 reviewer-mode；不能把“已自审”当作通过依据。
+6. 高风险任务必须在 reviewer-mode 通过后再请求 Codex 复核；CC 自审和 reviewer-mode 不能替代 Codex 高风险复核。
+7. 更新模块上下文。
+8. 只 stage 当前任务相关文件。
+9. 如果工作区存在无关改动，必须运行并展示 `git status --short --branch` 和 `git diff --cached --name-status`。
+10. 用户或 Codex 确认 staged 文件列表前，不得提交。
 
 ## 提交规则
 
@@ -44,7 +47,7 @@
 
 - PR base 为 `main`。
 - PR head 为当前任务分支。
-- PR 内容必须包含任务范围、测试结果、CC 自审结论、风险和回滚方式。
+- PR 内容必须包含任务范围、测试结果、CC 自审结论、reviewer-mode 自查结果、风险和回滚方式。
 - 高风险任务、失败测试、范围不确定或用户要求时，PR 前召回 Codex 复核。
 
 ## 合并规则
