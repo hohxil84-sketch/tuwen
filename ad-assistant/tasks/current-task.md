@@ -8,69 +8,9 @@
 
 `feature/sprint-04-task-05-shortcut-entry-wiring`
 
-## 实现记录 (2026-06-02)
+## 完成摘要
 
-### 修改文件
-
-- `desktop-app/src/components/dashboard/AppSidebar.vue` — 核心功能中 `AI 文案生成` 从 `disabled: true, route: "/"` 改为 `disabled: false, route: "/ai-ad-copy"`（仅改一行）
-- `docs/module-context/sprint-04-task-05-shortcut-entry-wiring/context.md`（新增）— 入口映射表、路由清单、未实现功能、扩展点
-- `PROGRESS.md` — 追加本任务进度记录
-- `tasks/current-task.md` — 本记录
-
-### 已验证无需修改的文件
-
-- `desktop-app/src/components/dashboard/QuickEntryCard.vue` — disabled 样式（opacity: 0.56, cursor: not-allowed, hover 禁用, "即将开放" badge）已足够清晰，无需调整
-- `desktop-app/src/pages/dashboardMock.ts` — MOCK_QUICK_ENTRIES 中 AI 文案生成已有正确 route `/ai-ad-copy` 且无 disabled 标志，OCR 已有正确 route `/ocr`
-- `desktop-app/src/pages/DashboardPage.vue` — 快捷入口使用 MOCK_QUICK_ENTRIES，无需修改
-- `desktop-app/src/router.ts` — 所有必需路由（/ai-ad-copy, /ocr, /membership, /history）已存在，无需修改
-
-### 实现内容
-
-全部按计划完成。核心改动：
-- Sidebar `AI 文案生成` 从 disabled 占位改为可点击，跳转 `/ai-ad-copy`
-- 其他已实现功能入口（OCR、会员中心、使用日志）确认均可正常跳转
-- Dashboard 快捷入口 AI 文案生成和 OCR 确认已正确配置
-- 未实现功能保持 disabled + "即将开放"
-- 不新增会员中心快捷入口（保持 6 宫格布局不变），Sidebar 入口已确保可用
-
-### 未实现内容
-
-无——计划内全部完成。
-
-### 自审结论
-
-- 只实现了 tasks/current-task.md 允许的内容: 是
-- 只修改了 allowed files: 是
-- 未混入无关文件: 是
-- 未新增依赖: 是
-- 未触碰高风险边界: 是
-- 未存储 secrets: 是
-- 构建: npm run build 通过（68 modules, 0 errors）
-- PROGRESS.md: 已更新
-- 模块上下文: 已创建
-
-### 测试结果
-
-```
-# 前端构建
-npm run build
-68 modules, 0 errors
-
-# diff 检查
-git diff --check
-通过
-```
-
-### 是否触发高风险暂停规则
-
-否——本任务仅修改一行前端入口映射和文档记录，不涉及任何高风险边界。
-
-### 风险和回滚方式
-
-1. **残余风险**: 无。改动仅一行代码，只将已有的 AI 文案页面路由正确接入 Sidebar。
-2. **回滚方式**: revert 本任务 commit，或在 `AppSidebar.vue` 中恢复 `AI 文案生成` 为 `disabled: true, route: "/"`。
-
----
+S04-T05 已由 CC 实现并自审通过。详细实现记录、测试结果、风险和回滚方式见 `PROGRESS.md` 与 `docs/module-context/sprint-04-task-05-shortcut-entry-wiring/context.md`。
 
 ## 背景
 
