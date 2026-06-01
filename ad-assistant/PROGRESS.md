@@ -47,6 +47,45 @@ PR：
 
 ## 记录
 
+## 2026-06-01 - Coding Standards Extensibility Guidelines
+
+状态：MERGED
+
+分支：`docs/extensibility-guidelines`
+提交：`3917a90`
+PR：#30（已按用户确认合并到 `main` @ `fe4da23`）
+
+### 范围
+
+- 目标：补充项目编码规范中的可扩展性与可修改性规则，支持第一期后续功能演进。
+- 已实现：新增“可扩展性与可修改性”章节，覆盖现有分层接入、可变业务规则集中管理、API/DTO/错误码集中维护、局部化修改、模块上下文和回滚记录。
+- 未实现：未修改业务代码；未新增依赖、格式化工具、CI、API、数据库、Provider、Auth、Credit 或 Tauri 逻辑。
+
+### 主要改动
+
+- `docs/15-coding-standards.md`：新增可扩展性与可修改性规则。
+- `tasks/current-task.md`：记录本次纯文档规范补充任务。
+- `PROGRESS.md`：本条进度和自审记录。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（纯文档）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用（项目级规范）
+- Bug 根因已记录（如适用）：不适用
+
+### 测试结果
+
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：规则为项目级约束，需要后续任务执行时持续检查。
+- 后续任务：后续功能任务应在任务单和模块上下文中记录扩展入口、修改注意事项和回滚方式。
+- 回滚方式：revert 对应文档提交。
+
 ## 2026-06-01 - Sprint-03 Task-01 Security & Reliability Fixes (S03-T01)
 
 状态：MERGED
