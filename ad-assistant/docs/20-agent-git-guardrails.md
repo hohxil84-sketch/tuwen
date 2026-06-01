@@ -36,6 +36,13 @@ CC 自审是默认提交门禁。Codex Review 是按需复核，不再是每次�
 
 - 只 stage 本任务相关文件。
 - 不使用 `git add -A`。
+- 如果工作区存在无关改动，提交前必须展示：
+  - `git status --short --branch`
+  - `git diff --cached --name-status`
+- 在用户或 Codex 明确确认 staged 文件列表前，不得提交。
+- staged 文件只能包含当前任务单 allowed files 中的文件，或任务单中已明确批准的必要例外。
+- 如果 staged 文件包含 unrelated files、generated files、local databases、logs、依赖/lockfile、Tauri、backend、OCR、CI 等任务外文件，必须停止并取消 stage。
+- 不得把多个任务的改动拆不开地塞进同一个 commit；需要拆分时，先切换或创建对应任务分支。
 - 不在 `main` 上提交。
 - 不推 `main`。
 - 不 force push。
