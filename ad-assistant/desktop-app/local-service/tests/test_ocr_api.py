@@ -7,6 +7,8 @@ Tests:
 4. Health check endpoint returns expected structure
 5. Missing/empty file → 422 rejection
 6. Response format validation
+7. History endpoints — list, detail, pagination
+8. Delete history endpoints — single delete, clear all
 """
 
 import io
@@ -372,3 +374,204 @@ class TestHistoryEndpoints:
         body = response.json()
         assert body["success"] is False
         assert body["error"]["code"] == "NOT_FOUND"
+
+
+# ---------------------------------------------------------------------------
+# 8. Delete history endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteHistoryEndpoints:
+    """DELETE /local/ocr/history/{id} and DELETE /local/ocr/history."""
+
+    def test_delete_single_record_returns_ok(self, client, minimal_png_bytes):
+        """After creating a record via OCR, delete it and verify 200."""
+        files = {"image": ("test.png", io.BytesIO(minimal_png_bytes), "image/png")}
+        ocr_resp = client.post("/local/ocr", files=files)
+        history_id = ocr_resp.json()["data"]["history_id"]
+
+        # Delete it
+        resp = client.delete(f"/local/ocr/history/{history_id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["data"]["deleted_id"] == history_id
+
+        # Verify it's gone from history list
+        list_resp = client.get("/local/ocr/history")
+        items = list_resp.json()["data"]["items"]
+        assert all(i["id"] != history_id for i in items)
+
+    def test_delete_nonexistent_returns_404(self, client):
+        """Deleting a made-up ID returns 404 NOT_FOUND."""
+        resp = client.delete(
+            "/local/ocr/history/00000000-0000-0000-0000-000000000000"
+        )
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "NOT_FOUND"
+
+    def test_clear_all_deletes_all_records(self, client, minimal_png_bytes):
+        """clear_all should remove every record and return count."""
+        # Create 2 records
+        for name in ("a.png", "b.png"):
+            files = {
+                "image": (name, io.BytesIO(minimal_png_bytes), "image/png")
+            }
+            client.post("/local/ocr", files=files)
+
+        resp = client.delete("/local/ocr/history")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["data"]["deleted_count"] == 2
+
+        # List should be empty
+        list_resp = client.get("/local/ocr/history")
+        assert list_resp.json()["data"]["items"] == []
+
+    def test_delete_unified_response_format(self, client, minimal_png_bytes):
+        """DELETE responses must include success, data, error, request_id."""
+        files = {"image": ("test.png", io.BytesIO(minimal_png_bytes), "image/png")}
+        ocr_resp = client.post("/local/ocr", files=files)
+        history_id = ocr_resp.json()["data"]["history_id"]
+
+        resp = client.delete(f"/local/ocr/history/{history_id}")
+        body = resp.json()
+        assert "success" in body
+        assert "data" in body
+        assert "error" in body
+        assert "request_id" in body
+        assert isinstance(body["success"], bool)
+
+    def test_delete_then_detail_returns_404(self, client, minimal_png_bytes):
+        """After deletion, fetching detail should return 404."""
+        files = {"image": ("test.png", io.BytesIO(minimal_png_bytes), "image/png")}
+        ocr_resp = client.post("/local/ocr", files=files)
+        history_id = ocr_resp.json()["data"]["history_id"]
+
+        client.delete(f"/local/ocr/history/{history_id}")
+
+        detail_resp = client.get(f"/local/ocr/history/{history_id}")
+        assert detail_resp.status_code == 404
+        assert detail_resp.json()["error"]["code"] == "NOT_FOUND"
+
+    def test_clear_all_empty_db_returns_zero(self, client):
+        """Clearing an empty database returns deleted_count=0 successfully."""
+        resp = client.delete("/local/ocr/history")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["data"]["deleted_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# 9. Sandbox path safety — _cleanup_sandbox_copy must reject malicious paths
+# ---------------------------------------------------------------------------
+
+
+class TestSandboxPathSafety:
+    """Verify _cleanup_sandbox_copy rejects paths that escape the sandbox."""
+
+    @pytest.fixture
+    def sandbox_dir(self, tmp_path):
+        """Create a temporary sandbox with a known file inside it."""
+        sandbox = tmp_path / "ocr_images"
+        sandbox.mkdir()
+        legit = sandbox / "real_file.png"
+        legit.write_bytes(b"legit")
+        # Create a file OUTSIDE the sandbox to prove it is never deleted
+        outside = tmp_path / "outside_file.png"
+        outside.write_bytes(b"outside")
+        return sandbox, outside
+
+    def _call_cleanup(self, sandbox_dir, rel_path):
+        """Import and call _cleanup_sandbox_copy with a patched SANDBOX_IMAGES_DIR."""
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        sandbox, _ = sandbox_dir
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            ocr_mod._cleanup_sandbox_copy(rel_path)
+
+    def test_legit_relative_path_deletes_file(self, sandbox_dir):
+        """A valid relative path under ocr_images/ should delete the file."""
+        sandbox, _ = sandbox_dir
+        legit = sandbox / "real_file.png"
+        assert legit.exists()
+
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            ocr_mod._cleanup_sandbox_copy("ocr_images/real_file.png")
+
+        assert not legit.exists()  # was deleted
+
+    def test_absolute_path_is_rejected(self, sandbox_dir):
+        """An absolute Unix path must NOT delete anything."""
+        sandbox, outside = sandbox_dir
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            ocr_mod._cleanup_sandbox_copy("/etc/passwd")
+
+        assert outside.exists()  # untouched
+
+    def test_drive_letter_path_is_rejected(self, sandbox_dir):
+        """A Windows path with a drive letter must NOT delete anything."""
+        sandbox, outside = sandbox_dir
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            ocr_mod._cleanup_sandbox_copy("C:\\Windows\\System32\\config\\SAM")
+
+        assert outside.exists()  # untouched
+
+    def test_unc_path_is_rejected(self, sandbox_dir):
+        """A UNC network path must NOT delete anything."""
+        sandbox, outside = sandbox_dir
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            ocr_mod._cleanup_sandbox_copy("\\\\evil-server\\share\\file.png")
+
+        assert outside.exists()  # untouched
+
+    def test_path_traversal_is_rejected(self, sandbox_dir):
+        """A path with .. traversal must NOT delete anything."""
+        sandbox, outside = sandbox_dir
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            ocr_mod._cleanup_sandbox_copy("ocr_images/../../../etc/passwd")
+
+        assert outside.exists()  # untouched
+
+    def test_not_under_ocr_images_is_rejected(self, sandbox_dir):
+        """A relative path not starting with ocr_images/ must NOT delete."""
+        sandbox, outside = sandbox_dir
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            ocr_mod._cleanup_sandbox_copy("some_other_dir/evil.png")
+
+        assert outside.exists()  # untouched
+
+    def test_none_path_is_noop(self, sandbox_dir):
+        """None path should be a silent no-op."""
+        sandbox, outside = sandbox_dir
+        import routes.ocr as ocr_mod
+        from unittest.mock import patch
+
+        with patch.object(ocr_mod, "SANDBOX_IMAGES_DIR", sandbox):
+            # Should not raise, should not delete anything
+            ocr_mod._cleanup_sandbox_copy(None)
+
+        assert outside.exists()  # untouched

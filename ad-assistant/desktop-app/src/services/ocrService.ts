@@ -163,3 +163,29 @@ export async function getHistoryDetail(id: string): Promise<HistoryRecord> {
   );
   return response.data;
 }
+
+/**
+ * Delete a single OCR history record and its sandbox image copy.
+ * Returns the ID of the deleted record.
+ */
+export async function deleteHistoryRecord(
+  id: string,
+): Promise<{ deleted_id: string }> {
+  const response = await request<{ deleted_id: string }>(
+    `${BASE_URL}/local/ocr/history/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+  return response.data;
+}
+
+/**
+ * Delete ALL OCR history records and their sandbox image copies.
+ * Returns the number of deleted records.
+ */
+export async function clearAllHistory(): Promise<{ deleted_count: number }> {
+  const response = await request<{ deleted_count: number }>(
+    `${BASE_URL}/local/ocr/history`,
+    { method: "DELETE" },
+  );
+  return response.data;
+}
