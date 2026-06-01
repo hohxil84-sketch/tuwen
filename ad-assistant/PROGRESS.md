@@ -154,8 +154,8 @@ PR：#20（已合并到 `main` @ `1a3602f`）
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
 
 分支：`feature/sprint-02-task-08-mock-ai-api-contract`
-提交：（待提交）
-PR：（待创建）
+提交：`6d763e6`
+PR：#22
 
 ### 范围
 
@@ -197,3 +197,53 @@ PR：（待创建）
 - 残余风险：其他端点仍使用 `response_model=None`，后续按需逐个迁移。
 - 后续任务：Candidate C — Real Provider routing design。
 - 回滚方式：revert 对应提交，`response_model` 改回 `None`，移除 shared 新文件，恢复 `.gitkeep` 原始内容。
+
+## 2026-06-01 - Sprint-02 Task-09 Provider Routing Design
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-02-task-09-provider-routing`
+提交：（待提交）
+PR：（待创建）
+
+### 范围
+
+- 目标：构建 provider 路由层 — ProviderRegistry（按名存取）、ProviderRouter（按 feature+plan 选择）、route_and_execute_provider_call（高层入口）。
+- 已实现：`ProviderRegistry` 单例（预注册 mock）、`ProviderRouter` 单例（DEFAULT_ROUTING_RULES）、`route_and_execute_provider_call()`、`mock_ai.py` 改用路由。
+- 未实现：不涉及真实 provider、不涉及 fallback/retry/health check、不涉及 DB 路由配置、不新增端点。
+
+### 主要改动
+
+- `cloud-backend/app/providers/registry.py`：新建 `ProviderRegistry` + `ProviderRegistryError` + `get_provider_registry()` 单例。
+- `cloud-backend/app/providers/router.py`：新建 `ProviderRouter` + `ProviderNotFoundError` + `DEFAULT_ROUTING_RULES` + `get_provider_router()` 单例。
+- `cloud-backend/app/services/provider_service.py`：新增 `route_and_execute_provider_call()`（先路由、后执行）；`execute_provider_call()` 不变。
+- `cloud-backend/app/api/v1/mock_ai.py`：移除 `MockProvider` import，改用 `route_and_execute_provider_call()`。
+- `cloud-backend/app/providers/__init__.py`：更新 docstring 反映 routing 架构。
+- `cloud-backend/tests/test_provider_routing.py`：20 个聚焦测试（registry 8 + router 8 + integration 4）。
+- `docs/06-provider-architecture.md`：新增 "Provider 路由层" 章节 + Task-09 实现证据。
+- `docs/sprint-02-summary.md`：新增 Task-09 状态块，移除 Candidate C。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（重大变更已由用户确认）
+- 未加入密钥或生产凭据：是
+- 模块上下文已创建：是
+- Bug 根因已记录（如适用）：不适用
+
+### 测试结果
+
+- SQLite regression：147 passed
+- Mock AI focused：21 passed
+- New routing focused：20 passed
+- Total：167 passed
+- FastAPI OpenAPI 生成验证：`MockAdCopyData` + `APIResponse_MockAdCopyData_` + path 均存在
+- `git diff --check`：通过
+- 接口返回 shape 未变：是
+
+### 风险和后续
+
+- 残余风险：所有路由仍解析到 MockProvider，未来加入真实 provider 时需验证路由规则正确性；fallback/retry 机制尚未实现。
+- 后续任务：Candidate A — Desktop Mock AI E2E Smoke Verification（或用户指定的其他任务）。
+- 回滚方式：revert 对应提交，`mock_ai.py` 恢复 `MockProvider()` 直接调用，移除 registry/router 模块和新测试。

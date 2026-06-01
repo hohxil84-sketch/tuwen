@@ -4,6 +4,7 @@
 不暴露为公共 HTTP API。
 
 Sprint-02 Task-03: MockProvider 专用执行路径。
+Sprint-02 Task-09: 新增 ``route_and_execute_provider_call`` 路由层入口。
 """
 
 import time
@@ -146,3 +147,40 @@ async def execute_provider_call(
         )
 
         raise
+
+
+# ---------------------------------------------------------------------------
+# Sprint-02 Task-09: routing layer
+# ---------------------------------------------------------------------------
+
+
+async def route_and_execute_provider_call(
+    *,
+    db: AsyncSession,
+    feature: str,
+    plan: str,
+    request: ProviderRequest,
+    user_id: uuid.UUID | None = None,
+    device_id: uuid.UUID | None = None,
+    request_id: str | None = None,
+) -> ProviderResult:
+    """Route to the correct provider for *(feature, plan)*, then execute and log.
+
+    This is the recommended high-level entry point for endpoint handlers.
+    It delegates provider selection to :class:`ProviderRouter` and then
+    calls :func:`execute_provider_call`.
+
+    All routes currently resolve to ``MockProvider`` (``"mock"``).
+    """
+    from app.providers.router import get_provider_router  # noqa: PLC0415
+
+    router = get_provider_router()
+    provider = await router.route(feature, plan)
+    return await execute_provider_call(
+        db=db,
+        provider=provider,
+        request=request,
+        user_id=user_id,
+        device_id=device_id,
+        request_id=request_id,
+    )
