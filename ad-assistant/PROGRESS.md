@@ -47,11 +47,50 @@ PR：
 
 ## 记录
 
+## 2026-06-02 - Sprint-03 Closeout
+
+状态：MERGED
+
+分支：`main`
+提交：`3bbfafb`
+
+### 范围
+
+- 目标：关闭 Sprint-03，编写 sprint summary，更新任务状态为 IDLE。
+- 已实现：`docs/sprint-03-summary.md`（完整 sprint summary）、`tasks/current-task.md` → IDLE、PROGRESS.md 本条记录。
+- 未实现：无代码变更。
+
+### 主要改动
+
+- `docs/sprint-03-summary.md`（NEW）：Sprint-03 完整收尾文档，含 completed modules、capability、safety boundaries、verification、residual risks、Sprint-04 候选。
+- `tasks/current-task.md`：状态 → IDLE，记录全部已完成的 S03 任务。
+- `PROGRESS.md`：本条记录。
+
+### 自检结果
+
+- 任务单完整：不适用（收尾任务）
+- 修改范围符合 allowed files：是（仅 docs + tasks）
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用
+
+### 测试结果
+
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：无
+- 后续任务：用户从 Sprint-04 候选中选择下一任务。
+- 回滚方式：revert 对应提交。
+
 ## 2026-06-02 - Sprint-03 Task-04 Desktop Dashboard UI Redesign (S03-T04)
 
-状态：IMPLEMENTED_SELF_REVIEW_PASSED
+状态：MERGED
 
 分支：`feature/sprint-03-task-04-dashboard-ui`
+提交：`c16d9d3`
+PR：#34
 
 ### 范围
 
@@ -231,9 +270,11 @@ PR：#28（已按用户确认合并到 `main` @ `0c1096b`）
 
 ## 2026-06-01 - Sprint-03 Task-03 Real Credit Deduction (S03-T03)
 
-状态：IMPLEMENTED_SELF_REVIEW_PASSED
+状态：MERGED
 
 分支：`feature/sprint-03-task-03-credit-deduction`
+提交：`8fcf6f5`
+PR：#33
 
 ### 范围
 
