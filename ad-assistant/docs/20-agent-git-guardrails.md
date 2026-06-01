@@ -6,7 +6,7 @@
 
 ## 默认门禁
 
-CC 自审是默认提交门禁。Codex Review 是按需复核，不再是每次提交的强制条件。
+CC 自审是默认提交门禁的第一步，不是最终质量门禁。CC 自审完成后必须追加 reviewer-mode 自查；Codex Review 是按需复核，不再是每次提交的强制条件，但高风险任务必须在 reviewer-mode 通过后再请求 Codex 复核。
 
 进入提交前，CC 必须确认：
 
@@ -20,6 +20,17 @@ CC 自审是默认提交门禁。Codex Review 是按需复核，不再是每次�
 - 模块上下文已更新
 - `PROGRESS.md` 已追加更新
 - 自审清单已完成
+- reviewer-mode 自查已完成，且阻塞/高风险发现已修复
+
+## Reviewer-mode 自查门禁
+
+完成实现和常规自审后，CC 必须停止继续写功能代码，切换到 reviewer-mode 审查自己的改动。审查重点是 bug、行为回归、安全/隐私风险、测试缺口、范围越界、未处理的高风险边界和 staged 文件污染。
+
+Reviewer-mode 输出必须 findings first，并按严重程度排序。没有发现问题时，也必须明确写出“未发现阻塞问题”和剩余风险/测试缺口。若 reviewer-mode 发现阻塞或高风险问题，本次自审视为未通过，必须先修复、补充必要测试、重新运行相关测试，并再次执行 reviewer-mode。
+
+Reviewer-mode 结果必须记录：审查范围、发现的问题、已修复内容、未修复风险、测试缺口、实际运行的测试命令和结果、`git status --short --branch`、`git diff --cached --name-status`。
+
+高风险任务必须在 reviewer-mode 通过后再请求 Codex 复核。高风险范围包括但不限于数据库 schema/DDL/migration、API contract/OpenAPI/shared DTO、Provider/模型路由/真实 AI 调用、Auth/Token/权限、Credit/Payment/扣费/provider cost、Tauri 权限、本地服务启动、文件系统权限、CI/依赖/环境变量、删除/清空/清理用户数据或沙箱文件。
 
 ## 必须暂停的情况
 
@@ -48,17 +59,17 @@ CC 自审是默认提交门禁。Codex Review 是按需复核，不再是每次�
 - 不 force push。
 - 不混合多个模块。
 - 不自行创建下一任务实现。
-- 自审通过后，可以提交并 push 当前任务分支。
+- 自审和 reviewer-mode 自查均通过后，可以提交并 push 当前任务分支。
 
 ## PR 规则
 
 - base: `main`
 - head: 当前任务分支
-- PR 内容必须包含：任务范围、测试结果、CC 自审结论、风险、回滚方式
+- PR 内容必须包含：任务范围、测试结果、CC 自审结论、reviewer-mode 自查结果、风险、回滚方式
 - CC 可以创建 PR 或 draft PR
 - CC 不能未经用户明确确认 self-merge
 - 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并记录确认来源和合并结果
-- 高风险任务、失败测试、范围不确定或用户要求时，PR 前召回 Codex 复核
+- 高风险任务、失败测试、范围不确定或用户要求时，PR 前召回 Codex 复核；CC 自审和 reviewer-mode 自查不能替代 Codex 高风险复核
 
 ## Codex 复核触发条件
 

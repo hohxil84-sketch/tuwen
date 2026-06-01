@@ -76,6 +76,16 @@ CC 负责维护 `tasks/current-task.md`。每个任务单必须包含：
 
 如果用户目标不完整，CC 应先做保守拆解；只有目标无法判断、会触碰高风险边界或存在互斥选择时，才暂停询问用户。
 
+## Reviewer-mode 自查
+
+CC 自审不是最终质量门禁。完成实现和常规自审后，CC 必须立刻切换到 reviewer-mode，对自己的改动做一次独立审查；审查时停止继续写功能代码，按代码审查标准优先寻找 bug、行为回归、安全/隐私风险、测试缺口、范围越界和未处理的高风险边界。
+
+Reviewer-mode 输出必须 findings first，按严重程度排序；没有发现问题时，也必须明确写出“未发现阻塞问题”和剩余风险/测试缺口。若 reviewer-mode 发现阻塞或高风险问题，本次自审视为未通过，必须先修复、补充必要测试、重新运行相关测试，并再次执行 reviewer-mode。
+
+高风险任务必须在 reviewer-mode 通过后再请求 Codex 复核；包括但不限于数据库 schema/DDL/migration、API contract/OpenAPI/shared DTO、Provider/模型路由/真实 AI 调用、Auth/Token/权限、Credit/Payment/扣费/provider cost、Tauri 权限、本地服务启动、文件系统权限、CI/依赖/环境变量、删除/清空/清理用户数据或沙箱文件。
+
+Reviewer-mode 交付说明必须包含：实际审查范围、发现的问题和修复结果、未修复风险、测试缺口、实际运行的测试命令和结果、`git status --short --branch`、`git diff --cached --name-status`。
+
 ## 自审清单
 
 完成任务前，必须自审并在交付说明中明确结论：
@@ -88,6 +98,7 @@ CC 负责维护 `tasks/current-task.md`。每个任务单必须包含：
 - 是否没有触碰未确认的高风险边界
 - 是否没有 secrets、真实密钥、Token 或生产连接串
 - 是否完成任务单要求的测试
+- 是否完成 reviewer-mode 自查，且阻塞/高风险发现已修复
 - 是否更新模块上下文
 - 是否追加更新 `PROGRESS.md`
 - 是否列出未实现内容和残余风险
@@ -101,12 +112,12 @@ CC 负责维护 `tasks/current-task.md`。每个任务单必须包含：
 - 用户或 Codex 明确确认 staged 文件列表前，不得 `git commit`。
 - 如果 staged 文件中出现任务单 allowed files 之外的文件，必须停止并取消 stage；不得用“顺手修复”“本地生成”“构建需要”作为混入理由。
 - 如果需要修改 forbidden files 或高风险边界文件，必须先更新任务单并等待用户确认，不能在当前任务 commit 中夹带。
-- 自审通过后，可以提交到当前任务分支并 push 当前任务分支。
+- 自审和 reviewer-mode 自查均通过后，可以提交到当前任务分支并 push 当前任务分支。
 - 不直接 push `main`，不 force push。
 - 可以创建 PR 或 draft PR；未经用户明确确认，不能 self-merge。
 - 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并在交付说明中记录确认来源和合并结果。
 - 合并只能通过 PR，base 为 `main`，head 为当前任务分支。
-- 高风险任务、测试异常、范围不确定或用户要求时，提交/PR 前先请求 Codex 或用户复核。
+- 高风险任务、测试异常、范围不确定或用户要求时，提交/PR 前先请求 Codex 或用户复核；CC 自审和 reviewer-mode 自查不能替代 Codex 高风险复核。
 
 ## 输出要求
 
