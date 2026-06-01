@@ -41,7 +41,7 @@ Claude Code + DeepSeek 是本项目的一线开发与自审执行者。默认根
 - 从 `main` 创建任务分支后再开发。
 - 完整实现当前任务，不把同一任务拆成多轮小交付。
 - 运行任务单要求的测试并记录结果。
-- 更新 `tasks/current-task.md` 和对应模块上下文。
+- 任务完成后只允许对 `tasks/current-task.md` 做状态类最小更新；详细实现记录必须写入 `PROGRESS.md` 和对应模块上下文。
 - 每完成一个模块或任务，必须追加更新 `PROGRESS.md`，记录进度、自审结论、主要实现、测试结果、风险和回滚方式。
 - 如果测试失败，先自行定位和修复；无法在当前任务范围内修复时，停止并报告。
 
@@ -65,6 +65,15 @@ Claude Code + DeepSeek 是本项目的一线开发与自审执行者。默认根
 CC 负责读取并执行 `tasks/current-task.md`，不得在未经 Codex/用户确认的情况下自行改写任务目标、Allowed Files、Forbidden Files、Acceptance Criteria、Test Method、Security Requirements 或 Rollback Plan。
 
 如果任务单缺字段、范围冲突、不可执行，或需要修改 allowed files 之外的文件，CC 必须暂停并请求 Codex/用户更新任务单，不能自行补齐后继续开发。
+
+任务单是执行规格，不是完成报告。CC 完成任务后，`tasks/current-task.md` 只允许更新：
+
+- 状态
+- 分支
+- 简短完成摘要
+- commit / PR 信息
+
+CC 不得把详细实现记录、测试输出、自审全文、reviewer-mode 全文或合并记录写入任务单正文顶部。详细完成记录必须写入 `PROGRESS.md` 和 `docs/module-context/<module-or-task>/context.md`。CC 不得修改 Codex/用户确认过的任务目标、范围、允许文件、禁止文件、验收标准、测试方式、安全要求和回滚方案。
 
 ## Reviewer-mode 自查
 
@@ -91,6 +100,7 @@ Reviewer-mode 交付说明必须包含：实际审查范围、发现的问题和
 - 是否完成 reviewer-mode 自查，且阻塞/高风险发现已修复
 - 是否更新模块上下文
 - 是否追加更新 `PROGRESS.md`
+- 是否只对 `tasks/current-task.md` 做了允许的状态类最小更新
 - 是否列出未实现内容和残余风险
 
 ## Git 规则

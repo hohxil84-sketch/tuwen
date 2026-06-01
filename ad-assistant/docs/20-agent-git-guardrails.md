@@ -20,6 +20,7 @@ CC 自审是默认提交门禁的第一步，不是最终质量门禁。CC 自�
 - 测试已运行并记录结果
 - 模块上下文已更新
 - `PROGRESS.md` 已追加更新
+- `tasks/current-task.md` 未被写入详细实现报告；如有更新，仅限状态、分支、简短完成摘要、commit/PR 信息
 - 自审清单已完成
 - reviewer-mode 自查已完成，且阻塞/高风险发现已修复
 - commit message、PR title、PR body 和交付说明均已准备中文说明
@@ -55,6 +56,7 @@ Reviewer-mode 结果必须记录：审查范围、发现的问题、已修复内
 - 在用户或 Codex 明确确认 staged 文件列表前，不得提交。
 - staged 文件只能包含当前任务单 allowed files 中的文件，或任务单中已明确批准的必要例外。
 - 如果 staged 文件包含 unrelated files、generated files、local databases、logs、依赖/lockfile、Tauri、backend、OCR、CI 等任务外文件，必须停止并取消 stage。
+- `tasks/current-task.md` 不是完成报告；不得把详细实现记录、测试输出、自审全文、reviewer-mode 全文或合并记录写入任务单正文顶部。
 - 不得把多个任务的改动拆不开地塞进同一个 commit；需要拆分时，先切换或创建对应任务分支。
 - `git commit` 必须使用中文提交说明，且说明本次任务目的；禁止使用 `update`、`fix`、`changes`、`misc`、`wip` 这类空泛说明。
 - 不在 `main` 上提交。

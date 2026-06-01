@@ -100,6 +100,8 @@ Codex 起草或更新 `tasks/current-task.md` 时，必须把用户目标写成 
 - `Completion Output Required` 必须要求 CC 输出：修改文件、实现内容、未实现内容、测试命令和结果、风险、回滚方式、Git 状态。
 - `Rollback Plan` 至少说明如何 revert commit、如何恢复配置、是否涉及数据回滚。
 - 明确要求 CC 更新对应模块上下文和 `PROGRESS.md`。
+- 明确说明任务单是执行规格，不是完成报告；CC 完成任务后只能对 `tasks/current-task.md` 做状态、分支、简短完成摘要、commit/PR 信息这类最小更新。
+- 明确要求详细实现记录、测试结果、自审结论、reviewer-mode 结果和合并记录写入 `PROGRESS.md` 与对应模块上下文，不写入任务单正文顶部。
 - 明确要求 CC 完成自审和 reviewer-mode 自查。
 - 高风险任务必须写明：reviewer-mode 通过后还要请求 Codex 复核。
 - 停机条件必须写清楚：任务单缺字段、范围冲突、需要改 forbidden files、测试失败且超出范围、发现 secrets、需要 Docker 但未获批准、需要删除/清空用户数据、需要真实支付或真实 AI 调用。
