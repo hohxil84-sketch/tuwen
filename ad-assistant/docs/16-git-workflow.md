@@ -24,11 +24,16 @@
 3. 完成 CC 自审清单。
 4. 更新模块上下文。
 5. 只 stage 当前任务相关文件。
+6. 如果工作区存在无关改动，必须运行并展示 `git status --short --branch` 和 `git diff --cached --name-status`。
+7. 用户或 Codex 确认 staged 文件列表前，不得提交。
 
 ## 提交规则
 
 - 不使用 `git add -A`。
 - 不把无关文件混进同一个 commit。
+- 不把多个任务、多个模块或高风险边界改动混进同一个 commit。
+- 不提交本地数据库、日志、构建输出、egg-info、临时文件等生成物。
+- 不在当前任务 commit 中夹带 package/lockfile、Tauri、backend、OCR、CI 等任务外改动；确需修改时，单独任务、单独分支、单独提交。
 - 不在 `main` 上提交。
 - 不 `git push origin main`。
 - 不 force push。

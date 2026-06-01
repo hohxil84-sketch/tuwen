@@ -97,6 +97,10 @@ CC 负责维护 `tasks/current-task.md`。每个任务单必须包含：
 - 开始前先运行 `git status --short --branch`。
 - 如果当前分支是 `main`，先切到任务分支再继续。
 - 只 stage 当前任务相关文件，不使用 `git add -A`。
+- 在存在任何 unrelated dirty files 时，提交前必须先运行并展示 `git status --short --branch` 和 `git diff --cached --name-status`。
+- 用户或 Codex 明确确认 staged 文件列表前，不得 `git commit`。
+- 如果 staged 文件中出现任务单 allowed files 之外的文件，必须停止并取消 stage；不得用“顺手修复”“本地生成”“构建需要”作为混入理由。
+- 如果需要修改 forbidden files 或高风险边界文件，必须先更新任务单并等待用户确认，不能在当前任务 commit 中夹带。
 - 自审通过后，可以提交到当前任务分支并 push 当前任务分支。
 - 不直接 push `main`，不 force push。
 - 可以创建 PR 或 draft PR；未经用户明确确认，不能 self-merge。
