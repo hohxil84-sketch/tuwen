@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.providers.base import AsyncProvider, ProviderRequest, ProviderResult
 from app.providers.mock_provider import MockProviderError
+from app.providers.router import get_provider_router
 from app.services.cost_service import calculate_mock_cost
 from app.services.provider_log_service import record_provider_call
 
@@ -172,8 +173,6 @@ async def route_and_execute_provider_call(
 
     All routes currently resolve to ``MockProvider`` (``"mock"``).
     """
-    from app.providers.router import get_provider_router  # noqa: PLC0415
-
     router = get_provider_router()
     provider = await router.route(feature, plan)
     return await execute_provider_call(

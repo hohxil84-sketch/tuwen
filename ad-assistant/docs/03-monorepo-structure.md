@@ -28,6 +28,12 @@ ad-assistant/
     17-release-and-update.md
     18-ui-style-guide.md
     19-pricing-and-credit-system.md
+    20-agent-git-guardrails.md
+    21-ci-postgres-integration-tests.md
+    22-provider-mock-foundation.md
+    23-mock-ai-api-endpoint.md
+    24-credit-system-design.md
+    25-desktop-mock-e2e-smoke.md
 
   desktop-app/
     README.md

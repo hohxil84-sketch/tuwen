@@ -95,6 +95,49 @@ PR：#21（已合并到 `main` @ `fe5e94f`）
 - 后续任务：后续产品任务按新的 CC-first 流程启动。
 - 回滚方式：revert workflow 文档提交，并按需恢复本地 skill 旧版本。
 
+## 2026-06-01 - Sprint-02 Task-06 Desktop Mock AI E2E Smoke Verification
+
+状态：MERGED
+
+分支：`feature/sprint-02-task-06-desktop-mock-e2e-smoke`
+提交：`cfbadeb`
+PR：#18（已合并到 `main` @ `cfbadeb`）
+
+### 范围
+
+- 目标：使 Task-05 的 desktop mock MVP 路径可重现、可手动验证。
+- 已实现：E2E smoke 操作手册 (`docs/25-desktop-mock-e2e-smoke.md`)、dev seed 脚本 (`cloud-backend/scripts/dev_seed_user.py`)、更新 desktop/backend 开发指南。
+- 未实现：未修改 backend/API/DDL/dependency/shared/Tauri/desktop 源码。
+
+### 主要改动
+
+- `docs/25-desktop-mock-e2e-smoke.md`：E2E smoke runbook。
+- `cloud-backend/scripts/dev_seed_user.py`：dev-only seed 脚本。
+- `docs/09-desktop-app-guide.md`：引用 dev runbook。
+- `docs/11-cloud-backend-guide.md`：新增 dev setup 章节。
+- `docs/module-context/sprint-02-task-06-desktop-mock-e2e-smoke/context.md`：模块上下文。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：是
+- Bug 根因已记录（如适用）：是（发现 DDL TIMESTAMPTZ / ORM DateTime 不匹配，后续 Task-07 修复）
+
+### 测试结果
+
+- `npm run build`：43 modules, 0 errors
+- Backend regression：147 passed
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：实时手动验证因本地 PostgreSQL/backend 环境不可用未完成。
+- 后续任务：Task-07（修复 DDL/ORM DateTime 不匹配）。
+- 回滚方式：revert 对应提交。
+
 ## 2026-06-01 - Sprint-02 Task-07 Backend PostgreSQL DateTime Alignment
 
 状态：MERGED

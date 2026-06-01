@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.device import Device
 from app.models.user import User
 from app.schemas.common import success_response
-from app.schemas.credit import CreditBalanceResponse, CreditLedgerItem, CreditLedgerListData
+from app.schemas.credit import CreditBalanceResponse, CreditLedgerListData
 from app.services.credit_service import get_credit_balance, list_credit_ledger
 
 router = APIRouter(prefix="/api/v1/credits", tags=["Credits"])
