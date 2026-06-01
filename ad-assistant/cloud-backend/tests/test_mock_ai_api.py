@@ -22,6 +22,29 @@ from app.models.provider_call_log import ProviderCallLog
 
 
 # ---------------------------------------------------------------------------
+# Ensure mock_ad_copy/standard routes to MockProvider during API tests.
+# DeepSeek routing is tested separately in test_deepseek_provider.py.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _route_mock_ad_copy_standard_to_mock():
+    """Override routing so mock_ad_copy/standard → mock during API tests."""
+    from app.providers.router import DEFAULT_ROUTING_RULES
+
+    original = DEFAULT_ROUTING_RULES["mock_ad_copy"]["standard"]
+    DEFAULT_ROUTING_RULES["mock_ad_copy"]["standard"] = "mock"
+    # Reset module-level router singleton so it picks up the new rule
+    import app.providers.router as _router_mod
+
+    _cached_router = _router_mod._router
+    _router_mod._router = None
+    yield
+    DEFAULT_ROUTING_RULES["mock_ad_copy"]["standard"] = original
+    _router_mod._router = _cached_router
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

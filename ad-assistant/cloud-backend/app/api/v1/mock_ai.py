@@ -61,10 +61,18 @@ async def generate_ad_copy(
     # 获取或生成 request_id（优先使用 middleware 注入的 X-Request-ID）
     request_id: str = getattr(request.state, "request_id", None) or f"req_{_uuid.uuid4().hex[:12]}"
 
-    # 构建 ProviderRequest —— 不含原始用户文本（product_name/selling_points）
+    # 构建 prompt（用于发送给 Provider，不记录到 provider_call_log / raw_usage）
+    selling_points_text = "、".join(body.selling_points)
+    prompt = (
+        f"为以下产品撰写{body.platform}平台的广告文案，风格为{body.tone}。\n\n"
+        f"产品名称：{body.product_name}\n"
+        f"卖点：{selling_points_text}"
+    )
+
+    # 构建 ProviderRequest —— prompt 文本发送给 Provider 但不记入 raw_usage
     provider_request = ProviderRequest(
         feature=FEATURE_NAME,
-        message="",  # 不记录用户原始内容到 raw_usage / provider_call_log
+        message=prompt,
     )
 
     # Sprint-02 Task-09: 通过 ProviderRouter 选择 Provider 并执行，

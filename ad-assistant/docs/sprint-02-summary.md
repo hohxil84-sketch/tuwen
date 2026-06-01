@@ -39,11 +39,11 @@ Current verified head: `0c1096b` (Sprint-02 closeout merged at `cb3abef`; S03-T0
 
 ## Current Safety Boundaries
 
-- No real AI Provider SDK, API key, environment variable, or network call has been added.
 - No real credit deduction is implemented.
 - Mock AI API does not write `credit_ledger`.
 - Mock AI API does not expose `raw_usage` to clients.
-- Desktop Mock AI integration is mock-only and does not add real provider calls, client-side provider selection, real credit deduction, API keys, or third-party AI network calls.
+- Desktop Mock AI integration does not perform real provider calls, client-side provider selection, real credit deduction, API keys, or third-party AI network calls.
+- **Sprint-03 Task-02**: `DeepSeekProvider` added as first real AI Provider (mock_ad_copy + standard plan → DeepSeek Chat API).
 
 ## Verification
 

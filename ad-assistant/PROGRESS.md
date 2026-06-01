@@ -92,6 +92,57 @@ PR：#28（已按用户确认合并到 `main` @ `0c1096b`）
 - 后续任务：S03-T02（首个真实 Provider 集成 — DeepSeek SDK）。
 - 回滚方式：revert 对应提交，恢复手动 fingerprint 输入、恢复双源 token、移除超时逻辑、恢复 pass。
 
+## 2026-06-01 - Sprint-03 Task-02 First Real Provider Integration — DeepSeek (S03-T02)
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-03-task-02-deepseek-provider`
+
+### 范围
+
+- 目标：集成 DeepSeek Chat API 作为首个真实 AsyncProvider，使 mock_ad_copy + standard plan 用户获得真实 AI 广告文案。
+- 已实现：`DeepSeekProvider`（AsyncProvider 实现）、`openai` SDK 依赖、DeepSeek 配置项、Registry 注册、路由规则更新、真实成本计算、prompt 构建、25 focused tests。
+- 未实现：不涉及 credit 扣费（S03-T03）、不涉及 fallback/retry、不涉及其他 plan/feature 路由、不涉及客户端修改。
+
+### 主要改动
+
+- `cloud-backend/pyproject.toml`：新增 `openai>=1.0.0` 依赖。
+- `cloud-backend/app/core/config.py`：新增 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 配置。
+- `cloud-backend/app/providers/deepseek_provider.py`（NEW）：DeepSeekProvider — 调用 DeepSeek Chat API，映射到 ProviderResult。
+- `cloud-backend/app/providers/__init__.py`：添加 deepseek_provider 到模块列表。
+- `cloud-backend/app/providers/registry.py`：注册 `"deepseek"` → DeepSeekProvider()。
+- `cloud-backend/app/providers/router.py`：`mock_ad_copy/standard` → `"deepseek"`（其他路由不变）。
+- `cloud-backend/app/services/cost_service.py`：新增 `calculate_deepseek_cost()`（¥1/1M input, ¥2/1M output）。
+- `cloud-backend/app/services/provider_service.py`：按 provider 名分发成本计算；新增 DeepSeekProviderError 处理；意外异常不再硬编码 provider/model。
+- `cloud-backend/app/api/v1/mock_ai.py`：构建真实 prompt，传入 ProviderRequest.message。
+- `cloud-backend/tests/test_deepseek_provider.py`（NEW）：25 focused tests（成功路径、错误映射、成本计算、路由规则、安全性）。
+- `cloud-backend/tests/test_provider_routing.py`：更新 fixture 注册 deepseek，更新断言覆盖新路由。
+- `cloud-backend/tests/test_mock_ai_api.py`：添加 routing override fixture 确保 API 测试仍使用 MockProvider。
+- `docs/06-provider-architecture.md`：新增 Sprint-03 Task-02 实现证据。
+- `docs/sprint-02-summary.md`：更新 safety boundaries。
+- `tasks/current-task.md`：S03-T02 任务单。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（重大变更已由用户确认）
+- 未加入密钥或生产凭据：是（API key 仅通过 Settings 读取，未硬编码）
+- 模块上下文已更新：不适用（provider 层，文档已更新）
+- Bug 根因已记录（如适用）：不适用
+
+### 测试结果
+
+- DeepSeek focused：25 passed
+- Full regression：192 passed, 55 skipped
+- `git diff --check`：passed
+
+### 风险和后续
+
+- 残余风险：`DEEPSEEK_API_KEY` 为空时 DeepSeekProvider 会抛出 API_KEY_MISSING；需在部署环境配置 `.env`。路由规则可变（dict-of-dicts），后续可随时调整。
+- 后续任务：S03-T03（真实 credit 扣费）、fallback/retry 机制、其他 plan 逐步切到 DeepSeek。
+- 回滚方式：将 `mock_ad_copy/standard` 路由改回 `"mock"`，或从 registry 移除 `"deepseek"`。
+
 ## 2026-06-01 - Agent Workflow CC Autonomous Handoff
 
 状态：MERGED

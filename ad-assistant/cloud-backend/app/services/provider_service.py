@@ -12,10 +12,12 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.providers.base import AsyncProvider, ProviderRequest, ProviderResult
+from app.providers.deepseek_provider import DeepSeekProviderError
 from app.providers.mock_provider import MockProviderError
 from app.providers.router import get_provider_router
-from app.services.cost_service import calculate_mock_cost
+from app.services.cost_service import calculate_deepseek_cost, calculate_mock_cost
 from app.services.provider_log_service import record_provider_call
 
 
@@ -63,14 +65,20 @@ async def execute_provider_call(
         result: ProviderResult = await provider.call(request)
 
         # ------------------------------------------------------------------
-        # 计算 mock 估算成本
+        # 计算估算成本（按 provider 分发）
         # ------------------------------------------------------------------
-        estimated_cost = calculate_mock_cost(
-            input_units=result.input_units,
-            output_units=result.output_units,
-            image_units=result.image_units,
-            gpu_seconds=result.gpu_seconds,
-        )
+        if result.provider == "deepseek":
+            estimated_cost = calculate_deepseek_cost(
+                input_units=result.input_units,
+                output_units=result.output_units,
+            )
+        else:
+            estimated_cost = calculate_mock_cost(
+                input_units=result.input_units,
+                output_units=result.output_units,
+                image_units=result.image_units,
+                gpu_seconds=result.gpu_seconds,
+            )
         result.estimated_cost = estimated_cost
 
         # ------------------------------------------------------------------
@@ -99,7 +107,7 @@ async def execute_provider_call(
 
     except MockProviderError as exc:
         # ------------------------------------------------------------------
-        # 可控失败：记录 error 日志后重新抛出
+        # MockProvider 可控失败
         # ------------------------------------------------------------------
         latency_ms = int((time.perf_counter() - start_time) * 1000)
 
@@ -121,7 +129,33 @@ async def execute_provider_call(
             latency_ms=latency_ms,
         )
 
-        raise  # 重新抛出，让调用方感知
+        raise
+
+    except DeepSeekProviderError as exc:
+        # ------------------------------------------------------------------
+        # DeepSeekProvider 可控失败
+        # ------------------------------------------------------------------
+        latency_ms = int((time.perf_counter() - start_time) * 1000)
+
+        await record_provider_call(
+            db=db,
+            provider="deepseek",
+            model=settings.DEEPSEEK_MODEL,
+            feature=request.feature,
+            status="error",
+            user_id=user_id,
+            device_id=device_id,
+            request_id=request_id,
+            error_code=exc.error_code,
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            estimated_cost=0.0,
+            credits_charged=0,
+            latency_ms=latency_ms,
+        )
+
+        raise
 
     except Exception:
         # ------------------------------------------------------------------
@@ -131,8 +165,8 @@ async def execute_provider_call(
 
         await record_provider_call(
             db=db,
-            provider="mock",
-            model="mock-text-v1",
+            provider="unknown",
+            model="unknown",
             feature=request.feature,
             status="error",
             user_id=user_id,
