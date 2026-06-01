@@ -1,0 +1,145 @@
+openapi: "3.0.3"
+info:
+  title: Recharge & Orders API
+  version: 0.1.0
+  description: User recharge and order history endpoints.
+
+paths:
+  /api/v1/credits/recharge:
+    post:
+      summary: Recharge credits by purchasing a plan
+      operationId: rechargeCredits
+      tags: [Credits]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RechargeRequest"
+            examples:
+              byPlan:
+                summary: Purchase a plan
+                value:
+                  plan_code: "expert"
+              byAmount:
+                summary: Custom amount
+                value:
+                  amount_cny: 100
+      responses:
+        "200":
+          description: Recharge successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RechargeResponse"
+        "400":
+          description: Validation error
+        "401":
+          description: Authentication required
+
+  /api/v1/orders:
+    get:
+      summary: List user's recharge orders
+      operationId: getOrders
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: Order list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderListData"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    RechargeRequest:
+      type: object
+      properties:
+        plan_code:
+          type: string
+          nullable: true
+          description: Plan code to purchase
+        amount_cny:
+          type: integer
+          nullable: true
+          description: Custom recharge amount in CNY
+
+    RechargeResponse:
+      type: object
+      required: [order_id, amount_cny, credits, new_balance, status]
+      properties:
+        order_id:
+          type: string
+        plan_code:
+          type: string
+          nullable: true
+        amount_cny:
+          type: integer
+        credits:
+          type: integer
+        new_balance:
+          type: integer
+        status:
+          type: string
+
+    OrderListData:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    OrderItem:
+      type: object
+      required: [id, amount_cny, credits, payment_method, status]
+      properties:
+        id:
+          type: string
+        plan_code:
+          type: string
+          nullable: true
+        amount_cny:
+          type: integer
+        credits:
+          type: integer
+        payment_method:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          nullable: true

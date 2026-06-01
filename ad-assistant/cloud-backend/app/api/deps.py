@@ -203,3 +203,35 @@ def verify_feature(user: User, feature: str) -> None:
                 "message": f"Feature '{feature}' requires a higher plan",
             },
         )
+
+
+# ---------------------------------------------------------------------------
+# Admin auth (Sprint-04 Task-04)
+# ---------------------------------------------------------------------------
+
+
+async def get_admin_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Admin-only dependency — checks user ID against ADMIN_USER_IDS config.
+
+    Raises 403 if the user is not in the admin whitelist.
+    """
+    admin_ids: set[str] = set(settings.ADMIN_USER_IDS)
+    if not admin_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FORBIDDEN",
+                "message": "Admin access is not configured",
+            },
+        )
+    if str(user.id) not in admin_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FORBIDDEN",
+                "message": "Admin access required",
+            },
+        )
+    return user

@@ -39,6 +39,10 @@
 
       <div class="nav-group">
         <div class="nav-group-title">订单管理</div>
+        <router-link to="/membership" class="nav-item" :class="{ active: isActive('/membership') }">
+          <span class="nav-icon">💎</span>
+          <span class="nav-label">会员中心</span>
+        </router-link>
         <router-link to="/history" class="nav-item" :class="{ active: isActive('/history') }">
           <span class="nav-icon">📋</span>
           <span class="nav-label">我的订单</span>

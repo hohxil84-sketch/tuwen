@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # ---- Credit / Cost conversion -------------------------------------------
     CREDITS_PER_CNY: int = 100  # 1 credit = ¥0.01, ceiling after multiply
 
+    # ---- Admin ---------------------------------------------------------------
+    ADMIN_USER_IDS: list[str] = []  # whitelist of admin user UUIDs
+
     # ---- Pre-flight balance check -------------------------------------------
     MIN_CREDIT_BALANCE_FOR_PROVIDER_CALL: int = 1  # absolute floor
     FEATURE_MIN_CREDITS: dict = {

@@ -1,7 +1,7 @@
 """Credit service — 用户 AI 算力账户与流水基础操作.
 
-本模块提供余额查询、账户创建、流水查询、扣费操作。
-不实现充值、支付或套餐发放。
+本模块提供余额查询、账户创建、流水查询、扣费操作、积分授予。
+不实现真实支付或套餐发放（见 recharge_service）。
 """
 
 import uuid
@@ -273,3 +273,72 @@ async def deduct_credits(
     )
 
     return actual_deduct
+
+
+# ---------------------------------------------------------------------------
+# Sprint-04 Task-04: credit grant (充值 / 赠送 / 月度发放)
+# ---------------------------------------------------------------------------
+
+
+async def grant_credits(
+    *,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    amount: int,
+    source_type: str = "system",
+    source_id: str | None = None,
+    description: str | None = None,
+) -> int:
+    """Atomically grant credits to a user's balance.
+
+    Reads the current balance, adds *amount*, writes a ``grant`` entry to
+    ``credit_ledger``, and returns the **new balance** after the grant.
+
+    All operations happen within the caller's transaction (``db`` session).
+
+    Args:
+        db: Active database session.
+        user_id: User receiving the credits.
+        amount: Credits to grant (must be > 0).
+        source_type: Ledger source type — ``"system"`` (monthly grant),
+                     ``"order"`` (recharge), or ``"manual"`` (admin).
+        source_id: Optional identifier (e.g. order_id) for the ledger entry.
+        description: Optional human-readable description.
+
+    Returns:
+        int: The new balance after granting credits.
+
+    Raises:
+        ValueError: If ``amount`` is not positive.
+    """
+    if amount <= 0:
+        raise ValueError(f"amount must be > 0, got {amount}")
+
+    # Get or create the credit account
+    account = await get_or_create_credit_account(db=db, user_id=user_id)
+
+    new_balance = account.balance + amount
+
+    # Atomic update: SET balance = balance + amount
+    await db.execute(
+        update(CreditAccount)
+        .where(CreditAccount.id == account.id)
+        .values(balance=new_balance)
+    )
+    # Update the in-memory object to stay consistent
+    account.balance = new_balance
+
+    # Write the ledger entry
+    await record_credit_ledger(
+        db=db,
+        user_id=user_id,
+        account_id=account.id,
+        change_type="grant",
+        amount=amount,
+        balance_after=new_balance,
+        source_type=source_type,
+        source_id=source_id,
+        description=description or f"Grant: {amount} credits",
+    )
+
+    return new_balance

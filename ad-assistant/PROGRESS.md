@@ -4,6 +4,49 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S04-T04: 会员/套餐/充值流程 (Membership / Package / Recharge)
+
+### 范围
+
+- 目标：补齐用户可见的核心商业链路 — 套餐展示、充值购买、管理员赠送额度。
+- 已实现：
+  - plans + recharge_orders 两张表（DDL + SQLAlchemy models + seed data）
+  - credit_service.grant_credits() 原子积分授予（参照 deduct_credits 模式）
+  - plan_service + recharge_service
+  - GET /api/v1/plans（公开）、POST /api/v1/credits/recharge（登录）、GET /api/v1/orders（登录）、POST /api/v1/admin/credits/grant（admin 白名单）
+  - MembershipPage.vue：当前套餐 banner + 3 列套餐对比 + 充值确认弹窗 + 充值记录表
+  - Sidebar "会员中心" 导航 + /membership 路由
+  - Shared DTOs + OpenAPI specs
+- 未实现：真实支付集成、月度自动发放调度器、套餐中间切换按比例退费、积分过期逻辑、年费定价、管理员 UI
+
+### 主要改动
+
+- 后端新增 15 文件：2 DDL + 2 models + 3 services + 3 API routers + 3 schemas + 3 tests
+- 后端修改 5 文件：models/__init__.py、credit_service.py、credits.py、deps.py、config.py、main.py
+- 前端新增 1 文件：MembershipPage.vue
+- 前端修改 3 文件：cloudApi.ts、AppSidebar.vue、router.ts
+- Shared 新增 4 文件：2 DTOs + 2 OpenAPI specs
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（DDL + credit 已在任务单声明）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：否（新模块，后续可补充）
+
+### 测试结果
+
+- 新模块聚焦测试（test_plans + test_recharge + test_admin_grant）：29 passed
+- 后端全量回归：279 passed, 57 skipped
+- 前端构建（npm run build）：68 modules, 0 errors
+
+### 风险和后续
+
+- 残余风险：simulated 支付即到账无风控；admin 白名单无 RBAC；月度发放需单独调度器
+- 后续任务：S04-T05（快捷入口接入真实功能）
+- 回滚方式：revert 对应提交，删除 plans/recharge_orders 表
+
 ## 2026-06-02 — S04-T03: Local OCR History Cleanup / 隐私清理
 
 ### 范围
