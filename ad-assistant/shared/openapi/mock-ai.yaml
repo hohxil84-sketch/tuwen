@@ -1,0 +1,254 @@
+# Mock AI API — OpenAPI 3.0.3 specification
+# Sprint-02 Task-08: first real OpenAPI spec in shared/openapi/
+#
+# Canonical source of truth for POST /api/v1/mock-ai/ad-copy.
+# The backend FastAPI app auto-generates OpenAPI from the same Pydantic schemas;
+# this hand-written spec is the human-readable contract shared with frontend
+# and desktop consumers.
+#
+# All responses follow the unified envelope:
+#   { success: boolean, data: object | null, error: object | null, request_id: string }
+
+openapi: "3.0.3"
+info:
+  title: AI 图文广告助手 — Mock AI API
+  description: |
+    Mock-only ad-copy generation endpoint (Sprint-02).
+    No real AI provider calls, no credit deduction.
+  version: "0.1.0"
+
+servers:
+  - url: http://localhost:9000
+    description: Local dev server (Vite proxy)
+
+paths:
+  /api/v1/mock-ai/ad-copy:
+    post:
+      operationId: generateAdCopy
+      summary: 生成 mock 广告文案
+      description: |
+        Requires: valid access token + active device binding + valid plan +
+        ``mock_ad_copy`` feature permission.
+
+        Mock-only — deterministic output, credits_charged=0,
+        no credit_ledger write, no real provider call.
+      tags:
+        - Mock AI
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MockAdCopyRequest"
+            examples:
+              douyin-direct:
+                summary: 抖音硬广风格
+                value:
+                  product_name: A4海报打印
+                  selling_points:
+                    - 当天可取
+                    - 防水材料
+                  platform: douyin
+                  tone: direct
+              xiaohongshu-soft:
+                summary: 小红书软文风格
+                value:
+                  product_name: 手冲咖啡套装
+                  selling_points:
+                    - 巴西单一产地
+                    - 附赠冲泡指南
+                  platform: xiaohongshu
+                  tone: soft
+      responses:
+        "200":
+          description: 成功返回 mock 广告文案
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse_MockAdCopyData"
+        "401":
+          description: 鉴权失败（token 无效 / 过期 / 设备未绑定）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                auth-required:
+                  value:
+                    success: false
+                    data: null
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication required
+                      details: null
+                    request_id: req_example01
+                feature-denied:
+                  value:
+                    success: false
+                    data: null
+                    error:
+                      code: FEATURE_DENIED
+                      message: Feature not available for current plan
+                      details: null
+                    request_id: req_example02
+        "403":
+          description: 权限不足（plan / feature 不满足）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: 请求校验失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validation-error:
+                  value:
+                    success: false
+                    data: null
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Request validation failed
+                      details:
+                        errors:
+                          - loc: ["body", "product_name"]
+                            msg: field required
+                            type: missing
+                    request_id: req_example03
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ------------------------------------------------------------------
+    # Request
+    # ------------------------------------------------------------------
+
+    MockAdCopyRequest:
+      type: object
+      required:
+        - product_name
+      properties:
+        product_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 产品/服务名称
+        selling_points:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            maxLength: 200
+          description: 卖点列表（最多 5 条，每条最长 200 字符）
+          default: []
+        platform:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 投放平台，例如 douyin、xiaohongshu
+          default: douyin
+        tone:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 文案风格，例如 direct、soft、storytelling
+          default: direct
+
+    # ------------------------------------------------------------------
+    # Response data
+    # ------------------------------------------------------------------
+
+    MockAdCopyData:
+      type: object
+      required:
+        - feature
+        - provider
+        - model
+        - text
+        - estimated_cost
+        - credits_charged
+      properties:
+        feature:
+          type: string
+          description: 功能标识（固定为 mock_ad_copy）
+        provider:
+          type: string
+          description: Provider 名称（固定为 mock）
+        model:
+          type: string
+          description: 模型标识（固定为 mock-text-v1）
+        text:
+          type: string
+          description: 生成的 mock 广告文案
+        estimated_cost:
+          type: number
+          format: float
+          description: 后端估算成本（人民币，mock 为 0.0）
+        credits_charged:
+          type: integer
+          description: 本次消耗点数（mock 固定为 0）
+
+    # ------------------------------------------------------------------
+    # Unified envelope
+    # ------------------------------------------------------------------
+
+    APIResponse_MockAdCopyData:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          description: 请求是否成功
+        data:
+          $ref: "#/components/schemas/MockAdCopyData"
+          nullable: true
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+          nullable: true
+        request_id:
+          type: string
+          nullable: true
+          description: 请求追踪 ID
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        data:
+          type: "null"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        request_id:
+          type: string
+          nullable: true
+
+    ErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: 机器可读错误码（例如 AUTH_REQUIRED、FEATURE_DENIED）
+        message:
+          type: string
+          description: 人类可读错误信息
+        details:
+          type: object
+          nullable: true
+          description: 额外错误详情（可选）

@@ -1,4 +1,4 @@
-"""Mock AI API routes — Sprint-02 Task-04.
+"""Mock AI API routes — Sprint-02 Task-04 / Sprint-02 Task-08.
 
 受保护 endpoint：POST /api/v1/mock-ai/ad-copy
 
@@ -8,6 +8,8 @@
 - 不暴露 raw_usage
 - credits_charged 固定为 0
 - 不写 credit_ledger
+- Sprint-02 Task-08: 绑定 ``response_model=APIResponse[MockAdCopyData]``，
+  使 FastAPI 自动生成正确的 OpenAPI schema 并在运行时校验响应。
 """
 
 import uuid as _uuid
@@ -26,7 +28,7 @@ from app.models.device import Device
 from app.models.user import User
 from app.providers.base import ProviderRequest
 from app.providers.mock_provider import MockProvider
-from app.schemas.common import success_response
+from app.schemas.common import APIResponse, success_response
 from app.schemas.mock_ai import MockAdCopyData, MockAdCopyRequest
 from app.services.provider_service import execute_provider_call
 
@@ -37,7 +39,7 @@ FEATURE_NAME = "mock_ad_copy"
 
 @router.post(
     "/mock-ai/ad-copy",
-    response_model=None,
+    response_model=APIResponse[MockAdCopyData],
     status_code=status.HTTP_200_OK,
 )
 async def generate_ad_copy(
@@ -86,4 +88,6 @@ async def generate_ad_copy(
         credits_charged=0,
     )
 
-    return success_response(data=response_data.model_dump(), request_id=request_id)
+    # Sprint-02 Task-08: 传入 Pydantic model 实例，由 FastAPI 通过
+    # response_model=APIResponse[MockAdCopyData] 序列化和校验。
+    return success_response(data=response_data, request_id=request_id)
