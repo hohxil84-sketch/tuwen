@@ -21,7 +21,11 @@ from app.providers.base import ProviderRequest
 from app.providers.mock_provider import MockProvider
 from app.services.cost_service import cny_to_credits
 from app.services.credit_service import deduct_credits
-from app.services.provider_service import execute_provider_call
+from app.services.provider_service import (
+    InsufficientBalanceError,
+    execute_provider_call,
+)
+from app.services.provider_log_service import list_provider_call_logs
 
 
 # ---------------------------------------------------------------------------
@@ -300,11 +304,49 @@ class TestProviderServiceWithDeduction:
         assert account.balance == 98  # 100 - 2
 
     @pytest.mark.anyio
-    async def test_partial_deduction_when_insufficient(self, db_session, test_user):
-        """When balance < required, deduct only available balance."""
+    async def test_insufficient_balance_blocked_by_preflight(self, db_session, test_user):
+        """Sprint-04: balance below FEATURE_MIN_CREDITS → InsufficientBalanceError."""
         account = CreditAccount(
             user_id=test_user.id, plan_code="standard", monthly_grant=0,
-            balance=1, status="active",  # only 1 credit (< 2 needed)
+            balance=1, status="active",  # only 1 credit (< 2 min for mock_ad_copy)
+        )
+        db_session.add(account)
+        await db_session.flush()
+
+        provider = MockProvider()
+        request = ProviderRequest(feature="mock_ad_copy", message="Test prompt")
+
+        with pytest.raises(InsufficientBalanceError) as exc_info:
+            await execute_provider_call(
+                db=db_session,
+                provider=provider,
+                request=request,
+                user_id=test_user.id,
+                device_id=uuid.uuid4(),
+            )
+
+        assert exc_info.value.error_code == "INSUFFICIENT_BALANCE"
+        assert exc_info.value.required == 2  # FEATURE_MIN_CREDITS["mock_ad_copy"]
+        assert exc_info.value.current == 1
+
+        # Balance should NOT be touched
+        await db_session.refresh(account)
+        assert account.balance == 1
+
+    @pytest.mark.anyio
+    async def test_partial_deduction_when_above_min_but_below_cost(
+        self, db_session, test_user, monkeypatch,
+    ):
+        """Partial deduction still works when balance passes pre-flight but
+        falls short of actual cost (edge case: actual cost > estimated min)."""
+        # Lower the feature minimum so pre-flight passes with balance=1
+        monkeypatch.setitem(
+            settings.FEATURE_MIN_CREDITS, "mock_ad_copy", 1,
+        )
+
+        account = CreditAccount(
+            user_id=test_user.id, plan_code="standard", monthly_grant=0,
+            balance=1, status="active",
         )
         db_session.add(account)
         await db_session.flush()
@@ -320,7 +362,8 @@ class TestProviderServiceWithDeduction:
             device_id=uuid.uuid4(),
         )
 
-        assert result.credits_charged == 1  # Partial deduction
+        # Partial deduction: cost ~2 credits, balance was 1
+        assert result.credits_charged == 1
         await db_session.refresh(account)
         assert account.balance == 0
 

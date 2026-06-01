@@ -11,12 +11,14 @@
 - 不写 credit_ledger（由 provider_service 负责）
 - Sprint-02 Task-08: 绑定 ``response_model=APIResponse[MockAdCopyData]``，
   使 FastAPI 自动生成正确的 OpenAPI schema 并在运行时校验响应。
+- Sprint-04 Task-01: INSUFFICIENT_BALANCE → 402 Payment Required。
 """
 
 import uuid as _uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
@@ -28,9 +30,12 @@ from app.database import get_db
 from app.models.device import Device
 from app.models.user import User
 from app.providers.base import ProviderRequest
-from app.schemas.common import APIResponse, success_response
+from app.schemas.common import APIResponse, error_response, success_response
 from app.schemas.mock_ai import MockAdCopyData, MockAdCopyRequest
-from app.services.provider_service import route_and_execute_provider_call
+from app.services.provider_service import (
+    InsufficientBalanceError,
+    route_and_execute_provider_call,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["Mock AI"])
 
@@ -77,15 +82,31 @@ async def generate_ad_copy(
 
     # Sprint-02 Task-09: 通过 ProviderRouter 选择 Provider 并执行，
     # 不再直接实例化 MockProvider。
-    result = await route_and_execute_provider_call(
-        db=db,
-        feature=FEATURE_NAME,
-        plan=user.plan_code,
-        request=provider_request,
-        user_id=user.id,
-        device_id=device.id,
-        request_id=request_id,
-    )
+    # Sprint-04 Task-01: 余额不足 → 402 Payment Required。
+    try:
+        result = await route_and_execute_provider_call(
+            db=db,
+            feature=FEATURE_NAME,
+            plan=user.plan_code,
+            request=provider_request,
+            user_id=user.id,
+            device_id=device.id,
+            request_id=request_id,
+        )
+    except InsufficientBalanceError as exc:
+        body = error_response(
+            code=exc.error_code,
+            message=exc.message,
+            request_id=request_id,
+            details={
+                "required": exc.required,
+                "current": exc.current,
+            },
+        )
+        return JSONResponse(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            content=body.model_dump(),
+        )
 
     # 构建响应 —— 不暴露 raw_usage
     response_data = MockAdCopyData(

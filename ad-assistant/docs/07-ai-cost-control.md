@@ -120,3 +120,25 @@ execute_provider_call()
 - Plan-level cost multipliers — future task
 - Monthly grant auto-replenish — future task
 - Refund logic — future task
+
+## Sprint-04 Task-01: Pre-flight Balance Check ✅ Implemented
+
+Implemented on branch `feature/sprint-04-task-01-provider-reliability`:
+
+- Added two-level pre-flight balance gate in ``execute_provider_call()`` (before provider invocation):
+  - **Level 1 — absolute minimum**: ``MIN_CREDIT_BALANCE_FOR_PROVIDER_CALL`` (default 1);
+  - **Level 2 — feature minimum**: ``FEATURE_MIN_CREDITS`` dict per feature (e.g. ``mock_ad_copy``=2, ``image_edit``=5);
+  - ``required = max(absolute_min, feature_min)`` → if ``balance < required`` → ``InsufficientBalanceError``.
+- Blocked calls write ``provider_call_log`` with ``error_code="INSUFFICIENT_BALANCE"``, do NOT call provider, do NOT touch balance.
+- ``user_id=None`` (system calls) skip balance check entirely.
+- API layer (``mock_ai.py``) returns **402 Payment Required** with Chinese error message showing required vs current credits.
+- Config: ``MIN_CREDIT_BALANCE_FOR_PROVIDER_CALL=1``, ``FEATURE_MIN_CREDITS={"mock_ad_copy":2,"ocr":1,"text_gen":2,"image_edit":5}``.
+
+### Pre-flight gate principle
+
+**不能亏** — if the user's balance is below the feature's minimum expected cost, the provider is never called. This prevents the scenario where a provider consumes resources but the user only partially pays (or pays nothing).
+
+### What's still not implemented
+
+- Dynamic cost pre-estimation (token count prediction before calling) — the feature-level minimum is a conservative approximation.
+- Fine-grained per-plan thresholds — all plans share the same ``FEATURE_MIN_CREDITS`` values.
