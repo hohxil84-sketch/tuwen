@@ -47,6 +47,51 @@ PR：
 
 ## 记录
 
+## 2026-06-01 - Sprint-03 Task-01 Security & Reliability Fixes (S03-T01)
+
+状态：MERGED
+
+分支：`feature/sprint-03-task-01-security-fixes`
+提交：`1d570f4`
+PR：#28（已按用户确认合并到 `main` @ `0c1096b`）
+
+### 范围
+
+- 目标：修复 Sprint-02 全面审查发现的 4 个 P0 安全/可靠性问题。
+- 已实现：D1 自动生成 device fingerprint (crypto.randomUUID)、D2 统一 token 到 Pinia store、D3 fetch 超时保护 (AbortController + 30s)、D4 _log_risk 异常日志 (logging.exception)。
+- 未实现：D1 中"重置设备指纹"按钮（仅 dev/debug 用，非 P0）；不涉及其他安全修复。
+
+### 主要改动
+
+- `desktop-app/src/pages/LoginPage.vue`：D1 — 移除手动 device_fingerprint 输入框，auto-generate via crypto.randomUUID() + localStorage 持久化。
+- `desktop-app/src/stores/authStore.ts`：D2 — initFromService() 改为 no-op + 移除未使用 getAccessToken import。
+- `desktop-app/src/services/cloudApi.ts`：D3 — 新增 AbortController 30s 超时 + 修复 Headers 合并 + 修复 options mutation。
+- `desktop-app/src/services/ocrService.ts`：D3 — 新增 AbortController 30s 超时 + 修复 options mutation。
+- `cloud-backend/app/services/auth_service.py`：D4 — except Exception: pass → logging.exception()。
+- `tasks/current-task.md`：S03-T01 任务单。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（重大变更已由用户确认）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用（安全修复，无新模块）
+- Bug 根因已记录（如适用）：是（自审发现 3 个问题：unused import、options mutation x2）
+
+### 测试结果
+
+- Backend regression：167 passed
+- Desktop `npm run build`：43 modules, 0 errors
+- CI `pg-integration`：passed
+- `git diff --check`：passed
+
+### 风险和后续
+
+- 残余风险：D2 `initFromService()` 改为 no-op，如有调用方依赖其旧行为（从 cloudApi 读 token）可能受影响，已确认无调用方。
+- 后续任务：S03-T02（首个真实 Provider 集成 — DeepSeek SDK）。
+- 回滚方式：revert 对应提交，恢复手动 fingerprint 输入、恢复双源 token、移除超时逻辑、恢复 pass。
+
 ## 2026-06-01 - Agent Workflow CC Autonomous Handoff
 
 状态：MERGED
@@ -293,9 +338,11 @@ PR：#23（已按用户确认合并到 `main` @ `37e0430`）
 
 ## 2026-06-01 - Sprint-02 Documentation Cleanup & Closeout
 
-状态：IMPLEMENTED_SELF_REVIEW_PASSED
+状态：MERGED
 
 分支：`docs/sprint-02-closeout`
+提交：`3890c4f`
+PR：#27（已合并到 `main` @ `cb3abef`）
 
 ### 范围
 
@@ -305,7 +352,7 @@ PR：#23（已按用户确认合并到 `main` @ `37e0430`）
 
 ### 主要改动
 
-- `docs/sprint-02-summary.md`：完成表增补 Task 06~09 + 2 workflow PR；移除 In Progress 段；新增 Closeout 和 Sprint-03 候选；更新 verified head 到 `4708379`。
+- `docs/sprint-02-summary.md`：完成表增补 Task 06~09 + 2 workflow PR；移除 In Progress 段；新增 Closeout 和 Sprint-03 候选；更新 verified head 到当前 main HEAD。
 - `PROGRESS.md`：本条记录。
 
 ### 自检结果
