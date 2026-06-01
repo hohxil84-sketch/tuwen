@@ -1,11 +1,13 @@
-"""Local OCR API Routes — Sprint-01 Task-04 implementation.
+"""Local OCR API Routes — Sprint-01 Task-04 + Sprint-04 Task-03.
 
 Endpoints
 ---------
-POST   /local/ocr              Accept an image file, run PaddleOCR, persist history.
-GET    /local/ocr/health        OCR engine readiness check.
-GET    /local/ocr/history       Paginated OCR history list.
-GET    /local/ocr/history/{id}  Single OCR history detail.
+POST   /local/ocr                  Accept an image file, run PaddleOCR, persist history.
+GET    /local/ocr/health            OCR engine readiness check.
+GET    /local/ocr/history           Paginated OCR history list.
+GET    /local/ocr/history/{id}      Single OCR history detail.
+DELETE /local/ocr/history/{id}      Delete a single history record + sandbox file.
+DELETE /local/ocr/history           Clear ALL history records + sandbox files.
 
 All responses follow the unified ``{success, data, error, request_id}`` format
 defined in ``docs/05-api-contract.md``.
@@ -31,6 +33,8 @@ from wrappers.paddleocr import (
     validate_image_file,
 )
 from history import (
+    clear_all_history,
+    delete_history_by_id,
     get_history_by_id,
     get_history_list,
     init_db,
@@ -79,18 +83,71 @@ def _copy_to_sandbox(source_path: Path) -> Optional[str]:
 def _cleanup_sandbox_copy(rel_path: Optional[str]) -> None:
     """Remove a previously created sandbox image copy.
 
-    Called when OCR fails after the copy was already written — without this
-    the file would be an orphaned user-image copy on disk with no history
-    record referencing it.
+    Called when OCR fails after the copy was already written, and
+    when a user deletes a history record.  Gracefully no-ops if the
+    file is already gone.
+
+    **Path-safety enforcement:** Only deletes files that pass every
+    validation check below.  Any failure logs a warning and returns
+    without touching the filesystem.
     """
     if rel_path is None:
         return
+
+    _safe = rel_path.replace("\\", "/")
+
+    # ---- 1. Must be relative (no leading /, no UNC, no drive letter) ----
+    if _safe.startswith("/"):
+        logger.warning("_cleanup_sandbox_copy rejected (absolute path): %s", rel_path[:120])
+        return
+    if ":" in _safe:
+        logger.warning(
+            "_cleanup_sandbox_copy rejected (drive letter or UNC): %s",
+            rel_path[:120],
+        )
+        return
+
+    # ---- 2. Must start with "ocr_images/" ------------------------------
+    if not _safe.startswith("ocr_images/"):
+        logger.warning(
+            "_cleanup_sandbox_copy rejected (not under ocr_images/): %s",
+            rel_path[:120],
+        )
+        return
+
+    # ---- 3. No ".." path traversal -------------------------------------
+    if ".." in _safe.split("/"):
+        logger.warning(
+            "_cleanup_sandbox_copy rejected (path traversal): %s",
+            rel_path[:120],
+        )
+        return
+
+    # ---- 4. Resolve and verify it is still inside SANDBOX_IMAGES_DIR ----
     try:
-        abs_path = SANDBOX_IMAGES_DIR.parent / rel_path
-        if abs_path.exists() and abs_path.is_relative_to(SANDBOX_IMAGES_DIR.resolve()):
-            abs_path.unlink()
-            logger.info("Cleaned up orphaned sandbox copy: %s", rel_path)
+        abs_path = (SANDBOX_IMAGES_DIR.parent / _safe).resolve()
+        sandbox_root = SANDBOX_IMAGES_DIR.resolve()
+        if not abs_path.is_relative_to(sandbox_root):
+            logger.warning(
+                "_cleanup_sandbox_copy rejected (resolved outside sandbox): %s → %s",
+                rel_path[:120],
+                str(abs_path)[:200],
+            )
+            return
     except (OSError, ValueError) as exc:
+        logger.warning(
+            "_cleanup_sandbox_copy rejected (resolve error): %s — %s",
+            rel_path[:120],
+            exc,
+        )
+        return
+
+    # ---- 5. Delete the file --------------------------------------------
+    try:
+        if abs_path.exists():
+            abs_path.unlink()
+            logger.info("Cleaned up sandbox copy: %s", rel_path)
+    except OSError as exc:
         logger.warning("Failed to clean up sandbox copy %s: %s", rel_path, exc)
 
 
@@ -390,3 +447,83 @@ async def ocr_history_detail(
         return _err("NOT_FOUND", f"OCR history record '{record_id}' not found.", status_code=404, request_id=rid)
 
     return JSONResponse(content=_ok(record, request_id=rid))
+
+
+# ---------------------------------------------------------------------------
+# DELETE /local/ocr/history/{record_id}
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/local/ocr/history/{record_id}")
+async def ocr_history_delete(
+    request: Request,
+    record_id: str,
+) -> JSONResponse:
+    """Delete a single OCR history record and its sandbox image copy.
+
+    The sandbox file is removed from disk (gracefully skipped if the
+    file is already gone).  Returns 404 if the record does not exist.
+    """
+    rid = _get_request_id(request)
+    try:
+        init_db()
+        found, local_copy_path = delete_history_by_id(record_id)
+    except Exception as exc:
+        logger.error("Failed to delete OCR history record %s: %s", record_id, exc)
+        return _err(
+            "HISTORY_DELETE_FAILED",
+            "Failed to delete OCR history record.",
+            status_code=500,
+            request_id=rid,
+        )
+
+    if not found:
+        return _err(
+            "NOT_FOUND",
+            f"OCR history record '{record_id}' not found.",
+            status_code=404,
+            request_id=rid,
+        )
+
+    # Clean up sandbox image copy (no-op if path is None or file already gone)
+    _cleanup_sandbox_copy(local_copy_path)
+
+    return JSONResponse(content=_ok({"deleted_id": record_id}, request_id=rid))
+
+
+# ---------------------------------------------------------------------------
+# DELETE /local/ocr/history
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/local/ocr/history")
+async def ocr_history_clear(request: Request) -> JSONResponse:
+    """Delete ALL OCR history records and their sandbox image copies.
+
+    Each sandbox file is removed from disk independently — failure
+    to remove one file does not prevent others from being cleaned up.
+    """
+    rid = _get_request_id(request)
+    try:
+        init_db()
+        deleted_count, local_copy_paths = clear_all_history()
+    except Exception as exc:
+        logger.error("Failed to clear OCR history: %s", exc)
+        return _err(
+            "HISTORY_CLEAR_FAILED",
+            "Failed to clear OCR history.",
+            status_code=500,
+            request_id=rid,
+        )
+
+    # Clean up all sandbox image copies independently
+    for path in local_copy_paths:
+        _cleanup_sandbox_copy(path)
+
+    logger.info(
+        "Cleared %d OCR history records and %d sandbox files",
+        deleted_count,
+        len(local_copy_paths),
+    )
+
+    return JSONResponse(content=_ok({"deleted_count": deleted_count}, request_id=rid))

@@ -7,6 +7,7 @@ Tests:
 4. History list ordering — most recent first
 5. Image hash field — 16 hex chars, no path info stored
 6. No absolute paths stored — filename is basename only
+7. Delete history — single record deletion and clear-all
 """
 
 import json
@@ -233,3 +234,85 @@ class TestNoAbsolutePaths:
         assert "/" not in h
         assert "\\" not in h
         assert "@" not in h
+
+
+# ---------------------------------------------------------------------------
+# 7. Delete history
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteHistory:
+    """delete_history_by_id and clear_all_history."""
+
+    def test_delete_existing_record_removes_it(self, history_db):
+        """After deletion, get_history_by_id returns None and list shrinks."""
+        record = _save_one(history_db)
+        found, path = history_db.delete_history_by_id(record["id"])
+        assert found is True
+        assert path is not None  # default local_copy_path is set
+        assert history_db.get_history_by_id(record["id"]) is None
+
+    def test_delete_nonexistent_id_returns_false_none(self, history_db):
+        """Deleting an ID that does not exist returns (False, None)."""
+        found, path = history_db.delete_history_by_id(
+            "00000000-0000-0000-0000-000000000000"
+        )
+        assert found is False
+        assert path is None
+
+    def test_delete_returns_correct_local_copy_path(self, history_db):
+        """The returned path matches the one stored."""
+        record = _save_one(
+            history_db, local_copy_path="ocr_images/test_abc.png"
+        )
+        found, path = history_db.delete_history_by_id(record["id"])
+        assert found is True
+        assert path == "ocr_images/test_abc.png"
+
+    def test_delete_record_with_null_path(self, history_db):
+        """Record with local_copy_path=None returns (True, None)."""
+        record = _save_one(history_db, local_copy_path=None)
+        found, path = history_db.delete_history_by_id(record["id"])
+        assert found is True
+        assert path is None
+
+    def test_clear_all_removes_all_records(self, history_db):
+        """After clear_all, get_history_list returns empty list."""
+        for i in range(5):
+            _save_one(
+                history_db,
+                image_filename=f"img_{i}.png",
+                image_hash=f"hash_{i:016d}",
+            )
+        count, paths = history_db.clear_all_history()
+        assert count == 5
+        assert len(paths) == 5
+        rows = history_db.get_history_list(limit=100, offset=0)
+        assert rows == []
+
+    def test_clear_all_empty_db_returns_zero(self, history_db):
+        """Clearing an empty database returns (0, [])."""
+        count, paths = history_db.clear_all_history()
+        assert count == 0
+        assert paths == []
+
+    def test_clear_all_returns_all_paths(self, history_db):
+        """All stored local_copy_paths are returned."""
+        paths_in = [
+            "ocr_images/a.png",
+            None,
+            "ocr_images/b.png",
+        ]
+        for i, p in enumerate(paths_in):
+            _save_one(
+                history_db,
+                image_filename=f"img_{i}.png",
+                image_hash=f"hash_{i:016d}",
+                local_copy_path=p,
+            )
+        _, paths_out = history_db.clear_all_history()
+        assert sorted(p for p in paths_out if p is not None) == sorted(
+            p for p in paths_in if p is not None
+        )
+        none_count = sum(1 for p in paths_out if p is None)
+        assert none_count == 1

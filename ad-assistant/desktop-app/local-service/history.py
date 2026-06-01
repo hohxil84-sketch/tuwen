@@ -226,3 +226,51 @@ def get_history_by_id(record_id: str) -> Optional[dict[str, Any]]:
         return _row_to_dict(row) if row else None
     finally:
         conn.close()
+
+
+def delete_history_by_id(record_id: str) -> tuple[bool, Optional[str]]:
+    """Delete a single OCR history record by its UUID primary key.
+
+    Returns a tuple of ``(found, local_copy_path)``:
+
+    - ``(False, None)`` — no record matched *record_id*.
+    - ``(True, None)`` — record deleted; its ``local_copy_path`` was ``NULL``.
+    - ``(True, "<path>")`` — record deleted; caller should clean up the
+      sandbox file at *local_copy_path*.
+    """
+    conn = _get_connection()
+    try:
+        row = conn.execute(
+            "SELECT local_copy_path FROM ocr_history WHERE id = ?",
+            (record_id,),
+        ).fetchone()
+        if row is None:
+            return (False, None)
+
+        local_copy_path = row["local_copy_path"]
+        conn.execute("DELETE FROM ocr_history WHERE id = ?", (record_id,))
+        conn.commit()
+        return (True, local_copy_path)
+    finally:
+        conn.close()
+
+
+def clear_all_history() -> tuple[int, list[Optional[str]]]:
+    """Delete ALL OCR history records.
+
+    Returns a tuple of ``(deleted_count, local_copy_paths)`` where
+    ``local_copy_paths`` is a list of all ``local_copy_path`` values
+    from the deleted records, for sandbox file cleanup.
+    """
+    conn = _get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT local_copy_path FROM ocr_history"
+        ).fetchall()
+        paths = [row["local_copy_path"] for row in rows]
+
+        conn.execute("DELETE FROM ocr_history")
+        conn.commit()
+        return (len(paths), paths)
+    finally:
+        conn.close()

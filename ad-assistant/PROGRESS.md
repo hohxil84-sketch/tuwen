@@ -4,6 +4,44 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S04-T03: Local OCR History Cleanup / 隐私清理
+
+### 范围
+
+- 目标：补齐本地 OCR 历史删除/清空能力，清理沙箱图片副本。
+- 已实现：
+  - history.py: `delete_history_by_id()` + `clear_all_history()`
+  - routes/ocr.py: `DELETE /local/ocr/history/{id}` + `DELETE /local/ocr/history`
+  - ocrService.ts: `deleteHistoryRecord()` + `clearAllHistory()`
+  - HistoryPage.vue: 工具栏 + 删除按钮 + 内联确认 + 清空弹窗
+- 未实现：无（计划内全部完成）
+
+### 主要改动
+
+- 后端修改 2 文件: `history.py`（2 functions）、`routes/ocr.py`（2 DELETE endpoints）
+- 后端测试修改 2 文件: `test_ocr_history.py`（+7 tests）、`test_ocr_api.py`（+6 tests）
+- 前端修改 2 文件: `ocrService.ts`（2 functions）、`HistoryPage.vue`（UI + script + CSS）
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（纯本地服务增量功能）
+- 未加入密钥或生产凭据：是
+
+### 测试结果
+
+- 后端单元测试（test_ocr_history.py）：19 passed
+- 后端 API 测试（test_ocr_api.py）：23 passed
+- 全量：42 passed
+- 前端构建（npm run build）：65 modules, 0 errors
+
+### 风险和后续
+
+- 残余风险：孤儿沙箱文件（DB 删除成功但文件清理失败时），不影响功能
+- 后续任务：S04-T04（会员/套餐/充值流程）
+- 回滚方式：revert 对应提交
+
 ## 2026-06-02 — S04-T02: Dashboard 数据集成 + AI 文案生成入口
 
 ### 范围
