@@ -2,32 +2,67 @@
 
 ## 角色
 
-Codex 负责定规则、拆任务、Review、风险判断和提交门禁。
+Claude Code / DeepSeek 是默认执行者，负责根据用户目标起草任务单，并独立完成开发、测试、自审、任务分支提交和 PR 准备。
 
-Claude Code / DeepSeek 负责按任务单实现当前任务。
+Codex 是可选复核者，只在用户召回、CC 请求专项复核、或任务触及高风险边界时参与。
+
+用户默认不参与日常细节，只确认任务方向、高风险变更和最终合并。
+
+## 标准流程
+
+1. 用户给出目标。
+2. CC 读取 `README.md`、`CLAUDE.md`、现有 `tasks/current-task.md`、相关 docs 和模块上下文。
+3. CC 根据用户目标起草或更新 `tasks/current-task.md`，补齐范围、禁区、验收标准、测试方式、依赖权限、高风险状态和回滚方案。
+4. CC 从 `main` 创建任务分支。
+5. CC 输出简短计划、涉及文件、风险判断；高风险任务先等用户确认。
+6. CC 实现当前任务。
+7. CC 运行任务单要求的测试。
+8. CC 完成自审清单，更新模块上下文和 `PROGRESS.md`。
+9. CC 自审通过后，可以提交并 push 当前任务分支。
+10. CC 创建 PR 或 draft PR，PR 内容包含范围、测试、自审结论和风险。
+11. 只有用户、仓库管理员或明确授权的流程可以合并 PR。
 
 ## 统一规则
 
-1. 一次只做一个任务，一个任务只对应一个 Git 分支。
-2. 只实现 `tasks/current-task.md` 明确允许的内容。
-3. 没有用户确认的重大变更，不开始实现。
-4. 同一任务由 Claude Code / DeepSeek 一次性完成，再交给 Codex Review。
-5. Codex Review 默认只看当前任务的 staged diff、任务单和必要上下文，不做全仓审查。
-6. 只有 Codex 明确 `允许提交` 后，才可以 commit、push 或建 PR。
-7. 提交时只 stage 当前任务相关文件，不使用 `git add -A`。
-8. 每个完成的模块都要更新对应的 `docs/module-context/<module-or-task>/context.md`。
-9. 下一任务必须通过新的任务单和新的任务分支开始。
+- 一次只做一个任务，一个任务只对应一个 Git 分支。
+- 用户只给目标时，CC 负责把目标转成任务单。
+- 只实现 `tasks/current-task.md` 明确允许的内容。
+- CC 自审是默认门禁，Codex Review 是按需复核。
+- 提交时只 stage 当前任务相关文件，不使用 `git add -A`。
+- 每个完成的模块都要更新对应的 `docs/module-context/<module-or-task>/context.md`。
+- 每个完成的模块或任务都要追加更新 `PROGRESS.md`，记录进度、自审、主要实现、测试、风险和回滚方式。
+- 下一任务必须由 CC 生成或更新新的任务单，并通过新的任务分支开始。
+
+## Bug 修复流程
+
+1. 先复现或确认失败现象。
+2. 找到根因并说明证据。
+3. 制定解决方案，明确改哪些文件、风险和测试方式。
+4. 按方案修改。
+5. 跑相关测试和必要回归测试。
+6. 反馈根因、修改、测试结果和残余风险。
+
+根因不明确时，继续调查，不直接试改。
 
 ## 高风险边界
 
-遇到以下边界，必须先停下并等用户确认：
+遇到以下边界，CC 必须先停下并等用户确认：
 
-- 数据库 schema
+- 数据库 schema / DDL / migration
 - API / OpenAPI / shared DTO
-- Auth / Token
-- Provider / credit / payment
+- Auth / Token / 权限
+- Provider / credit / payment / provider cost
 - Tauri permissions
-- dependencies
-- CI / workflows
+- dependencies / lockfiles
+- CI / workflows / deployment
 - filesystem permissions
 - remote command execution
+- 删除文件、重命名目录、大规模重构
+
+## 何时召回 Codex
+
+- 用户明确要求 Review。
+- CC 自审发现范围不确定。
+- 高风险变更需要额外审查。
+- 测试失败且无法在任务范围内修复。
+- PR 前需要独立复核关键风险。
