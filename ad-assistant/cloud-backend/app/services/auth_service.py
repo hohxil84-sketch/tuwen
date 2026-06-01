@@ -10,6 +10,7 @@ Implements the confirmed plan from ``docs/auth-device-plan.md``:
 """
 
 import hashlib
+import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
@@ -368,4 +369,8 @@ async def _log_risk(
         )
         await db.flush()
     except Exception:
-        pass  # risk logging must never break the main flow
+        logging.exception(
+            "risk_log write failed (non-fatal): user_id=%s event_type=%s",
+            user_id,
+            event_type,
+        )

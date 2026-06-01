@@ -30,17 +30,6 @@
         />
       </div>
 
-      <div class="form-group">
-        <label for="fingerprint">设备指纹</label>
-        <input
-          id="fingerprint"
-          v-model.trim="form.device_fingerprint"
-          type="text"
-          placeholder="请输入设备指纹"
-          :disabled="auth.isLoggingIn"
-        />
-      </div>
-
       <!-- Error display -->
       <div v-if="auth.loginError" class="error-banner">
         <p>{{ auth.loginError }}</p>
@@ -78,23 +67,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive } from "vue";
+import { computed, onMounted, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 
 const auth = useAuthStore();
 const router = useRouter();
 
+// ---- Device fingerprint (auto-generated, persisted) ----
+const DEV_FP_KEY = "device_fingerprint";
+
+function getOrCreateFingerprint(): string {
+  let fp = localStorage.getItem(DEV_FP_KEY);
+  if (!fp) {
+    fp = crypto.randomUUID();
+    localStorage.setItem(DEV_FP_KEY, fp);
+  }
+  return fp;
+}
+
 // ---- Form state ----
 const form = reactive({
   account: "",
   password: "",
-  device_fingerprint: "",
+});
+
+// Auto-generate device fingerprint on mount
+onMounted(() => {
+  getOrCreateFingerprint();
 });
 
 // ---- Computed ----
 const isFormValid = computed(
-  () => form.account.length > 0 && form.password.length > 0 && form.device_fingerprint.length > 0,
+  () => form.account.length > 0 && form.password.length > 0,
 );
 
 // ---- Methods ----
@@ -104,7 +109,7 @@ async function handleLogin(): Promise<void> {
     await auth.login({
       account: form.account,
       password: form.password,
-      device_fingerprint: form.device_fingerprint,
+      device_fingerprint: getOrCreateFingerprint(),
     });
     // Navigate to OCR workspace after successful login
     router.push("/ocr");

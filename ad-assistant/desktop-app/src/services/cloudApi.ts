@@ -17,6 +17,22 @@
 const BASE_URL: string =
   import.meta.env.VITE_CLOUD_API_BASE_URL || "http://127.0.0.1:8000";
 
+/** Default request timeout in ms. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Create an AbortController that auto-aborts after *timeoutMs* ms.
+ * Returns the controller and a timer ID so the caller can clear the timer
+ * when the request completes before the timeout.
+ */
+function createTimeout(
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): { controller: AbortController; timer: ReturnType<typeof setTimeout> } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return { controller, timer };
+}
+
 // ---------------------------------------------------------------------------
 // Unified response shape (mirrors backend)
 // ---------------------------------------------------------------------------
@@ -117,19 +133,43 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<CloudAPIResponse<T>> {
-  const headers: Record<string, string> = {
+  const headers = new Headers({
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string> | undefined),
-  };
+  });
 
-  if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
+  // Merge caller-provided headers
+  if (options.headers) {
+    const extra = new Headers(options.headers as HeadersInit);
+    extra.forEach((value, key) => headers.set(key, value));
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  const { controller, timer } = createTimeout();
+
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err: unknown) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw {
+        code: "REQUEST_TIMEOUT",
+        message: "请求超时，请检查网络后重试。",
+      } as CloudAPIErrorDetail;
+    }
+    throw {
+      code: "NETWORK_ERROR",
+      message: "网络连接失败，请检查网络后重试。",
+    } as CloudAPIErrorDetail;
+  }
+  clearTimeout(timer);
 
   let body: CloudAPIResponse<T>;
   try {
@@ -229,6 +269,7 @@ export function sanitizeApiError(err: CloudAPIErrorDetail): string {
     VALIDATION_ERROR: "输入格式不正确，请检查后重试。",
     RATE_LIMITED: "请求过于频繁，请稍后再试。",
     NETWORK_ERROR: "网络连接失败，请检查网络后重试。",
+    REQUEST_TIMEOUT: "请求超时，请检查网络后重试。",
   };
 
   if (err.code && codeMap[err.code]) {
