@@ -49,9 +49,11 @@ PR：
 
 ## 2026-06-01 - Coding Standards Extensibility Guidelines
 
-状态：IMPLEMENTED_SELF_REVIEW_PASSED
+状态：MERGED
 
 分支：`docs/extensibility-guidelines`
+提交：`3917a90`
+PR：#30（已按用户确认合并到 `main` @ `fe4da23`）
 
 ### 范围
 
