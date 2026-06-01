@@ -148,13 +148,23 @@ git diff --check
 
 PostgreSQL migration integration tests are not required because no DDL changes are allowed.
 
+## OpenAPI & Shared DTO (Sprint-02 Task-08)
+
+The mock AI endpoint is the first to have a machine-readable API contract:
+
+- **OpenAPI spec**: `shared/openapi/mock-ai.yaml` — complete path, request schema, response schema, error examples
+- **TypeScript DTO**: `shared/dto/mock-ai.ts` — `MockAdCopyRequest`, `MockAdCopyData`, `APIResponse<T>`, `ErrorDetail`
+- **Backend**: `response_model=APIResponse[MockAdCopyData]` wired on the route handler
+
+These files are the canonical contract for frontend/desktop consumers.
+
 ## Non-Goals
 
 - Real provider integration.
 - Provider routing.
 - Credit deduction.
 - DDL or migration changes.
-- OpenAPI/shared DTO generated artifact updates.
+- OpenAPI/shared DTO for endpoints other than mock-ai.
 - Desktop or frontend UI.
 - Payment, recharge, orders, grants, admin, quotas, expiration.
 - Queues, background jobs, retries, rate limiting infrastructure.
@@ -182,6 +192,21 @@ PostgreSQL migration integration tests are not required because no DDL changes a
 - **No credit_ledger writes**: ✅ confirmed
 - **request_id propagation**: ✅ confirmed (X-Request-ID → response + provider_call_log)
 - **raw_usage not exposed**: ✅ confirmed
+
+## Implementation Evidence (2026-06-01 — Task-08 extension)
+
+- **Implementation branch**: `feature/sprint-02-task-08-mock-ai-api-contract`
+- **Endpoint**: `POST /api/v1/mock-ai/ad-copy` — now with `response_model=APIResponse[MockAdCopyData]`
+- **Added files**:
+  - `shared/openapi/mock-ai.yaml` — OpenAPI 3.0.3 spec
+  - `shared/dto/mock-ai.ts` — TypeScript DTOs
+- **Changed files**:
+  - `cloud-backend/app/schemas/common.py` — generic `APIResponse[T]`
+  - `cloud-backend/app/api/v1/mock_ai.py` — wired `response_model`
+  - `shared/openapi/.gitkeep` — updated to reflect first spec
+  - `shared/dto/.gitkeep` — updated to reflect first DTO
+- **Wire response unchanged**: ✅ same HTTP body, desktop mock client needs zero changes
+- **No new dependencies**: ✅ confirmed
 
 ## Review Gate
 

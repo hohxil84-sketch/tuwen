@@ -22,6 +22,7 @@ Current verified head: `42dbad8 Merge pull request #16 from hohxil84-sketch/feat
 - PostgreSQL migration integration checks run in GitHub Actions.
 - `MockProvider` exists as a deterministic, network-free Provider implementation.
 - `POST /api/v1/mock-ai/ad-copy` is available as a mock-only AI endpoint.
+- Mock AI endpoint now has a typed `response_model=APIResponse[MockAdCopyData]` and machine-readable contract (`shared/openapi/mock-ai.yaml`, `shared/dto/mock-ai.ts`).
 - Mock AI API writes `provider_call_log` with `credits_charged=0`.
 - Mock AI API propagates `X-Request-ID` to the response and provider log.
 - Desktop app has a narrow cloud API client for login/logout/mock ad-copy.
@@ -59,7 +60,21 @@ Current verified head: `42dbad8 Merge pull request #16 from hohxil84-sketch/feat
 | Task | Scope | Branch |
 |------|-------|--------|
 | Task-06 draft | Desktop Mock AI E2E Smoke Verification | `feature/sprint-02-task-06-desktop-mock-e2e-smoke` |
-| Task-07 draft | Backend PostgreSQL DateTime Alignment | `feature/sprint-02-task-07-pg-datetime-align` |
+| Task-08 draft | Mock AI API Contract Formalization | `feature/sprint-02-task-08-mock-ai-api-contract` |
+
+Task-08 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
+- Goal: wire `response_model=APIResponse[MockAdCopyData]`, create `shared/openapi/mock-ai.yaml`, create `shared/dto/mock-ai.ts`
+- Deliverables:
+  - `cloud-backend/app/schemas/common.py` — generic `APIResponse[T]`
+  - `cloud-backend/app/api/v1/mock_ai.py` — wired `response_model`
+  - `shared/openapi/mock-ai.yaml` — first OpenAPI spec
+  - `shared/dto/mock-ai.ts` — first TypeScript DTO
+  - `docs/23-mock-ai-api-endpoint.md` — updated with OpenAPI/DTO references
+  - `docs/05-api-contract.md` — noted first spec created
+  - `docs/sprint-02-summary.md` — this update
+- This is a major change (API contract / shared DTO / OpenAPI per CODEX.md).
+- Wire response is unchanged — desktop mock client needs zero changes.
+- No new dependencies, no DDL changes, no other endpoint changes.
 
 Task-06 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
 - Goal: make the merged Task-05 desktop mock MVP path reproducible and manually verified.
@@ -74,24 +89,9 @@ Task-06 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
 - No production backend/API/DDL/dependency/shared/Tauri/desktop source changes were made.
 - No secrets or real provider integrations were added.
 
-Task-07 status (2026-06-01): `IMPLEMENTED_AWAITING_REVIEW`
-- Goal: align SQLAlchemy models `DateTime(timezone=True)` with DDL `TIMESTAMPTZ`.
-- Deliverables:
-  - 8 model files updated — all 18 DateTime columns now `DateTime(timezone=True)`.
-  - `cloud-backend/scripts/dev_seed_user.py` — docstring updated (mismatch resolved).
-  - `docs/25-desktop-mock-e2e-smoke.md` — removed PG bypass, added PG alternative.
-  - `docs/11-cloud-backend-guide.md` — updated PG status.
-  - `docs/12-database-design.md` — added timestamp alignment note.
-  - `docs/sprint-02-summary.md` — this update.
-  - `docs/module-context/sprint-02-task-07-pg-datetime-align/context.md` — new.
-- Verification: SQLite 147 ✅, PG integration 55 ✅, ORM PG read/write ✅, `git diff --check` ✅.
-- This is a major change (model column type declarations) — user confirmed 2026-06-01.
-- No DDL, API, service, provider, shared, desktop, dependency, or .env changes.
-
 ## Next-Stage Candidate Tasks
 
 These are candidates only. Create a new task document and new branch before implementation.
 
 - Candidate A: Desktop Mock AI E2E smoke verification and local runbook.
-- Candidate B: API response/OpenAPI/shared DTO generation for the mock AI endpoint.
 - Candidate C: Real Provider routing design, still without real billing deduction.

@@ -6,6 +6,9 @@ API 契约必须稳定、可版本化、可生成类型。
 
 所有前后端交互以 `shared/openapi/` 为准。
 
+Sprint-02 Task-08 创建了第一个正式 spec：`shared/openapi/mock-ai.yaml`（Mock AI ad-copy endpoint）。
+对应的 TypeScript DTO 位于 `shared/dto/mock-ai.ts`。
+
 修改 API 契约属于重大变更，必须先确认。
 
 ## API 分组

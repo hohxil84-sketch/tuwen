@@ -1,5 +1,8 @@
 # Data Transfer Objects — shared request/response type definitions.
-# Sprint-01: skeleton only — no DTOs defined yet.
+# Sprint-02 Task-08: first real DTO created (mock-ai.ts).
+#
+# Existing:
+# - mock-ai.ts  (MockAdCopyRequest, MockAdCopyData, APIResponse<T>) ← FIRST
 #
 # Reserved:
 # - auth.ts      (AuthLoginRequest, AuthLoginResponse, etc.)

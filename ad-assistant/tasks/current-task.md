@@ -1,120 +1,242 @@
-# Current Task: Agent Workflow CC Autonomous Handoff
+# Current Task: Sprint-02 Task-08 Mock AI API Contract Formalization
 
 ## Status
 
-`IMPLEMENTED_SELF_REVIEW_READY`
+`IMPLEMENTED_SELF_REVIEW_PASSED`
 
-Implementation completed on 2026-06-01. Ready for commit and PR.
+Implemented by Claude Code on 2026-06-01. Self-review passed. Awaiting commit + push + PR.
 
-Suggested branch: `docs/cc-autonomous-workflow`
+## Implementation Evidence
+
+- **Branch**: `feature/sprint-02-task-08-mock-ai-api-contract`
+- **Backend**: `APIResponse[T]` generic model wired on `POST /api/v1/mock-ai/ad-copy`
+- **Shared OpenAPI**: `shared/openapi/mock-ai.yaml` — first real spec
+- **Shared DTO**: `shared/dto/mock-ai.ts` — first real TypeScript DTO
+- **Tests**: 147 SQLite regression ✅, 21 mock AI focused ✅
+- **OpenAPI gen**: `MockAdCopyData` + `APIResponse_MockAdCopyData_` in schemas ✅
+- **git diff --check**: ✅
+- **Wire response unchanged**: ✅
 
 ## Background
 
-The project workflow is changing from Codex-led task writing and mandatory Codex Review to a CC-first process:
+The mock AI endpoint `POST /api/v1/mock-ai/ad-copy` is implemented and working (Task-04 + Task-05), but the API contract exists only as Pydantic schemas inside the backend. The project's `shared/openapi/` and `shared/dto/` directories are empty skeletons from Sprint-01.
 
-- Claude Code / DeepSeek should own task writing, implementation, testing, self-review, task-branch commit/push, and PR preparation.
-- Codex should be optional and invoked only for high-risk, unclear, failing, or user-requested review cases.
-- Bug fixes must be root-cause driven before code changes.
-- Module progress must be tracked in a root-level `PROGRESS.md`.
+Per `docs/05-api-contract.md`: "API 契约必须稳定、可版本化、可生成类型。所有前后端交互以 `shared/openapi/` 为准。"
+
+Current gaps:
+
+| Gap | Detail |
+|-----|--------|
+| `response_model=None` | All endpoints (including mock-ai) use `response_model=None`. FastAPI cannot generate correct OpenAPI docs or validate responses at runtime. |
+| `shared/openapi/` empty | No OpenAPI YAML specs exist — `.gitkeep` only |
+| `shared/dto/` empty | No TypeScript DTOs exist — `.gitkeep` only |
+| Generic response wrapper not wired | `APIResponse[MockAdCopyData]` is not used as a FastAPI generic response model |
+
+The desktop mock AI client (Task-05) depends on the response shape but has no machine-readable contract to validate against. Future endpoints will face the same problem.
 
 ## Goal
 
-Update project rules and local skills so CC can independently execute the full development loop while preserving high-risk stop rules and PR merge guardrails.
+Create the first end-to-end API contract pipeline for the mock AI endpoint:
+
+1. Backend: wire a generic `response_model` so FastAPI validates responses at runtime and auto-generates correct OpenAPI
+2. Shared: create `shared/openapi/mock-ai.yaml` — the first real OpenAPI spec
+3. Shared: create `shared/dto/mock-ai.ts` — the first shared TypeScript DTO
+
+This establishes the pattern for all future endpoints.
 
 ## What To Build
 
-1. Update project workflow docs to define CC autonomous responsibilities.
-2. Update Git guardrails so CC self-review is the default commit gate.
-3. Add `PROGRESS.md` as the module progress ledger.
-4. Require CC to update `PROGRESS.md` after each module or task.
-5. Require bug fixes to follow: reproduce/confirm, root cause, solution plan, implementation, tests, feedback.
-6. Update local Codex skills used by this project so they no longer conflict with the new CC-first rules.
+### 1. Generic response model (backend)
+
+Add `APIResponse[T]` as a generic Pydantic model so `response_model` can be wired on endpoints with typed `data`:
+
+```python
+# app/schemas/common.py — new generic wrapper
+from typing import Generic, TypeVar
+T = TypeVar("T")
+
+class APIResponse(BaseModel, Generic[T]):
+    success: bool
+    data: T | None = None
+    error: ErrorDetail | None = None
+    request_id: str | None = None
+```
+
+### 2. Wire `response_model` on mock AI endpoint (backend)
+
+Update `POST /api/v1/mock-ai/ad-copy`:
+
+```python
+@router.post(
+    "/mock-ai/ad-copy",
+    response_model=APIResponse[MockAdCopyData],  # was: response_model=None
+    status_code=status.HTTP_200_OK,
+)
+```
+
+And return `APIResponse[MockAdCopyData]` directly. The `success_response()` helper should accept Pydantic model instances (not just dicts) so it can construct `APIResponse(data=mock_ad_copy_data)` without `.model_dump()` first. FastAPI serializes the model via `response_model`.
+
+### 3. Create `shared/openapi/mock-ai.yaml`
+
+First real OpenAPI spec. Include:
+- Unified response wrapper schema
+- `POST /api/v1/mock-ai/ad-copy` request/response definition
+- `MockAdCopyData` response schema
+- Error response examples (401, 403)
+
+### 4. Create `shared/dto/mock-ai.ts`
+
+TypeScript types mirroring the OpenAPI spec:
+- `MockAdCopyRequest`
+- `MockAdCopyData`
+- `APIResponse<T>`
+- `ErrorDetail`
+
+### 5. Documentation updates
+
+- `docs/23-mock-ai-api-endpoint.md` — add OpenAPI/DTO file references
+- `docs/05-api-contract.md` — note first spec created
+- `docs/sprint-02-summary.md` — add Task-08 status
+- `shared/openapi/.gitkeep` — update to reflect first spec created
+- `shared/dto/.gitkeep` — update to reflect first DTO created
 
 ## What Not To Build
 
-- No business feature work.
-- No backend, desktop, official website, shared DTO, API, database schema, provider, auth, credit, payment, Tauri, CI, dependency, or lockfile changes.
-- No direct push to `main`.
-- No self-merge.
+- Do NOT create OpenAPI specs for auth, device, credit, or other endpoints — mock-ai only
+- Do NOT create DTOs for other endpoints
+- Do NOT change API behavior, request/response shapes, or business logic
+- Do NOT touch provider layer, auth chain, credit/payment
+- Do NOT modify `shared/error-codes/` (separate task)
+- Do NOT add API versioning or API gateway changes
+- Do NOT add new dependencies
+- Do NOT add new tests (existing 147 + 21 must continue to pass)
 
 ## Allowed Files
 
-- `README.md`
-- `CLAUDE.md`
-- `CODEX.md`
-- `PROGRESS.md`
-- `docs/14-ai-agent-workflow.md`
-- `docs/16-git-workflow.md`
-- `docs/20-agent-git-guardrails.md`
-- `tasks/current-task.md`
-- Local skill files under `C:\Users\123\.codex\skills\ad-assistant-task-executor\`
-- Local skill files under `C:\Users\123\.codex\skills\ad-assistant-git-guardrails\`
+- `cloud-backend/app/schemas/common.py` — add generic `APIResponse[T]`
+- `cloud-backend/app/api/v1/mock_ai.py` — wire `response_model`
+- `cloud-backend/app/schemas/mock_ai.py` — minor adapt if needed
+- `shared/openapi/mock-ai.yaml` — new OpenAPI spec
+- `shared/openapi/.gitkeep` — update or remove
+- `shared/dto/mock-ai.ts` — new TypeScript DTO
+- `shared/dto/.gitkeep` — update or remove
+- `docs/23-mock-ai-api-endpoint.md` — add references
+- `docs/05-api-contract.md` — minor update
+- `docs/sprint-02-summary.md` — add Task-08
+- `tasks/current-task.md` — this file
+- `PROGRESS.md` — add entry
 
 ## Forbidden Files
 
-- `cloud-backend/**`
-- `desktop-app/**`
-- `official-website/**`
-- `shared/**`
-- `cloud-backend/migrations/**`
+- `cloud-backend/app/api/v1/auth.py`, `device.py` — other endpoints
+- `cloud-backend/app/services/**` — service code
+- `cloud-backend/app/providers/**` — provider code
+- `cloud-backend/app/core/**` — core code
+- `cloud-backend/app/models/**` — model code
+- `cloud-backend/tests/**` — test files
+- `shared/error-codes/**`
+- `shared/sdk/**`, `shared/typescript/**`, `shared/constants/**`
+- `desktop-app/**` — desktop code
+- `official-website/**` — website code
+- `migrations/**`
 - `.github/workflows/**`
-- dependency manifests and lockfiles
-- `.env` and `.env.example`
-- unrelated task draft files
+- dependency files (`pyproject.toml`, `package.json`, lockfiles)
+- `.env` files
 
 ## Acceptance Criteria
 
-1. Project docs consistently describe CC as the default task writer, implementer, tester, self-reviewer, task-branch committer/pusher, and PR preparer.
-2. Codex Review is described as optional/on-demand, not a required commit gate.
-3. High-risk stop rules remain explicit.
-4. Bug fix root-cause workflow is documented.
-5. `PROGRESS.md` exists with a reusable entry template.
-6. CC is required to update `PROGRESS.md` after every completed module or task.
-7. Local project skills match the new workflow.
-8. `git diff --check` passes.
-9. Skill validation passes for modified skills.
+1. `APIResponse[T]` generic model exists in `app/schemas/common.py` and is compatible with existing `success_response()` / `error_response()` helpers
+2. `POST /api/v1/mock-ai/ad-copy` uses `response_model=APIResponse[MockAdCopyData]`
+3. FastAPI `/docs` (Swagger UI) shows the correct response schema for the mock AI endpoint
+4. FastAPI `/openapi.json` includes the `MockAdCopyData` schema in `components/schemas`
+5. `shared/openapi/mock-ai.yaml` exists with complete request/response definitions
+6. `shared/dto/mock-ai.ts` exists with TypeScript types matching the spec
+7. Existing 147 SQLite tests + 21 mock AI tests all pass (regression)
+8. `git diff --check` passes
 
 ## Test Method
 
-```powershell
-git diff --check
-python C:\Users\123\.codex\skills\.system\skill-creator\scripts\quick_validate.py C:\Users\123\.codex\skills\ad-assistant-task-executor
-python C:\Users\123\.codex\skills\.system\skill-creator\scripts\quick_validate.py C:\Users\123\.codex\skills\ad-assistant-git-guardrails
+### Regression tests (must pass)
+
+```bash
+cd d:/Project/ad-assistant/cloud-backend
+python -m pytest tests/ -v --ignore=tests/test_migrations_integration.py
+# Expected: 147 passed
+```
+
+### mock AI focused tests (must pass)
+
+```bash
+cd d:/Project/ad-assistant/cloud-backend
+python -m pytest tests/test_mock_ai_api.py -v
+# Expected: 21 passed
+```
+
+### FastAPI OpenAPI generation verification
+
+```bash
+cd d:/Project/ad-assistant/cloud-backend
+python -c "
+from app.main import app
+spec = app.openapi()
+schemas = spec.get('components', {}).get('schemas', {})
+assert 'MockAdCopyData' in schemas, f'MockAdCopyData not found: {list(schemas.keys())}'
+assert 'APIResponse_MockAdCopyData_' in schemas or any(k.startswith('APIResponse') for k in schemas), f'APIResponse generic not found'
+paths = spec.get('paths', {})
+assert '/api/v1/mock-ai/ad-copy' in paths, 'mock-ai path not found'
+print('OK: FastAPI OpenAPI includes MockAdCopyData + APIResponse + mock-ai path')
+"
 ```
 
 ## Dependency Permission
 
-No dependency changes are allowed.
+No new dependencies.
 
 ## Major Change Status
 
-No code or infrastructure major change. This is a workflow and documentation change.
+**是 — 重大变更。** 原因：
+- 修改 API response schema 绑定 → 影响 OpenAPI 生成
+- 创建 `shared/openapi/` 和 `shared/dto/` 下的第一个正式文件 → 共享契约变更
+- 属于 CODEX.md 中定义的"API contract / OpenAPI / shared DTO"高风险边界
 
-High-risk operational rules are changed intentionally:
+### What this actually changes
 
-- CC self-review becomes the default commit gate.
-- Codex Review becomes optional/on-demand.
-- CC may commit and push task branches after self-review.
+| Layer | Change |
+|-------|--------|
+| API behavior | **None** — same HTTP response body |
+| FastAPI metadata | **Yes** — `response_model` now bound, OpenAPI JSON now complete |
+| `shared/` contracts | **Yes** — first real OpenAPI spec and TypeScript DTO |
+| Runtime validation | **Yes** — FastAPI validates response against schema before returning |
 
-`main` remains protected by PR-only merge and no self-merge rules.
+Backward compatibility: wire response is identical — desktop mock client needs zero changes.
 
 ## Security Requirements
 
-- Do not add secrets, API keys, tokens, production connection strings, or private user data.
-- Preserve high-risk stop rules for auth, token, provider, credit, payment, Tauri, CI, dependencies, and database changes.
+- Do NOT expose `raw_usage` in response schema or OpenAPI spec
+- Do NOT include `user_id`, `device_id`, or internal identifiers in response DTO
+- Do NOT add real AI provider credentials or endpoints
+- Do NOT change authentication or authorization logic
+- Keep `credits_charged=0` and mock-only behavior intact
 
 ## Rollback Plan
 
-Revert the documentation and skill updates from the workflow commit. No database or dependency rollback is required.
+1. Revert `app/api/v1/mock_ai.py` — restore `response_model=None`
+2. Revert `app/schemas/common.py` — remove generic `APIResponse[T]`, restore original
+3. Remove `shared/openapi/mock-ai.yaml` and `shared/dto/mock-ai.ts`
+4. Restore `.gitkeep` files in shared directories
+5. No DB rollback needed
+
+## Suggested Branch
+
+`feature/sprint-02-task-08-mock-ai-api-contract`
 
 ## Completion Output Required
 
-- Changed files
-- Implemented scope
-- Not implemented scope
-- Self-review result
-- Test commands and results
-- `PROGRESS.md` status
-- Skill validation result
-- Risks and rollback
-- Commit hash and PR link
+- Changed files (with diff stat)
+- Exact test commands and results
+- OpenAPI generation verification output
+- Confirmation that wire response is unchanged
+- Confirmation that no other endpoints, provider, auth, credit, or dependency changes were made
+- Residual risks
+- Module context updated
+- Commit and PR created (self-review passed)

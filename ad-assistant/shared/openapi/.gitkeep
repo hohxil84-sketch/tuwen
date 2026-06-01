@@ -1,5 +1,8 @@
 # OpenAPI specifications — the authoritative source for API contracts.
-# Sprint-01: skeleton only — no API specs defined yet.
+# Sprint-02 Task-08: first real spec created (mock-ai.yaml).
+#
+# Existing specs:
+# - mock-ai.yaml  (Mock AI API: POST /api/v1/mock-ai/ad-copy) ← FIRST
 #
 # Reserved specs:
 # - auth.yaml    (Auth API: login, refresh, logout)
