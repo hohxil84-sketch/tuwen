@@ -9,6 +9,7 @@ available :class:`AsyncProvider` instances by name.
 from __future__ import annotations
 
 from app.providers.base import AsyncProvider
+from app.providers.deepseek_provider import DeepSeekProvider
 from app.providers.mock_provider import MockProvider
 
 
@@ -77,10 +78,12 @@ def get_provider_registry() -> ProviderRegistry:
     """Return the module-level :class:`ProviderRegistry` singleton.
 
     On first call the registry is populated with ``MockProvider``
-    (registered as ``"mock"``).
+    (registered as ``"mock"``) and ``DeepSeekProvider``
+    (registered as ``"deepseek"``).
     """
     global _registry
     if _registry is None:
         _registry = ProviderRegistry()
         _registry.register("mock", MockProvider())
+        _registry.register("deepseek", DeepSeekProvider())
     return _registry

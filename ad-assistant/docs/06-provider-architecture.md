@@ -157,5 +157,22 @@ Implemented on branch `feature/sprint-02-task-09-provider-routing`:
 - added `route_and_execute_provider_call()` as high-level entry point;
 - updated `mock_ai.py` to use routing instead of direct `MockProvider()` instantiation;
 - 20 focused routing tests + 147 regression + 21 mock AI tests all pass;
-- all routes still resolve to `MockProvider` — no real provider SDKs/keys/network calls;
+- all routes initially resolved to `MockProvider`;
 - `execute_provider_call()` unchanged — still accepts explicit `provider`.
+
+## Sprint-03 Task-02: DeepSeekProvider (First Real Provider) ✅ Implemented
+
+Implemented on branch `feature/sprint-03-task-02-deepseek-provider`:
+
+- added `openai>=1.0.0` dependency for OpenAI-compatible SDK;
+- added `DeepSeekProvider` (`app/providers/deepseek_provider.py`) — real AI Provider backed by DeepSeek Chat API;
+- registered `"deepseek"` in `ProviderRegistry` alongside `"mock"`;
+- updated `DEFAULT_ROUTING_RULES`: `mock_ad_copy/standard` → `"deepseek"` (other routes unchanged);
+- added `calculate_deepseek_cost()` using official DeepSeek pricing (¥1/1M input, ¥2/1M output);
+- updated `provider_service.py` to dispatch cost calculation by provider name;
+- added `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL` to `Settings`;
+- updated `mock_ai.py` to construct real prompt and pass via `ProviderRequest.message`;
+- 25 focused deepseek tests + 192 total regression pass.
+
+**Security**: API key read from `Settings().DEEPSEEK_API_KEY`, never hardcoded, never sent to client,
+never logged in `raw_usage` or `provider_call_log`.

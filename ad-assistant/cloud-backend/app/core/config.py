@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     MAX_LOGIN_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_SECONDS: int = 15 * 60                     # 15 minutes
 
+    # ---- DeepSeek Provider --------------------------------------------------
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

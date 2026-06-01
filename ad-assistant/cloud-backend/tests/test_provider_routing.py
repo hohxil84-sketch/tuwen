@@ -11,6 +11,7 @@ import uuid
 import pytest
 
 from app.providers.base import ProviderRequest
+from app.providers.deepseek_provider import DeepSeekProvider
 from app.providers.mock_provider import MockProvider, MockProviderError
 from app.providers.registry import (
     ProviderRegistry,
@@ -82,11 +83,13 @@ class TestProviderRegistry:
         r2 = get_provider_registry()
         assert r1 is r2
 
-    def test_singleton_has_mock_pre_registered(self):
-        """单例默认预注册了 MockProvider。"""
+    def test_singleton_has_mock_and_deepseek_pre_registered(self):
+        """单例默认预注册了 MockProvider 和 DeepSeekProvider。"""
         registry = get_provider_registry()
         assert "mock" in registry
         assert isinstance(registry.get("mock"), MockProvider)
+        assert "deepseek" in registry
+        assert isinstance(registry.get("deepseek"), DeepSeekProvider)
 
 
 # ---------------------------------------------------------------------------
@@ -99,9 +102,10 @@ class TestProviderRouter:
 
     @pytest.fixture
     def registry(self):
-        """返回预注册了 mock 的 registry。"""
+        """返回预注册了 mock 和 deepseek 的 registry。"""
         r = ProviderRegistry()
         r.register("mock", MockProvider())
+        r.register("deepseek", DeepSeekProvider())
         return r
 
     @pytest.fixture
@@ -111,9 +115,9 @@ class TestProviderRouter:
 
     @pytest.mark.anyio
     async def test_route_mock_ad_copy_standard(self, router):
-        """mock_ad_copy + standard → mock provider。"""
+        """mock_ad_copy + standard → deepseek provider (S03-T02)。"""
         provider = await router.route("mock_ad_copy", "standard")
-        assert isinstance(provider, MockProvider)
+        assert isinstance(provider, DeepSeekProvider)
 
     @pytest.mark.anyio
     async def test_route_mock_ad_copy_expert(self, router):
@@ -141,14 +145,14 @@ class TestProviderRouter:
 
     @pytest.mark.anyio
     async def test_route_all_combinations_resolve(self, router):
-        """所有 (feature, plan) 组合都应解析到 provider。"""
+        """所有 (feature, plan) 组合都应解析到已注册的 provider。"""
         features = list(DEFAULT_ROUTING_RULES.keys())
         plans = ["standard", "expert", "enterprise", "free_tier"]
         for feature in features:
             for plan in plans:
                 provider = await router.route(feature, plan)
-                assert isinstance(provider, MockProvider), (
-                    f"route({feature!r}, {plan!r}) returned {type(provider)}"
+                assert provider is not None, (
+                    f"route({feature!r}, {plan!r}) returned None"
                 )
 
     @pytest.mark.anyio
@@ -177,11 +181,11 @@ class TestRouteAndExecute:
 
     @pytest.mark.anyio
     async def test_success_returns_provider_result(self, db_session):
-        """成功路由 + 执行应返回 ProviderResult。"""
+        """成功路由 + 执行应返回 ProviderResult（expert plan → mock）。"""
         result = await route_and_execute_provider_call(
             db=db_session,
             feature="mock_ad_copy",
-            plan="standard",
+            plan="expert",
             request=ProviderRequest(feature="mock_ad_copy", message=""),
             user_id=uuid.uuid4(),
             device_id=uuid.uuid4(),
@@ -201,7 +205,7 @@ class TestRouteAndExecute:
         await route_and_execute_provider_call(
             db=db_session,
             feature="mock_ad_copy",
-            plan="standard",
+            plan="expert",
             request=ProviderRequest(feature="mock_ad_copy", message=""),
             user_id=user_id,
             device_id=uuid.uuid4(),

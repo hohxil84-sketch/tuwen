@@ -29,7 +29,7 @@ class ProviderNotFoundError(Exception):
 
 DEFAULT_ROUTING_RULES: dict[str, dict[str, str]] = {
     "mock_ad_copy": {
-        "standard": "mock",
+        "standard": "deepseek",
         "expert": "mock",
         "enterprise": "mock",
     },
