@@ -204,6 +204,43 @@ PR：
 - 后续任务：用户从 Sprint-04 候选或新需求中选择下一任务
 - 回滚方式：revert 对应提交，或恢复 AppSidebar.vue 中 AI 文案生成 disabled 状态
 
+## 2026-06-02 — S04-T06: Tauri 深色标题栏审计与最小修复
+
+状态：BLOCKED_NEEDS_TAURI_SOURCE
+
+分支：`feature/sprint-04-task-06-tauri-dark-titlebar`
+
+提交：`3809f8b`
+
+### 范围
+
+- 目标：审计 `desktop-app/src-tauri/` 目录，确认 Tauri 源配置文件现状；如存在则修复深色标题栏，如不存在则记录阻塞。
+- 已实现：完整审计，确认六个 Tauri 源配置文件全部缺失，标记 BLOCKED，创建模块上下文
+- 未实现：深色标题栏修复（源配置缺失），Tauri 工程初始化（需单独任务单）
+
+### 主要改动
+
+- `docs/module-context/sprint-04-task-06-tauri-dark-titlebar/context.md`（NEW）：审计结果和后续建议
+- `PROGRESS.md`：本条记录
+- `tasks/current-task.md`：状态更新 + 简短摘要
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是（仅 docs + tasks）
+- 未触碰未确认高风险变更：是
+
+### 测试结果
+
+- `npm run build`：68 modules, 0 errors
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：桌面端 Windows 白色标题栏与深色 UI 不一致（S04-T07 已解决）
+- 后续任务：S04-T07（Tauri 工程初始化，已通过 #46 完成）
+- 回滚方式：无需回滚，未修改代码
+
 ## 2026-06-02 — S04-T07: Tauri 工程源配置初始化与深色标题栏恢复
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
