@@ -4,6 +4,33 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R07: 代码签名准备与签名集成方案
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-07-code-signing-plan`
+
+### 范围
+
+- 目标：建立可执行的代码签名方案文档，明确证书类型、私钥保护、签名命令、验证步骤和 SmartScreen 风险。
+- 已实现：
+  - `docs/29-code-signing-plan.md`：证书类型对比（EV/OV/自签名）、获取流程、私钥保护策略（Azure Key Vault / 加密 PFX）、Tauri 签名配置模板、signtool 命令模板、验证命令、SmartScreen 风险说明、CI 集成方案模板、分阶段实施时间线
+  - `docs/17-release-and-update.md`：补充代码签名检查项和方案链接
+  - 模块上下文文档
+- 未实现：实际签名（无证书）、CI secrets 配置、tauri.conf.json 签名配置、自动签名验证 CI
+
+### 主要改动
+
+- 新增 2 文件：代码签名方案（1）+ 模块上下文（1）
+- 修改 3 文件：发布文档 + PROGRESS.md + current-task.md
+- 不影响代码、Tauri 配置、CI 配置
+- 不包含任何真实凭据
+
+### 测试
+
+- `git diff --check`：通过
+- 人工审查：文档不含真实凭据、所有路径为 PLACEHOLDER
+
 ## 2026-06-02 — S05-R06: 模拟充值风控与订单状态加固
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED

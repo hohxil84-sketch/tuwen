@@ -15,6 +15,7 @@
 - 安装包来源
 - 版本号
 - 更新通道
+- **代码签名**：EXE/MSI/NSIS 必须签名（内测阶段可跳过，见 [29-code-signing-plan.md](29-code-signing-plan.md)）
 
 ## 本地打包 Smoke（S04-T08）
 
@@ -43,7 +44,7 @@ npm run tauri build
 - **内测图标已替换**：S04-T09 已将 Tauri 默认占位图标替换为内测品牌图标（暗色背景 + 几何 "A" 字标识）。正式品牌图标仍待确认。
 - **frameless 窗口无原生阴影**：已知 S04-T07 残余风险，打包后窗口仍无系统级阴影和菜单。S04-T10 已通过 CSS 内描边 + 内阴影提供最小视觉边界（不等同于 Windows 原生窗口阴影，正式方案需 DWM API 或 Tauri 插件）。
 - **不包含自动更新**：当前 bundle 未配置 updater endpoint 和签名私钥。
-- **未经代码签名**：打包产物未签名，Windows SmartScreen 可能弹出警告。
+- **未经代码签名**：打包产物未签名，Windows SmartScreen 可能弹出警告。代码签名方案详见 [docs/29-code-signing-plan.md](29-code-signing-plan.md)。
 
 ### 人工验证要点
 
@@ -70,6 +71,20 @@ npm run tauri build
 - `0.1.x`：MVP 内测
 - `0.2.x`：付费试点
 - `1.0.x`：正式商业发布
+
+## 代码签名
+
+所有桌面端发布产物（EXE/MSI/NSIS）在正式分发前必须代码签名。
+
+签名方案详见 [docs/29-code-signing-plan.md](29-code-signing-plan.md)，包括：
+- 证书类型选择（EV vs OV vs 自签名）
+- 私钥保护策略（Azure Key Vault / 加密 PFX）
+- Tauri 签名配置模板
+- 签名和验证命令
+- SmartScreen 风险说明
+- CI/CD 集成方案
+
+当前未实现。内测阶段用户通过手动 `Run anyway` 绕过 SmartScreen 警告。
 
 ## 发布前闸门
 
