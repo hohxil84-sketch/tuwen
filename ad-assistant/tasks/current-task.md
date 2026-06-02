@@ -1,4 +1,4 @@
-# S05-R07: 代码签名准备与签名集成方案
+# S05-R08: Windows 原生窗口阴影专项
 
 ## 状态
 
@@ -6,102 +6,122 @@
 
 ## 分支
 
-`feature/sprint-05-risk-07-code-signing-plan`
+`feature/sprint-05-risk-08-native-window-shadow`
 
 ## 背景
 
-当前 EXE/MSI/NSIS 未签名，Windows SmartScreen 会提示风险。代码签名需要证书、私钥、安全存储和发布流程，是高风险发布链路任务。
+S04-T10 通过 CSS 内描边和内阴影缓解 frameless 窗口边界感，但不等同于 Windows DWM 原生外部阴影。正式体验需要 native window shadow 方案。
 
-先建立可执行的代码签名方案和本地/CI 集成边界，明确证书准备、私钥保护、签名命令、验证方式和未签名 fallback。
+S04-Sprint E2E 残余风险 #4 标记此问题。
 
 ## 用户目标
 
-建立可执行的代码签名方案文档，明确证书类型、获取途径、私钥存储策略、签名命令模板、验证步骤、SmartScreen 风险说明，为后续真实签名实现提供决策依据。
+接入 Windows 原生窗口阴影方案，提升 frameless 窗口桌面层次，使窗口具有系统级外部阴影。
 
 ## What To Build
 
-1. **代码签名方案文档** (`docs/29-code-signing-plan.md`)
-   - 证书类型对比（EV / OV / 自签名 / Let's Encrypt 不适用原因）
-   - 推荐获取途径和预估成本
-   - 私钥保护策略（HSM / Azure Key Vault / 本地加密 PFX）
-   - Tauri bundle 签名配置模板
-   - 签名命令模板（signtool + PFX、CI 环境变量注入）
-   - 签名验证命令和步骤
-   - 未签名 fallback 与 SmartScreen 风险说明
-   - 时间戳服务配置
+### 1. 方案调研与选择
 
-2. **更新发布文档** (`docs/17-release-and-update.md`)
-   - 补充代码签名检查项
-   - 链接到详细方案文档
+三方案对比：
+- `window-shadows` crate：调用 Windows DWM API（`DwmExtendFrameIntoClientArea` + `DWMWA_USE_IMMERSIVE_DARK_MODE`），Tauri 社区常用
+- 手动 DWM API 调用（`windows` crate）：不新增独立依赖，但需手写 unsafe 代码
+- Tauri plugin `tauri-plugin-window`：Tauri 2 官方窗口插件，但无直接 shadow API
 
-3. **模块上下文** (`docs/module-context/sprint-05-risk-07-code-signing-plan/context.md`)
+**选择 `window-shadows` crate**：Tauri 2 生态标准方案，API 最简，仅 1 行调用，支持 Windows/macOS/Linux（各平台自动 fallback）。
+
+### 2. 最小 PoC
+
+- `Cargo.toml`：新增 `window-shadows = "0.2"`
+- `lib.rs`：在 `setup` hook 中调用 `window_shadows::set_shadow(&window, true)`
+- 仅在 Windows 平台启用（条件编译）
+
+### 3. 兼容性
+
+- 最大化时自动无阴影（DWM 行为）
+- macOS/Linux 自动 fallback（无操作）
+- 不修改 `tauri.conf.json` 权限
 
 ## What Not To Build
 
-- 不生成或购买真实证书
-- 不提交证书、私钥、密码或 PFX
-- 不改 CI secrets（`.github/**`）
-- 不修改 Tauri 配置或 Rust 源码
-- 不正式发布安装包
+- 不改业务页面（`App.vue` 内容不变）
+- 不接入透明窗口、Mica、Acrylic
+- 不扩大文件系统、shell、http 权限
+- 不修改 Tauri permissions / capabilities
 
 ## Allowed Files
 
+- `desktop-app/src-tauri/src/lib.rs`
+- `desktop-app/src-tauri/Cargo.toml`
+- `desktop-app/src-tauri/Cargo.lock`
 - `docs/17-release-and-update.md`
-- `docs/29-code-signing-plan.md`
-- `docs/module-context/sprint-05-risk-07-code-signing-plan/context.md`
+- `docs/module-context/sprint-05-risk-08-native-window-shadow/context.md`
 - `PROGRESS.md`
 - `tasks/current-task.md`
 
 ## Forbidden Files
 
-- `.github/**`
-- `desktop-app/src-tauri/**`
-- 任何证书、私钥、PFX、密码、生产发布凭据
-- CI/deployment 配置
+- `desktop-app/src/**`（业务页面不变）
+- `desktop-app/src-tauri/tauri.conf.json`
+- backend/shared/payment/provider/auth/credit
+- CI/deployment
+- 证书/发布凭据
 
 ## Acceptance Criteria
 
-- [ ] 文档说明证书类型、获取途径、预估成本
-- [ ] 明确私钥存储策略和安全要求
-- [ ] 包含签名命令模板和验证命令
-- [ ] 包含 Tauri bundle 签名配置建议
-- [ ] 明确当前未签名风险仍存在
-- [ ] 不提交任何敏感凭据
-- [ ] `git diff --check` 通过
+- [ ] 普通窗口尺寸下可见原生或等价外部阴影
+- [ ] 最大化时无边距/裁切异常（要求 GUI 验证）
+- [ ] `cargo build` / `cargo check` 通过
+- [ ] 文档说明兼容性和 fallback
 
 ## Test Method
+
+```bash
+cd ad-assistant/desktop-app/src-tauri
+cargo check
+cargo build --release
+```
 
 ```bash
 git diff --check
 ```
 
-人工审查：文档不含 secrets、路径均为占位符。
+GUI 验证（需用户执行）：
+- `npm run tauri dev` 启动后观察窗口阴影
+- 最大化后确认无异常
 
 ## Dependency Permission
 
-不允许新增依赖。
+新增 1 个 Rust crate：`window-shadows = "0.2"`
+
+理由：Tauri 2 生态标准方案，调用 Windows DWM API 实现原生窗口阴影。代码量极小（~200 行），无额外间接依赖链（仅依赖 `windows` crate，Tauri 自身已依赖）。
 
 ## Major Change Status
 
 `MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-原因：涉及发布链路和签名凭据安全。
+原因：涉及 Tauri Rust 源码、窗口系统 API 和 1 个新依赖。
+
+必须暂停确认的情况：
+- 需要新增 `window-shadows` 以外的依赖
+- 需要修改 Tauri 权限或 capabilities
+- 需要接入 Mica/Acrylic/透明窗口
 
 ## Security Requirements
 
-- 绝不提交证书、私钥、密码或 token
-- 文档只能写占位路径和示例命令
-- 不记录真实凭据到任何项目文件
+- 不新增 shell/fs/http/updater 权限
+- 不引入来源不明 native 代码
+- `window-shadows` 仅调用公开 Windows DWM API
 
 ## Rollback Plan
 
-- revert 文档 commit
+- revert commit；恢复 S04-T10 CSS 视觉边界方案（无代码修改，仅移除 `set_shadow` 调用和 `window-shadows` 依赖）
 
 ## Completion Output Required
 
-- 签名方案摘要
-- 未实现内容
-- 凭据安全说明
+- 方案选择理由
+- 依赖/权限影响
+- 测试结果
+- 兼容性说明
 - 风险
 - 回滚方式
 - 中文 commit message
