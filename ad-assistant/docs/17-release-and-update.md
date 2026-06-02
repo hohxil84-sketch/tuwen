@@ -16,6 +16,44 @@
 - 版本号
 - 更新通道
 
+## 本地打包 Smoke（S04-T08）
+
+当前桌面端已通过最小本地打包验证，可生成 Windows 安装包。
+
+### 构建命令
+
+```bash
+cd desktop-app
+npm run tauri build
+```
+
+### 产物
+
+构建产品位于 `desktop-app/src-tauri/target/release/`：
+
+| 产物 | 相对路径（project root） | 类型 |
+|------|--------------------------|------|
+| 应用 EXE | `desktop-app/src-tauri/target/release/ad-assistant-desktop.exe` | 裸二进制 |
+| MSI 安装包 | `desktop-app/src-tauri/target/release/bundle/msi/AdAssistant_0.1.0_x64_en-US.msi` | Windows Installer |
+| NSIS 安装包 | `desktop-app/src-tauri/target/release/bundle/nsis/AdAssistant_0.1.0_x64-setup.exe` | NSIS 安装程序 |
+
+### 已知限制
+
+- **productName 仅支持 ASCII**：当前 `tauri.conf.json` 的 `productName` 为 `"AdAssistant"`（ASCII）。WiX v3（MSI 打包工具）不兼容中文产品名称（codepage 1252 限制）。如需中文产品名出现在 Windows 安装程序中，需升级到 WiX v4（支持 UTF-8）或仅使用 NSIS 安装包。
+- **占位图标**：当前使用 Tauri 默认占位图标，尚未替换为品牌图标。
+- **frameless 窗口无原生阴影**：已知 S04-T07 残余风险，打包后窗口仍无系统级阴影和菜单。
+- **不包含自动更新**：当前 bundle 未配置 updater endpoint 和签名私钥。
+- **未经代码签名**：打包产物未签名，Windows SmartScreen 可能弹出警告。
+
+### 人工验证要点
+
+安装或直接启动 EXE 后，应确认：
+- [ ] 应用主窗口正常打开
+- [ ] 深色工作台背景覆盖整个窗口（frameless）
+- [ ] 自定义标题栏可见（data-tauri-drag-region 区域可拖拽）
+- [ ] 最小化、最大化/还原、关闭按钮可用
+- [ ] 窗口可拖拽移动
+
 ## 云端发布
 
 云端发布必须检查：

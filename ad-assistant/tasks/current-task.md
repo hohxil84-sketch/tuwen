@@ -1,4 +1,4 @@
-# S04-T07: Tauri 工程源配置初始化与深色标题栏恢复
+# S04-T08: Tauri 打包与 EXE Smoke 验证
 
 ## 状态
 
@@ -6,78 +6,66 @@
 
 ## 分支
 
-`feature/sprint-04-task-07-tauri-source-init`
+`feature/sprint-04-task-08-tauri-package-smoke`
 
 ## 完成摘要
 
-S04-T07 已完成：手动创建 Tauri 2 源配置 10 个文件，frameless 窗口 + AppTopbar 自定义深色标题栏（拖拽区 + 窗口控制按钮），capabilities 最小化 7 项权限。npm run build 74 modules 0 errors，tauri dev exit 0，Cargo 355 crates 编译通过，desktop-app.exe 成功启动。vite.config.ts 额外修改（忽略 target/）属 Tauri 运行必要配置。
+Tauri 本地打包 Smoke 验证通过。`bundle.active` 开启 + `targets: "all"`，`npm run tauri build` 成功生成裸 EXE + MSI + NSIS 安装包。`productName` 修正为 ASCII "AdAssistant"（WiX v3 codepage 1252 不兼容中文）。构建产物未提交，待用户人工 GUI 验证（窗口启动、深色标题栏、窗口控制按钮）。详细记录见 PROGRESS.md 和模块上下文。
 
 ## 背景
 
-S04-T06 已审计 `desktop-app/src-tauri/`，确认当前仅有 `.gitkeep` 和 `target/` 构建产物，不存在可提交的 Tauri 源配置文件：
+S04-T07 已恢复 `desktop-app/src-tauri/` 的 Tauri 2 源配置，并完成 frameless 深色标题栏方案。当前 `desktop-app` 已具备 `npm run tauri dev` 开发模式，但 `tauri.conf.json` 中 `bundle.active` 仍为 `false`，尚未验证能否生成本地 Windows EXE / installer 构建产物。
 
-- `desktop-app/src-tauri/tauri.conf.json` 或 `tauri.conf.json5`
-- `desktop-app/src-tauri/Cargo.toml`
-- `desktop-app/src-tauri/src/main.rs`
-- `desktop-app/src-tauri/src/lib.rs`
-- `desktop-app/src-tauri/capabilities/*.json`
-
-因此 S04-T06 已标记为 `BLOCKED_NEEDS_TAURI_SOURCE`，未能处理 Windows / Tauri 原生白色标题栏与深色桌面 UI 不一致的问题。
-
-本任务目标是补齐最小可维护的 Tauri 2 源配置，让桌面端重新具备可运行的 Tauri 工程基础，并在该基础上实现深色标题栏或等效的深色窗口 chrome 最小修复。
+本任务目标是做一次最小的 Tauri packaging smoke：开启必要 bundle 配置，运行本地构建，确认是否能生成可启动的 Windows 桌面产物，并记录构建产物路径、验证方式、失败原因或后续阻塞项。
 
 ## 用户目标
 
-恢复桌面端 Tauri 工程源配置，使 `desktop-app` 能以 Tauri 桌面应用方式运行；同时解决或最小化顶部白色系统标题栏破坏深色 UI 观感的问题。
+确认当前桌面端是否已经具备生成本地 EXE / 安装包的基础能力，为后续内测分发做准备；本任务只做本地打包验证，不做正式发布。
 
 ## What To Build
 
-- 初始化或恢复 `desktop-app/src-tauri/` 下可提交的 Tauri 2 源配置文件。
-- 补齐 Tauri 运行所需的最小 Rust 入口、配置文件和 capabilities。
-- 在不扩大权限的前提下配置窗口外观，使标题栏 / 系统 chrome 与现有深色工作台尽量一致。
-- 如采用 `decorations: false`、frameless 或自定义标题栏，必须同时提供可用的拖拽区域和窗口控制能力，且不破坏现有页面布局。
-- 补齐或修正 `desktop-app/package.json` 中 Tauri 开发脚本和官方依赖。
-- 更新 `docs/module-context/sprint-04-task-07-tauri-source-init/context.md`，记录初始化方式、关键配置、权限边界、验证结果、风险和回滚方式。
+- 配置最小 Tauri bundle，使 `npm run tauri build` 能尝试生成 Windows 桌面构建产物。
+- 如果现有图标、identifier、productName、version、bundle 配置不满足打包要求，在最小范围内修正。
+- 运行 Tauri packaging smoke，确认生成的 `.exe` 或 installer 产物是否存在。
+- 对生成产物做最小人工验证：能启动应用主窗口，且深色标题栏 / 自定义窗口控制按钮仍可见。
+- 更新 `docs/17-release-and-update.md`，记录当前本地打包 smoke 流程和限制。
+- 新增 `docs/module-context/sprint-04-task-08-tauri-package-smoke/context.md`，记录 bundle 配置、产物路径、验证结果、残余风险和回滚方式。
 - 追加更新 `PROGRESS.md`。
 
 ## What Not To Build
 
-- 不做 EXE packaging。
-- 不生成安装包。
+- 不做正式发布。
+- 不上传、分发或签名安装包。
 - 不新增自动更新能力。
-- 不发布版本。
-- 不接入真实 Provider。
-- 不修改后端 API、数据库、shared DTO、Auth、Credit、Payment 或 Provider 逻辑。
-- 不修改本地 OCR 服务启动方式。
-- 不改 Dashboard 业务布局、业务卡片、路由功能或页面数据逻辑，除非自定义标题栏必须做最小壳层适配。
-- 不修改或提交 `desktop-app/src-tauri/target/**`。
+- 不配置 updater endpoint、签名私钥或发布通道。
+- 不做代码签名证书接入。
+- 不做 MSI / NSIS 深度定制主题。
+- 不接入 sidecar。
+- 不修改本地 Python 服务启动方式。
+- 不修改后端 API、数据库、shared DTO、Provider、Auth、Credit、Payment 或 CI。
+- 不修改业务页面、路由、Provider 调用、扣费逻辑或登录授权逻辑。
+- 不提交 `desktop-app/src-tauri/target/**`、`desktop-app/dist/**` 或任何构建产物。
 
 ## Allowed Files
 
 - `desktop-app/src-tauri/tauri.conf.json`
-- `desktop-app/src-tauri/tauri.conf.json5`
-- `desktop-app/src-tauri/Cargo.toml`
-- `desktop-app/src-tauri/Cargo.lock`
-- `desktop-app/src-tauri/src/main.rs`
-- `desktop-app/src-tauri/src/lib.rs`
-- `desktop-app/src-tauri/capabilities/*.json`
-- `desktop-app/src-tauri/icons/**`（仅 Tauri 默认图标或项目已有图标的必要接入）
-- `desktop-app/package.json`
-- `desktop-app/package-lock.json`
-- `desktop-app/src/App.vue`（仅当窗口拖拽区或自定义标题栏需要最小适配）
-- `desktop-app/src/components/dashboard/AppTopbar.vue`（仅当与页面顶部栏整合自定义标题栏时）
-- `desktop-app/src/styles/**`（仅当已有样式体系需要最小标题栏样式补充）
+- `desktop-app/src-tauri/Cargo.toml`（仅当 Tauri build 明确要求最小 metadata 修正）
+- `desktop-app/src-tauri/icons/**`（仅当现有图标格式导致打包失败，且只允许替换/补齐应用图标）
+- `desktop-app/package.json`（仅当需要新增 `tauri:build` 这类脚本别名）
+- `desktop-app/package-lock.json`（仅当 npm 脚本或 Tauri 官方依赖的必要修正导致 lockfile 更新）
+- `docs/17-release-and-update.md`
 - `docs/09-desktop-app-guide.md`
-- `docs/26-desktop-dashboard-ui-redesign.md`
-- `docs/module-context/sprint-04-task-07-tauri-source-init/context.md`
+- `docs/module-context/sprint-04-task-08-tauri-package-smoke/context.md`
 - `PROGRESS.md`
 - `tasks/current-task.md`（完成后仅允许状态、分支、简短完成摘要、commit/PR 信息）
 
-如执行过程中确认必须修改上述范围外文件，且属于 Tauri 初始化的必要文件，必须先暂停并请求用户或 Codex 更新任务单。
+如执行过程中确认必须修改上述范围外文件，且属于 Tauri packaging 的必要文件，必须先暂停并请求用户或 Codex 更新任务单。
 
 ## Forbidden Files
 
 - `desktop-app/src-tauri/target/**`
+- `desktop-app/dist/**`
+- `desktop-app/src-tauri/gen/schemas/**`
 - `cloud-backend/**`
 - `shared/**`
 - `desktop-app/local-service/**`
@@ -87,52 +75,58 @@ S04-T06 已审计 `desktop-app/src-tauri/`，确认当前仅有 `.gitkeep` 和 `
 - 根目录 `package-lock.json`
 - 数据库 DDL / migrations
 - Provider、Auth、Credit、Payment、Billing 相关文件
-- 与 Tauri 初始化和标题栏无关的 Dashboard 业务逻辑
+- 任何真实密钥、证书、签名私钥、生产连接串或发布凭据
 
 ## Dependency Permission
 
-本任务允许新增或恢复 Tauri 官方必要依赖，但仅限以下范围：
+默认不允许新增依赖。
+
+已允许使用现有 Tauri 官方依赖：
 
 - `@tauri-apps/api`
 - `@tauri-apps/cli`
-- Rust 侧 Tauri 2 官方 crate 及其初始化所需依赖
+- Rust 侧已存在的 Tauri 2 crates
 
-禁止新增非 Tauri 官方依赖。禁止升级与本任务无关的前端、后端或根目录依赖。若 npm 或 Cargo 自动改动超出 Tauri 初始化必要范围，必须暂停说明原因并请求确认。
+如果 `npm run tauri build` 要求安装 Windows 打包工具、Rust target、WiX、NSIS 或系统级工具，执行者必须先报告缺失项、安装来源建议、风险和替代验证方式；不得在任务内自行安装系统工具，除非用户明确确认。
 
 ## Major Change Status
 
 `MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-原因：本任务会恢复 Tauri 工程源配置，并可能修改桌面窗口 chrome、Tauri capabilities、依赖和 lockfile。这些属于高风险边界，但本任务单已明确限定允许范围和验收要求。
+原因：Tauri packaging、bundle 配置、安装包生成和产物验证属于发布链路前置工作，是高风险边界。本任务单只确认本地 packaging smoke，不允许发布、签名、上传、自动更新或改 CI。
 
 仍需暂停确认的情况：
 
-- 需要扩大 Tauri capabilities 权限到文件系统、shell、网络白名单或远程执行。
-- 需要修改本地 Python 服务启动、sidecar、打包配置或 updater。
-- 需要修改 CI、Docker、部署或环境变量契约。
-- 需要删除文件、重命名目录或大规模重构。
+- 需要配置代码签名证书、私钥、publisher、timestamp server 或正式发布身份。
+- 需要新增 updater、发布通道、下载地址或远程更新逻辑。
+- 需要修改 CI / GitHub Actions / deployment。
+- 需要接入 sidecar 或修改本地 Python 服务启动方式。
+- 需要新增 Tauri 插件或扩大 capabilities 权限。
 - 需要修改后端、数据库、shared DTO、Provider、Auth、Credit 或 Payment。
+- 需要安装系统级打包工具。
+- 需要删除文件、重命名目录或大规模重构。
 
 ## Security Requirements
 
-- 不写入真实 API Key、Token、密码、生产连接串或用户隐私数据。
+- 不写入真实 API Key、Token、密码、生产连接串、证书或签名私钥。
 - 不把 Provider API Key 放入客户端。
-- 不绕过云端授权、设备绑定、套餐权限或扣费链路。
-- Tauri capabilities 必须最小化，只允许应用当前运行所需权限。
-- 不新增 shell、filesystem、remote execution、全局网络访问等高风险能力，除非用户另行确认。
-- 不修改 `target/**` 构建产物。
+- 不新增 updater endpoint 或远程下载执行逻辑。
+- 不扩大 Tauri capabilities。
+- 不提交构建产物、安装包、EXE、日志或本地缓存。
+- 不修改客户端 token 存储策略。
+- 打包产物如需记录路径，只写入相对路径和文件名，不复制二进制内容。
 
 ## Acceptance Criteria
 
-- [ ] `desktop-app/src-tauri/` 下存在可提交的 Tauri 2 源配置文件，而不只是 `.gitkeep` 和 `target/**`。
-- [ ] `desktop-app/package.json` 包含可运行的 Tauri 开发脚本和必要官方依赖。
+- [ ] `desktop-app/src-tauri/tauri.conf.json` 的 bundle 配置满足本地打包 smoke 要求。
 - [ ] `npm run build` 在 `desktop-app` 下通过。
-- [ ] 如果本机 Rust / Tauri 环境可用，`npm run tauri dev` 能启动桌面应用。
-- [ ] 如果 `npm run tauri dev` 因本机环境不可用失败，必须记录缺失环境、失败原因和替代验证。
-- [ ] 标题栏 / 系统 chrome 已采用深色或等效方案；若平台限制导致不能完全深色化，必须记录原因和可接受降级。
-- [ ] 如采用 frameless / 自定义标题栏，窗口拖拽、关闭、最小化、最大化仍可用。
-- [ ] 未修改或提交 `desktop-app/src-tauri/target/**`。
-- [ ] 未修改后端、数据库、shared DTO、Provider、Auth、Credit、Payment、CI 或根目录依赖。
+- [ ] `npm run tauri build` 已运行，并记录成功或失败结果。
+- [ ] 如打包成功，记录生成的 EXE / installer 相对路径和文件类型。
+- [ ] 如打包成功，人工启动产物并确认主窗口可打开、深色标题栏可见、窗口控制按钮可用。
+- [ ] 如打包失败，记录精确失败原因、缺失工具、阻塞项和后续修复建议。
+- [ ] 未提交 `desktop-app/src-tauri/target/**`、`desktop-app/dist/**`、installer、EXE 或日志。
+- [ ] 未新增自动更新、代码签名、发布上传或 CI 改动。
+- [ ] 未修改后端、数据库、shared DTO、Provider、Auth、Credit、Payment。
 - [ ] 模块上下文已更新。
 - [ ] `PROGRESS.md` 已追加记录。
 - [ ] `git diff --check` 通过。
@@ -149,42 +143,48 @@ npm run build
 必须运行：
 
 ```powershell
+cd ad-assistant/desktop-app
+npm run tauri build
+```
+
+必须运行：
+
+```powershell
 git diff --check
 ```
 
-如果 Tauri 环境可用，必须运行：
+如果 `npm run tauri build` 成功，必须人工验证：
 
-```powershell
-cd ad-assistant/desktop-app
-npm run tauri dev
-```
+- 启动生成的 EXE 或 installer 安装后的应用。
+- 确认主窗口能打开。
+- 确认 frameless 深色标题栏仍正常。
+- 确认最小化、最大化/还原、关闭按钮可用。
 
-如果 `npm run tauri dev` 不可用，执行者必须提供：
+如果 `npm run tauri build` 失败，执行者必须提供：
 
-- 本机缺失的具体工具或错误信息。
-- `desktop-app/src-tauri/` 源文件清单。
-- `package.json` Tauri 脚本和依赖检查结果。
-- `npm run build` 结果。
-- 未修改 `target/**` 的说明。
+- 原始错误摘要。
+- 缺失工具或配置项。
+- 是否与本任务允许范围相关。
+- 不安装系统工具时的替代验证结果。
+- 后续任务建议。
 
 ## Rollback Plan
 
-- revert 本任务 commit 可移除 Tauri 源配置、依赖和标题栏适配。
-- 如果只需要回滚标题栏方案，可恢复 `tauri.conf.*` 的窗口配置和相关 Vue/CSS 最小适配。
-- 本任务不涉及数据库迁移或远端数据变更，无数据回滚步骤。
+- revert 本任务 commit 可恢复打包配置和文档记录。
+- 如果仅需关闭打包，恢复 `tauri.conf.json` 中 `bundle.active = false`。
+- 本任务不涉及数据库迁移、远端发布或用户数据变更，无数据回滚步骤。
+- 本地生成的 `target/**`、`dist/**`、EXE 或 installer 产物不得提交；清理前必须确认路径位于 `desktop-app/` 构建输出目录内。
 
 ## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- Tauri 源配置初始化方式
-- 标题栏 / 窗口 chrome 方案
-- capabilities 权限清单和是否最小化
-- 新增或恢复的依赖
+- bundle 配置变化
+- 生成产物路径和文件类型，或失败阻塞原因
+- 人工启动验证结果
 - 未实现内容
 - 测试命令和结果
-- `npm run tauri dev` 人工验证结果或未验证原因
 - 自审结论
 - reviewer-mode 自查结论
 - 是否触发高风险暂停规则

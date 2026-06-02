@@ -123,6 +123,51 @@ Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记
 - 后续任务：Sprint-04 剩余候选（Membership/套餐/充值、快捷入口接入真实功能、Tauri 深色标题栏、Local OCR history cleanup）
 - 回滚方式：revert 对应提交，恢复 mock 数据
 
+## 2026-06-02 — S04-T08: Tauri 打包与 EXE Smoke 验证
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-04-task-08-tauri-package-smoke`
+
+### 范围
+
+- 目标：开启最小 Tauri bundle 配置，生成本地 Windows EXE/MSI/NSIS 安装包，做最小人工验证。
+- 已实现：
+  - `tauri.conf.json`：`bundle.active` 开启 + `targets: "all"` + productName 修正为 ASCII（WiX v3 兼容）
+  - `npm run tauri build` 成功，生成 3 个产物：裸 EXE + MSI + NSIS 安装包
+  - 文档更新：`docs/17-release-and-update.md`、`docs/09-desktop-app-guide.md`
+  - 模块上下文：`docs/module-context/sprint-04-task-08-tauri-package-smoke/context.md`
+- 未实现：无（计划内全部完成）；人工 GUI 验证需用户在 Windows 桌面执行
+
+### 主要改动
+
+- `desktop-app/src-tauri/tauri.conf.json`：`bundle.active: true`、`targets: "all"`、`productName: "AdAssistant"`
+- `docs/17-release-and-update.md`：新增本地打包 Smoke 章节（命令、产物、限制、验证要点）
+- `docs/09-desktop-app-guide.md`：新增本地打包命令和产物路径
+- `docs/module-context/sprint-04-task-08-tauri-package-smoke/context.md`（NEW）
+- `PROGRESS.md`：本条记录
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（bundle 配置和 productName 修正均在任务单授权范围）
+- 未加入密钥或生产凭据：是
+- 未提交构建产物：是
+- 模块上下文已更新：是
+
+### 测试结果
+
+- `npm run build`（desktop-app）：74 modules, 0 errors
+- `npm run tauri build`：exit 0，2 bundle 格式（MSI + NSIS）全部成功
+- `git diff --check`：待运行
+
+### 风险和后续
+
+- 残余风险：productName 仅 ASCII（WiX v3 限制）；占位图标；frameless 窗口无原生阴影；构建产物未签名
+- 后续任务：S04-T09（品牌图标替换）、窗口阴影修复、代码签名
+- 回滚方式：revert 对应提交，或恢复 `bundle.active = false`
+
 ## 记录模板
 
 ```markdown
