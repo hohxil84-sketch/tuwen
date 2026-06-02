@@ -70,6 +70,10 @@
           <span class="nav-icon">📄</span>
           <span class="nav-label">使用日志</span>
         </router-link>
+        <router-link to="/admin" class="nav-item" :class="{ active: isActive('/admin') }">
+          <span class="nav-icon">🛡️</span>
+          <span class="nav-label">管理后台</span>
+        </router-link>
       </div>
     </nav>
 

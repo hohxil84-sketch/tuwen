@@ -371,6 +371,132 @@ export async function listOrders(
 }
 
 // ---------------------------------------------------------------------------
+// Admin (S05-R02)
+// ---------------------------------------------------------------------------
+
+/** Generic paginated list wrapper returned by admin endpoints. */
+export interface AdminPaginatedData<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminUserItem {
+  id: string;
+  account: string;
+  plan_code: string;
+  status: string;
+  created_at: string | null;
+}
+
+export interface AdminOrderItem {
+  id: string;
+  user_id: string;
+  plan_code: string | null;
+  amount_cny: number;
+  credits: number;
+  payment_method: string;
+  status: string;
+  description: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface AdminCreditAccountItem {
+  id: string;
+  user_id: string;
+  plan_code: string;
+  balance: number;
+  monthly_grant: number;
+  status: string;
+  created_at: string | null;
+}
+
+export interface AdminProviderLogItem {
+  id: string;
+  request_id: string | null;
+  user_id: string | null;
+  provider: string;
+  model: string;
+  feature: string;
+  status: string;
+  error_code: string | null;
+  total_tokens: number;
+  credits_charged: number | null;
+  latency_ms: number | null;
+  created_at: string | null;
+}
+
+export interface AdminUsageEventItem {
+  id: string;
+  user_id: string | null;
+  event_type: string;
+  feature: string;
+  request_id: string | null;
+  created_at: string | null;
+}
+
+async function adminRequest<T>(
+  path: string,
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminPaginatedData<T>> {
+  const response = await request<AdminPaginatedData<T>>(
+    `${path}?limit=${limit}&offset=${offset}`,
+    { method: "GET" },
+  );
+  return response.data;
+}
+
+export async function adminListUsers(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminPaginatedData<AdminUserItem>> {
+  return adminRequest<AdminUserItem>("/api/v1/admin/users", limit, offset);
+}
+
+export async function adminListOrders(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminPaginatedData<AdminOrderItem>> {
+  return adminRequest<AdminOrderItem>("/api/v1/admin/orders", limit, offset);
+}
+
+export async function adminListCreditAccounts(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminPaginatedData<AdminCreditAccountItem>> {
+  return adminRequest<AdminCreditAccountItem>(
+    "/api/v1/admin/credit-accounts",
+    limit,
+    offset,
+  );
+}
+
+export async function adminListProviderLogs(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminPaginatedData<AdminProviderLogItem>> {
+  return adminRequest<AdminProviderLogItem>(
+    "/api/v1/admin/provider-logs",
+    limit,
+    offset,
+  );
+}
+
+export async function adminListUsageEvents(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminPaginatedData<AdminUsageEventItem>> {
+  return adminRequest<AdminUsageEventItem>(
+    "/api/v1/admin/usage-events",
+    limit,
+    offset,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Error sanitization (shared)
 // ---------------------------------------------------------------------------
 

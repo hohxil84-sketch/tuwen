@@ -4,6 +4,53 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R02: 基础后台最小可用管理台
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-02-basic-admin`
+
+### 范围
+
+- 目标：新增最小只读管理台，管理员可查看用户、充值订单、积分账户、Provider 调用日志、使用事件。
+- 已实现：
+  - 后端 5 个只读 GET endpoint（复用 get_admin_user 权限检查，limit≤100）
+  - admin_service.py + PaginatedItems schema + 12 focused tests
+  - AdminPage.vue：5 tab 页签 + 表格 + 分页 + loading/error/forbidden/empty 状态
+  - sidebar 新增"管理后台"入口（始终可见，权限服务端判断）
+  - 敏感字段排除：password_hash、raw_usage、raw_response、metadata_json
+- 未实现：筛选/搜索/排序/导出/统计图表/增删改；authStore 未添加 isAdmin computed
+
+### 主要改动
+
+- 后端新增 2 文件：admin_service.py、test_admin.py（12 tests）
+- 后端修改 2 文件：schemas/admin.py（+5 Item + PaginatedItems）、api/v1/admin.py（+5 GET endpoint）
+- 桌面端新增 1 文件：AdminPage.vue
+- 桌面端修改 3 文件：cloudApi.ts（+Admin DTOs + 5 functions）、router.ts（+ /admin）、AppSidebar.vue（+ 管理后台）
+- 新增模块上下文
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 未新增依赖：是
+- 未修改 DDL、models、Provider、Credit、Payment、config、CI：是
+
+### 测试结果
+
+- 后端 admin focused：12 passed
+- 后端全量回归：305 passed, 74 skipped（+12 vs S05-R01）
+- 前端构建（npm run build）：77 modules, 0 errors（含 vue-tsc）
+- git diff --check：通过
+
+### 风险和后续
+
+- 残余风险：手动 GUI 验证未执行；仍依赖 ADMIN_USER_IDS 白名单（S05-R03 替换）；仅只读无操作
+- 后续任务：S05-R03（RBAC 角色权限最小体系）
+- 回滚方式：revert 对应 commit
+
 ## 2026-06-02 — S05-R01: 余额不足 402 桌面端充值引导
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
