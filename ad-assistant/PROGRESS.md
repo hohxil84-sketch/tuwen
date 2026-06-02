@@ -4,6 +4,46 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S04-T10: Tauri frameless 窗口边界与阴影最小优化
+
+### 范围
+
+- 目标：frameless 窗口增加最小 CSS 视觉边界/层次，缓解"窗口贴在桌面没有层次"的观感问题。
+- 已实现：
+  - `App.vue` `#app-shell` 新增 `border: 1px solid rgba(148,163,184,0.10)` + `box-shadow: inset 0 0 40px rgba(0,0,0,0.30)`
+  - 前端构建通过（74 modules, 0 errors）
+  - `git diff --check` 通过
+- 未实现：
+  - 不等同于 Windows 原生窗口阴影（需 DWM API 或 Tauri 插件）
+  - 未执行 Tauri dev/build 打包验证和人工 GUI 验证
+  - 未修改 `AppTopbar.vue`（标题栏拖拽区和窗口控制按钮未变动）
+
+### 主要改动
+
+- 修改 1 文件：`desktop-app/src/App.vue`（`#app-shell` 新增 2 行 CSS）
+- 修改 1 文件：`docs/17-release-and-update.md`（frameless 限制条目补充 S04-T10 说明）
+- 新增 1 文件：`docs/module-context/sprint-04-task-10-tauri-window-depth/context.md`
+
+### 自检结果
+
+- 任务单完整：是（Codex 起草）
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 未新增依赖：是（纯 CSS 方案）
+- 未修改 tauri.conf.json、Rust 源码、capabilities、package.json：是
+
+### 测试结果
+
+- 前端构建（npm run build）：74 modules, 0 errors
+- git diff --check：通过
+
+### 风险和后续
+
+- 残余风险：CSS 方案不等同于 Windows 原生阴影；最大化时 1px 描边可能不可见（可接受）；多 DPI 显示器未人工验证
+- 后续任务：正式窗口阴影需接入 DWM API 或 Tauri window-shadows 插件（高风险，需专项任务）
+- 回滚方式：revert commit 或从 `App.vue` `#app-shell` 移除新增 2 行 CSS
+
 ## 2026-06-02 — S04-T09: Tauri 内测品牌图标替换
 
 ### 范围

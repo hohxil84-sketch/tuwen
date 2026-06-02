@@ -1,4 +1,4 @@
-# S04-T09: Tauri 内测品牌图标替换
+# S04-T10: Tauri frameless 窗口边界与阴影最小优化
 
 ## 状态
 
@@ -6,61 +6,67 @@
 
 ## 分支
 
-`feature/sprint-04-task-09-tauri-brand-icon`
+`feature/sprint-04-task-10-tauri-window-depth`
 
 ## 完成摘要
 
-已将 Tauri 默认占位图标替换为内测品牌图标（暗色背景 + 几何 "A" 字标识 + 双色渐变）。`icon.ico`（7 尺寸 16–256 px）+ `icon.png`（128×128 RGBA），均由 Pillow 生成。`tauri.conf.json` 图标引用未变。`npm run build`（74 modules, 0 errors）和 `npm run tauri build`（EXE + MSI 生成成功，NSIS 网络超时与图标无关）均已验证。详细记录见 PROGRESS.md 和模块上下文。
+已为 frameless 窗口增加最小 CSS 视觉边界：`App.vue` `#app-shell` 新增 1px 内描边 + 40px 柔和内阴影。纯 CSS 方案，未新增依赖，未修改 tauri.conf.json/Rust/capabilities。前端构建通过（74 modules, 0 errors）。此方案不等同于 Windows 原生窗口阴影，正式方案需 DWM API 或 Tauri 插件专项处理。详细记录见 PROGRESS.md 和模块上下文。
 
 ## 背景
 
-S04-T07 已恢复 Tauri 2 桌面工程源配置，S04-T08 已完成本地 EXE / MSI / NSIS 打包 smoke 验证。当前 `desktop-app/src-tauri/icons/` 仍使用 Tauri 默认占位图标，打包产物和 Windows 应用图标缺少项目识别度。
+S04-T07 已采用 `decorations: false` 的 frameless 窗口方案，解决了 Windows 系统标题栏与深色工作台不一致的问题。该方案的残余风险是：部分 Windows 版本下 frameless 窗口缺少原生系统阴影，窗口边界与桌面背景区分不够明显。
 
-本任务只做内测阶段的最小品牌图标替换：用一个可辨识、可打包、可回滚的 MVP 图标替换默认占位图标，并记录图标来源、格式、构建验证和限制。
+S04-T08 已验证本地打包链路，S04-T09 已替换内测图标。下一步适合做一个低风险桌面体验收口任务：在不引入新依赖、不扩大 Tauri 权限、不接入系统级插件的前提下，为当前 frameless 窗口补齐最小的视觉边界、内阴影或外观层次，并记录原生阴影仍需后续专项处理的边界。
 
 ## 用户目标
 
-为后续 Windows 内测分发准备一个不再显示 Tauri 默认图标的桌面应用图标。由于用户尚未提供正式品牌 VI，本任务按保守拆解执行：只做内测可用图标，不做最终品牌体系设计。
+让内测桌面应用在 frameless 模式下更容易看出窗口边界，减少“窗口贴在桌面上没有层次”的观感问题。本任务只做最小 UI/CSS 级优化和验证，不做 Windows 原生阴影插件或系统 API 接入。
 
 ## What To Build
 
-- 设计或生成一个简单、清晰、适合内测的应用图标，表达“AI 图文广告助手 / AdAssistant”身份。
-- 替换或补齐 `desktop-app/src-tauri/icons/` 下 Tauri 打包需要的图标文件。
-- 保持 `tauri.conf.json` 的图标引用与实际文件一致。
-- 运行桌面端构建和 Tauri 打包，确认新图标不会破坏 EXE / MSI / NSIS 生成。
-- 更新 `docs/17-release-and-update.md`，把“占位图标”状态改为“内测图标已替换”，同时保留正式品牌图标仍待确认的限制。
-- 新增 `docs/module-context/sprint-04-task-09-tauri-brand-icon/context.md`，记录图标文件、设计说明、验证结果、残余风险和回滚方式。
+- 审查当前 `App.vue`、`AppTopbar.vue` 和 Tauri 窗口配置，确认 frameless 窗口边界感的主要来源。
+- 在最小范围内增加窗口外壳的视觉边界，例如内描边、顶部/侧边分隔、柔和内阴影、最大化状态下的边界降级处理。
+- 保持 Dashboard、OCR、会员中心、AI 文案页等现有页面布局不被压缩、遮挡或重新缩放。
+- 浏览器开发模式和 Tauri 模式都应保持可用；浏览器模式不应出现多余窗口控制按钮。
+- 更新 `docs/17-release-and-update.md`，说明当前采用的是 CSS/视觉层级缓解方案，不等同于 Windows 原生窗口阴影。
+- 新增 `docs/module-context/sprint-04-task-10-tauri-window-depth/context.md`，记录方案、验证结果、限制和回滚方式。
 - 追加更新 `PROGRESS.md`。
 
 ## What Not To Build
 
-- 不做正式品牌 VI、商标、logo 体系或版权注册。
-- 不做官网、营销页、宣传物料或应用内 UI 大改版。
-- 不做正式发布、上传、分发或安装包签名。
-- 不配置 updater endpoint、签名私钥、代码签名证书或发布通道。
-- 不修改 Tauri capabilities、sidecar、本地 Python 服务启动方式或文件系统权限。
+- 不接入 Windows 原生阴影插件、DWM API、native window shadow crate 或自定义 Rust 命令。
+- 不新增 Tauri 插件或扩大 capabilities。
+- 不开启透明窗口、毛玻璃、acrylic、mica 或系统级窗口特效。
+- 不恢复系统标题栏，不改变 `decorations: false` 的当前方案。
+- 不重做 Dashboard UI、导航、页面布局或主题系统。
 - 不修改后端 API、数据库、shared DTO、Provider、Auth、Credit、Payment、Billing 或 CI。
-- 不新增真实 AI Provider 调用、扣费逻辑或客户端授权逻辑。
+- 不做正式发布、上传、分发、代码签名或 updater。
 - 不提交 `desktop-app/src-tauri/target/**`、`desktop-app/dist/**`、EXE、MSI、NSIS 安装包或构建日志。
 
 ## Allowed Files
 
-- `desktop-app/src-tauri/icons/**`
-- `desktop-app/src-tauri/tauri.conf.json`（仅当图标文件名或格式变化需要同步引用）
+- `desktop-app/src/App.vue`
+- `desktop-app/src/components/dashboard/AppTopbar.vue`（仅当标题栏边界或拖拽区视觉需要同步）
+- `desktop-app/src-tauri/tauri.conf.json`（仅允许读取；若需要修改，必须先暂停并更新任务单）
 - `docs/17-release-and-update.md`
-- `docs/09-desktop-app-guide.md`（仅当需要补充图标验证说明）
-- `docs/module-context/sprint-04-task-09-tauri-brand-icon/context.md`
+- `docs/09-desktop-app-guide.md`（仅当需要补充窗口外观验证说明）
+- `docs/module-context/sprint-04-task-10-tauri-window-depth/context.md`
 - `PROGRESS.md`
 - `tasks/current-task.md`（完成后仅允许状态、分支、简短完成摘要、commit/PR 信息）
 
-如执行过程中确认必须修改上述范围外文件，必须先暂停并请求用户或 Codex 更新任务单。不得用“顺手修复”扩大范围。
+如执行过程中确认必须修改上述范围外文件，必须先暂停并请求用户或 Codex 更新任务单。
 
 ## Forbidden Files
 
 - `desktop-app/src-tauri/target/**`
 - `desktop-app/dist/**`
+- `desktop-app/src-tauri/capabilities/**`
+- `desktop-app/src-tauri/src/**`
+- `desktop-app/src-tauri/Cargo.toml`
+- `desktop-app/src-tauri/Cargo.lock`
+- `desktop-app/package.json`
+- `desktop-app/package-lock.json`
 - `desktop-app/src-tauri/gen/schemas/**`
-- `desktop-app/src/**`（除非用户另行确认应用内 UI 图标同步任务）
 - `desktop-app/local-service/**`
 - `cloud-backend/**`
 - `shared/**`
@@ -74,50 +80,48 @@ S04-T07 已恢复 Tauri 2 桌面工程源配置，S04-T08 已完成本地 EXE / 
 
 ## Dependency Permission
 
-默认不允许新增依赖。
+不允许新增依赖。
 
-允许使用本机已有工具、Tauri 现有官方依赖、Rust / Node 项目中已经安装的依赖生成或验证图标。若需要安装新的图标生成工具、字体、图片处理库、系统级工具或 npm / Python / Rust 依赖，必须暂停并请求用户确认。
+不得安装、下载或引入新的 npm、Rust、Python、系统级窗口工具、Tauri 插件或图片处理库。只能使用现有前端 CSS、Vue 组件和现有 Tauri 配置进行验证。
 
 ## Major Change Status
 
-`MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
+`NO_MAJOR_CHANGE_EXPECTED`
 
-原因：Tauri 图标会进入桌面打包产物，属于发布链路前置工作。本任务只授权图标资源替换和本地打包验证，不授权正式发布、签名、上传、updater、CI 或权限变更。
+原因：本任务预期只做桌面前端 CSS/视觉层级调整和文档记录，不修改 Tauri 权限、Rust 源码、依赖、后端、数据库、Provider、Auth、Credit、Payment、CI 或发布链路。
 
-仍需暂停确认的情况：
+必须暂停确认的情况：
 
-- 需要使用第三方受版权限制的图标、商标、字体或素材。
-- 需要新增依赖、安装系统级工具或下载外部资产。
-- 需要修改 CI / GitHub Actions / deployment。
-- 需要配置代码签名证书、publisher、timestamp server、签名私钥或正式发布身份。
-- 需要新增 updater、发布通道、下载地址或远程更新逻辑。
-- 需要扩大 Tauri capabilities 或新增 Tauri 插件。
-- 需要修改应用内 UI、后端、数据库、shared DTO、Provider、Auth、Credit 或 Payment。
-- 需要删除文件、重命名目录或大规模重构。
+- 需要修改 `tauri.conf.json` 的 `transparent`、`decorations`、窗口尺寸、权限或安全配置。
+- 需要新增 Tauri plugin、Rust crate、npm 依赖或系统级窗口阴影工具。
+- 需要修改 `desktop-app/src-tauri/src/**`、capabilities、Cargo 文件或 lockfile。
+- 需要接入 Windows DWM API、Mica、Acrylic、透明窗口或 native shadow 方案。
+- 需要大规模改动 Dashboard 结构、路由、页面组件或主题变量。
+- 需要修改后端、数据库、shared DTO、Provider、Auth、Credit 或 Payment。
+- 需要删除文件、重命名目录或清理用户数据。
 
 ## Security Requirements
 
 - 不写入真实 API Key、Token、密码、生产连接串、证书或签名私钥。
-- 不把 Provider API Key 放入客户端。
-- 不新增 updater endpoint 或远程下载执行逻辑。
+- 不新增 updater endpoint、远程下载执行逻辑或发布凭据。
 - 不扩大 Tauri capabilities。
+- 不新增本地文件系统、shell、http、clipboard、notification、global-shortcut 或 updater 权限。
+- 不修改客户端 token 存储策略、授权流程、Provider 调用或扣费逻辑。
 - 不提交构建产物、安装包、EXE、日志或本地缓存。
-- 不引入来源不明、授权不清的第三方图标、字体或图片素材。
-- 文档中只记录图标相对路径、格式、来源说明和验证结果，不复制二进制内容。
 
 ## Acceptance Criteria
 
-- [ ] `desktop-app/src-tauri/icons/` 不再使用 Tauri 默认占位图标。
-- [ ] 图标在小尺寸下仍可辨识，至少覆盖 Windows 打包所需的 `.ico` 和 Tauri 配置引用的 `.png`。
-- [ ] `desktop-app/src-tauri/tauri.conf.json` 的 `bundle.icon` 引用与实际图标文件一致。
-- [ ] `npm run build` 在 `desktop-app` 下通过。
-- [ ] `npm run tauri build` 在 `desktop-app` 下通过，或记录明确失败原因且失败与本任务无关。
-- [ ] 如打包成功，记录新图标对应的 EXE / MSI / NSIS 产物相对路径；不提交产物。
-- [ ] 文档已说明当前图标是内测图标，不代表最终品牌 VI。
-- [ ] 未新增依赖、未下载授权不明外部素材、未写入 secrets。
-- [ ] 未修改后端、数据库、shared DTO、Provider、Auth、Credit、Payment、CI 或 Tauri capabilities。
+- [ ] frameless 窗口在普通窗口尺寸下有清晰边界感，视觉上不再完全贴合桌面背景。
+- [ ] 最大化状态下不出现不合理的外边距、裁切、滚动条或内容错位。
+- [ ] 自定义标题栏拖拽区、最小化、最大化/还原、关闭按钮仍正常。
+- [ ] Dashboard、OCR、History、Membership、AI 文案生成等主要页面不出现明显布局回归。
+- [ ] 浏览器开发模式下布局仍正常，窗口控制按钮仍按现有逻辑隐藏。
+- [ ] 未新增依赖、未修改 Tauri capabilities、未修改 Rust 源码、未修改 `package*.json` 或 `Cargo*`。
+- [ ] 未修改后端、数据库、shared DTO、Provider、Auth、Credit、Payment 或 CI。
+- [ ] 文档已说明本任务是 CSS/视觉层级缓解，不是 Windows 原生阴影接入。
 - [ ] 模块上下文已更新。
 - [ ] `PROGRESS.md` 已追加记录。
+- [ ] `npm run build` 通过。
 - [ ] `git diff --check` 通过。
 
 ## Test Method
@@ -132,47 +136,42 @@ npm run build
 必须运行：
 
 ```powershell
-cd ad-assistant/desktop-app
-npm run tauri build
-```
-
-必须运行：
-
-```powershell
 git diff --check
 ```
 
-如 `npm run tauri build` 成功，必须记录：
+建议运行：
 
-- `desktop-app/src-tauri/target/release/ad-assistant-desktop.exe`
-- `desktop-app/src-tauri/target/release/bundle/msi/*.msi`
-- `desktop-app/src-tauri/target/release/bundle/nsis/*setup.exe`
+```powershell
+cd ad-assistant/desktop-app
+npm run tauri dev
+```
 
-建议人工验证：
+人工验证建议：
 
-- 启动生成的 EXE 或 installer 安装后的应用。
-- 确认 Windows 任务栏 / 窗口 / 安装包显示不再是 Tauri 默认图标。
-- 确认主窗口能打开，深色 frameless 标题栏和窗口控制按钮仍正常。
+- 普通窗口尺寸：观察窗口四边、顶部标题栏和桌面背景之间是否有清晰层次。
+- 最大化状态：确认没有多余外边距、内容裁切或滚动条异常。
+- 标题栏：确认拖拽、最小化、最大化/还原、关闭按钮可用。
+- 主要页面：快速切换 Dashboard、OCR、History、Membership、AI 文案生成，确认无明显布局回归。
+
+如 `npm run tauri dev` 因环境或人工 GUI 限制无法完成，执行者必须记录原因，并至少完成 `npm run build`、静态 diff 审查和文档说明。
 
 ## Rollback Plan
 
-- revert 本任务 commit 可恢复上一版图标和文档记录。
-- 如只需回退图标，恢复 `desktop-app/src-tauri/icons/` 中上一版 `icon.ico` 和 `icon.png`，并确认 `tauri.conf.json` 图标引用不变。
-- 本任务不涉及数据库迁移、远端发布或用户数据变更，无数据回滚步骤。
-- 本地生成的 `target/**`、`dist/**`、EXE、MSI 或 NSIS 产物不得提交；清理前必须确认路径位于 `desktop-app/` 构建输出目录内。
+- revert 本任务 commit 可恢复窗口外观和文档记录。
+- 如只需回退视觉优化，恢复 `desktop-app/src/App.vue` 与 `AppTopbar.vue` 中本任务新增的样式。
+- 本任务不涉及数据库迁移、远端发布、Tauri 权限、依赖或用户数据变更，无数据回滚步骤。
+- 本地生成的 `dist/**`、`target/**` 或 Tauri 开发产物不得提交。
 
 ## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- 图标设计/来源说明
-- 图标文件格式和相对路径
-- `tauri.conf.json` 图标引用是否变化
-- 生成产物路径和文件类型，或失败阻塞原因
-- 人工图标验证结果（如已执行）
-- 未实现内容
+- 窗口边界/阴影视觉方案说明
+- 是否修改 `tauri.conf.json`
+- 未实现内容，特别是是否仍未接入 Windows 原生阴影
 - 测试命令和结果
+- 人工验证结果（如已执行）
 - 自审结论
 - reviewer-mode 自查结论
 - 是否触发高风险暂停规则

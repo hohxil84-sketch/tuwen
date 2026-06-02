@@ -166,6 +166,10 @@ svg {
   height: 100vh;
   overflow: hidden;
   background: var(--bg-app);
+  /* S04-T10: CSS-only frameless window depth — inner border + soft vignette.
+     Does NOT replace native Windows window shadow; formal fix needs DWM/plugin. */
+  border: 1px solid rgba(148, 163, 184, 0.10);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.30);
 }
 
 .app-scale-stage {
