@@ -4,6 +4,38 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R05: Provider 健康检查与熔断器
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-05-provider-health-circuit`
+
+### 范围
+
+- 目标：在 Provider 不稳定时减少连续失败，提供熔断保护和健康状态可见性。
+- 已实现：
+  - `circuit_breaker.py`：CLOSED → OPEN → HALF_OPEN 三态熔断器（阈值 3 次，冷却 60s）
+  - 集成到 `route_and_execute_provider_call`：调用前检查 CB，成功/失败报告
+  - `GET /api/v1/admin/provider-health`：管理员查看所有 Provider 熔断状态
+  - 18 tests：状态机全生命周期 + 注册表 + admin 端点权限
+- 未实现：DB 持久化、动态参数调整、并发 HALF_OPEN 控制
+
+### 主要改动
+
+- 新增 2 文件：circuit_breaker.py、test_circuit_breaker.py
+- 修改 3 文件：provider_service.py（+CB 集成）、admin.py（+health endpoint）、schemas/admin.py（+2 schema）
+- 不影响 credit_service、models、desktop UI 或 credit 计费逻辑
+
+### 测试结果
+
+- `python -m pytest tests/test_circuit_breaker.py -v`：18 passed
+- `python -m pytest tests/ -v`：350 passed, 74 skipped
+
+### 风险
+
+- 熔断状态仅在内存，服务重启后重置
+- HALF_OPEN 无并发控制（MVP 可接受）
+
 ## 2026-06-02 — S05-R04: 月度积分发放调度器
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED

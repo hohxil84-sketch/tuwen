@@ -143,3 +143,22 @@ class MonthlyGrantResponse(BaseModel):
     skipped: int
     failed: int
     errors: list[dict]
+
+
+# ---------------------------------------------------------------------------
+# Provider health (S05-R05)
+# ---------------------------------------------------------------------------
+
+
+class ProviderHealthItem(BaseModel):
+    """Circuit breaker status for a single provider."""
+
+    state: str  # "CLOSED" | "OPEN" | "HALF_OPEN"
+    consecutive_failures: int
+    opened_at: float | None
+
+
+class ProviderHealthResponse(BaseModel):
+    """Health status for all registered providers."""
+
+    providers: dict[str, ProviderHealthItem]

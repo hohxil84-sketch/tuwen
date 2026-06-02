@@ -6,6 +6,7 @@ Sprint-02 Task-03: MockProvider 专用执行路径。
 Sprint-02 Task-09: 新增 ``route_and_execute_provider_call`` 路由层入口。
 Sprint-03 Task-03: 真实 credit 扣费（CNY→credits + deduct_credits）。
 Sprint-04 Task-01: 预扣检查 + 降级/重试。
+Sprint-05 Risk-05: 熔断器集成 + 健康检查。
 """
 
 import asyncio
@@ -19,6 +20,10 @@ from app.core.config import settings
 from app.providers.base import AsyncProvider, ProviderRequest, ProviderResult
 from app.providers.deepseek_provider import DeepSeekProviderError
 from app.providers.mock_provider import MockProviderError
+from app.providers.circuit_breaker import (
+    CircuitBreakerOpenError,
+    get_circuit_breaker_registry,
+)
 from app.providers.registry import get_provider_registry
 from app.providers.router import get_provider_router
 from app.services.cost_service import (
@@ -432,15 +437,17 @@ async def route_and_execute_provider_call(
 ) -> ProviderResult:
     """Route to the correct provider for *(feature, plan)*, then execute and log.
 
-    新增 Sprint-04 Task-01 降级链：
+    S04-T01 降级链 + S05-R05 熔断器：
     - 主 Provider 失败时，按 ``FALLBACK_RULES`` 尝试降级 Provider；
+    - 熔断器打开时跳过该 Provider（快速失败）；
     - ``InsufficientBalanceError`` 不触发降级（余额不足换 Provider 也无意义）；
-    - 所有 Provider 均失败时抛出最后一个错误。
+    - 所有 Provider 均失败或熔断时抛出最后一个错误。
 
     This is the recommended high-level entry point for endpoint handlers.
     """
     router = get_provider_router()
     registry = get_provider_registry()
+    cb_registry = get_circuit_breaker_registry()
     primary_name = router.resolve_name(feature, plan)
 
     # 构建降级链：[primary, fallback1]
@@ -453,9 +460,21 @@ async def route_and_execute_provider_call(
 
     for idx, name in enumerate(provider_names):
         is_fallback = idx > 0
+
+        # ── S05-R05: 熔断器检查 ──────────────────────────────────────
+        cb = cb_registry.get(name)
+        if not cb.before_call():
+            logger.warning(
+                "Circuit breaker OPEN for provider '%s' (feature='%s') — skipping",
+                name,
+                feature,
+            )
+            last_error = CircuitBreakerOpenError(name)
+            continue
+
         try:
             provider = registry.get(name)
-            return await execute_provider_call(
+            result = await execute_provider_call(
                 db=db,
                 provider=provider,
                 request=request,
@@ -463,11 +482,14 @@ async def route_and_execute_provider_call(
                 device_id=device_id,
                 request_id=request_id,
             )
+            cb.on_success()  # S05-R05: 成功 → 重置熔断器
+            return result
         except InsufficientBalanceError:
-            # 余额不足 — 不降级，直接上报
+            # 余额不足 — 不降级，不触发熔断（非 Provider 故障）
             raise
         except (MockProviderError, DeepSeekProviderError) as exc:
             last_error = exc
+            cb.on_failure()  # S05-R05: 失败 → 计数
             if is_fallback:
                 logger.warning(
                     "Fallback provider '%s' also failed for feature='%s': %s",
@@ -486,6 +508,7 @@ async def route_and_execute_provider_call(
             continue
         except Exception as exc:
             last_error = exc
+            cb.on_failure()  # S05-R05: 意外失败也计数
             logger.exception(
                 "Unexpected error from provider '%s' for feature='%s'",
                 name,
