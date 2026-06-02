@@ -4,6 +4,54 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S04-R01: Sprint-04 内测 E2E Smoke 与残余风险压实
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`risk/sprint-04-e2e-smoke`
+
+### 范围
+
+- 目标：通过一轮可复现的内测 E2E smoke 验证，压实 Sprint-04 残余风险，确认当前桌面应用链路可用性。
+- 已实现：
+  - `docs/28-sprint-04-e2e-smoke.md`：完整 E2E smoke runbook（自动化验证 + 代码静态验证 + 打包产物验证 + 8 条 GUI 链路手动复现步骤）
+  - `docs/sprint-04-summary.md`：残余风险跟踪版（12 项风险 E2E 压实状态）
+  - 后端全量回归：293 passed, 74 skipped
+  - 前端构建：74 modules, 0 errors
+  - Tauri build：EXE + MSI (2.8 MB) + NSIS (1.9 MB) 生成成功
+  - 残余风险压实：2 项已缓解（NSIS 网络 + Tauri 权限），1 项部分压实（GUI 缺口 → runbook）
+- 未实现：GUI 链路 8/8 NOT_RUN（无 GUI 环境），Tauri dev BLOCKED_BY_ENV（timeout），代码签名/NOT_RUN
+
+### 主要改动
+
+- `docs/28-sprint-04-e2e-smoke.md`（NEW）：E2E smoke runbook
+- `docs/sprint-04-summary.md`（NEW）：残余风险跟踪版
+- `PROGRESS.md`：本条记录
+- `tasks/current-task.md`：状态 → COMPLETED
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 未修改业务代码、测试代码、数据库、shared DTO、Tauri 权限、依赖或 CI：是
+
+### 测试结果
+
+- `pytest tests/ -v`：293 passed, 74 skipped
+- `npm run build`：74 modules, 0 errors
+- `npm run tauri build`：EXE + MSI + NSIS 生成成功
+- `git diff --check`：通过
+- Tauri dev：BLOCKED_BY_ENV（timeout 15s 不足）
+
+### 风险和后续
+
+- 残余风险：GUI 链路 8 条全 NOT_RUN（需用户在 Windows 桌面按 runbook 手动执行）；Tauri dev 首次编译慢但 release build 已验证
+- 新发现缺陷：0
+- 后续任务：用户从 Sprint-05 候选（内测分发准备/基础后台/商业链路加固/P1 功能探索）中选择
+- 回滚方式：revert 对应 commit
+
 ## 2026-06-02 — S04-T10: Tauri frameless 窗口边界与阴影最小优化
 
 ### 范围
