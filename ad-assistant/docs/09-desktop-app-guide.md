@@ -98,3 +98,17 @@ npm run dev       # Vite 开发服务器 → http://127.0.0.1:5173
 默认云端 API 地址为 `http://127.0.0.1:8000`，可通过 `VITE_CLOUD_API_BASE_URL` 覆盖。
 测试账号及种子数据脚本见运行手册。
 
+## 本地打包
+
+```bash
+cd desktop-app
+npm run tauri build    # Tauri 打包 → MSI + NSIS 安装包
+```
+
+产物路径：
+- 裸 EXE：`src-tauri/target/release/ad-assistant-desktop.exe`
+- MSI：`src-tauri/target/release/bundle/msi/AdAssistant_0.1.0_x64_en-US.msi`
+- NSIS：`src-tauri/target/release/bundle/nsis/AdAssistant_0.1.0_x64-setup.exe`
+
+注意：当前 `productName` 为 `"AdAssistant"`（ASCII），因 WiX v3 不支持中文产品名。详见 `docs/17-release-and-update.md` 和 `docs/module-context/sprint-04-task-08-tauri-package-smoke/context.md`。
+
