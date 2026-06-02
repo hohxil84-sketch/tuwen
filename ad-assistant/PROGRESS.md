@@ -4,6 +4,37 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R08: Windows 原生窗口阴影专项
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-08-native-window-shadow`
+
+### 范围
+
+- 目标：为 Tauri 2 frameless 窗口接入 Windows 原生 DWM 窗口阴影，提升桌面层次。
+- 已实现：
+  - 新增 `window-shadows-v2` v0.1.1 依赖（专为 Tauri 2 设计，跨平台自动 fallback）
+  - `lib.rs` setup hook 中调用 `window_shadows_v2::set_shadows(app, true)`
+  - Windows: `DwmExtendFrameIntoClientArea` + 暗色模式适配
+  - macOS: `NSWindow.hasShadow`
+  - Linux: 自动无操作
+- 未实现：不修改业务页面、不扩大 Tauri 权限、不接入 Mica/Acrylic
+
+### 主要改动
+
+- 修改 2 文件：Cargo.toml（1 新依赖）+ lib.rs（1 行调用）
+- 自动更新 Cargo.lock（新增 2 packages）
+- 修改 3 文档：release-and-update.md + 模块上下文 + PROGRESS.md
+- S04-T10 CSS 内描边方案保留
+
+### 测试
+
+- `cargo check`：通过
+- `cargo build --release`：通过
+- `git diff --check`：通过
+- GUI 验证：需用户执行 `npm run tauri dev` 确认阴影效果
+
 ## 2026-06-02 — S05-R07: 代码签名准备与签名集成方案
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
