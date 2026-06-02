@@ -62,7 +62,11 @@
         </div>
       </div>
 
-      <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
+      <div v-if="errorMsg" class="error-msg">
+        <span>{{ errorMsg }}</span>
+        <button v-if="insufficientBalance" class="recharge-btn" @click="goMembership">去充值 →</button>
+        <span v-if="errorRequestId" class="error-request-id">request_id: {{ errorRequestId }}</span>
+      </div>
 
       <button type="submit" class="btn-generate" :disabled="submitting || !formValid">
         {{ submitting ? "生成中..." : "✨ 生成文案" }}
@@ -104,6 +108,8 @@ const form = ref<MockAdCopyRequest>({
 const sellingPointsText = ref("");
 const submitting = ref(false);
 const errorMsg = ref<string | null>(null);
+const insufficientBalance = ref(false);
+const errorRequestId = ref<string | null>(null);
 const result = ref<MockAdCopyResponse | null>(null);
 
 const formValid = computed(() => {
@@ -118,8 +124,14 @@ function goLogin(): void {
   router.push("/login");
 }
 
+function goMembership(): void {
+  router.push("/membership");
+}
+
 async function handleSubmit(): Promise<void> {
   errorMsg.value = null;
+  insufficientBalance.value = false;
+  errorRequestId.value = null;
   result.value = null;
 
   // Parse selling points from comma-separated text
@@ -141,6 +153,10 @@ async function handleSubmit(): Promise<void> {
   } catch (err: unknown) {
     const apiErr = err as CloudAPIErrorDetail;
     errorMsg.value = sanitizeApiError(apiErr);
+    if (apiErr.code === "INSUFFICIENT_BALANCE") {
+      insufficientBalance.value = true;
+      errorRequestId.value = apiErr.request_id || null;
+    }
   } finally {
     submitting.value = false;
   }
@@ -264,12 +280,39 @@ async function handleSubmit(): Promise<void> {
 }
 
 .error-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 14px;
   background: rgba(224, 79, 95, 0.1);
   border: 1px solid rgba(224, 79, 95, 0.2);
   border-radius: 6px;
   color: #e04f5f;
   font-size: 13px;
+}
+
+.recharge-btn {
+  align-self: flex-start;
+  padding: 6px 16px;
+  background: rgba(47, 111, 237, 0.15);
+  border: 1px solid rgba(47, 111, 237, 0.3);
+  border-radius: 5px;
+  color: var(--blue);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.recharge-btn:hover {
+  background: rgba(47, 111, 237, 0.25);
+}
+
+.error-request-id {
+  color: var(--text-muted);
+  font-family: "Consolas", "Menlo", monospace;
+  font-size: 11px;
+  word-break: break-all;
 }
 
 .btn-generate {

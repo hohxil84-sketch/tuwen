@@ -4,6 +4,50 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R01: 余额不足 402 桌面端充值引导
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-01-insufficient-balance-ux`
+
+### 范围
+
+- 目标：当用户因余额不足（402 / INSUFFICIENT_BALANCE）无法生成 AI 文案时，桌面端展示明确中文提示、"去充值"按钮和 request_id。
+- 已实现：
+  - `cloudApi.ts`: `CloudAPIErrorDetail` 新增 `request_id?`；`request()` 抛错时附加 request_id；`sanitizeApiError` codeMap 新增 INSUFFICIENT_BALANCE
+  - `AdCopyPage.vue`: 检测 INSUFFICIENT_BALANCE → 展示错误消息 + "去充值 →"按钮 + request_id；点击按钮跳转 `/membership`
+  - 非 402 错误保持原有纯文本展示逻辑
+  - 模块上下文 + desktop-app-guide 更新
+- 未实现：OcrPage 未同步（范围仅限 AdCopyPage）；手动 GUI 验证未执行（需后端 + 低余额用户）
+
+### 主要改动
+
+- `desktop-app/src/services/cloudApi.ts`：+4 行（CloudAPIErrorDetail 字段 + request() 传播 + codeMap）
+- `desktop-app/src/pages/AdCopyPage.vue`：+~30 行（状态 + catch 分支 + 模板 + CSS）
+- `docs/module-context/sprint-05-risk-01-insufficient-balance-ux/context.md`（NEW）
+- `docs/09-desktop-app-guide.md`：补充 402 UX 说明
+- `PROGRESS.md`：本条记录
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 未新增依赖：是
+- 未修改后端、shared、数据库、Tauri 权限、CI：是
+
+### 测试结果
+
+- `npm run build`（desktop-app）：74 modules, 0 errors（含 vue-tsc 类型检查）
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：402 差异化 UX 需后端 + 低余额用户手动验证；OcrPage 未同步添加充值引导
+- 后续任务：S05-R02（基础后台最小可用管理台）
+- 回滚方式：revert 对应 commit
+
 ## 2026-06-02 — S04-R01: Sprint-04 内测 E2E Smoke 与残余风险压实
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
