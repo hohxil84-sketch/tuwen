@@ -4,6 +4,37 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R06: 模拟充值风控与订单状态加固
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-06-recharge-risk-control`
+
+### 范围
+
+- 目标：在不接入真实支付的前提下，提升模拟充值的安全边界。
+- 已实现：
+  - 订单状态机：PENDING → COMPLETED | FAILED，状态常量 + 转移守卫
+  - 幂等键：`idempotency_key` 列 + `_resolve_idempotency()`（已完成重放、pending 409）
+  - 金额校验：`MIN/MAX_RECHARGE_AMOUNT_CNY` 配置化
+  - 频率限制：滑动窗口（默认 10 次/3600s），按用户隔离
+  - 新增 5 异常类：`RechargeRiskError` → `DuplicateOrderError` / `RateLimitExceededError` / `InvalidRechargeAmountError` / `InvalidStatusTransitionError`
+  - `RechargeOrder` 模型新增 `idempotency_key` + `failed_at` 列
+  - Migration SQL（含 partial unique index）+ rollback SQL
+- 未实现：取消订单 API、退款、IP 级别风控、真实支付对接
+
+### 主要改动
+
+- 修改 7 文件：model、service、API、schema、config、tests、PROGRESS.md
+- 新增 3 文件：migration SQL（2）+ 模块上下文（1）
+- 不影响 credit_service.py、desktop UI、Provider 路由
+
+### 测试结果
+
+- `tests/test_recharge.py`: 54 passed（+30 new）
+- `tests/` 全量: 380 passed, 74 skipped
+- `git diff --check` 通过
+
 ## 2026-06-02 — S05-R05: Provider 健康检查与熔断器
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
