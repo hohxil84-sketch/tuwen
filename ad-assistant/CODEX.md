@@ -75,7 +75,8 @@ Codex 起草或更新 `tasks/current-task.md` 时，必须把用户目标写成 
 - 明确是否涉及重大变更：是 / 否。
 - 触碰数据库 schema/DDL/migration、API/OpenAPI/shared DTO、Auth/Token、Provider、credit/payment、Tauri 权限、依赖、CI、删除/清空用户数据时，必须写为高风险并要求用户确认。
 - 本地启动服务和测试时，优先使用本机已安装应用，例如 PostgreSQL、Redis、缓存、OCR 服务等。
-- 本机没有对应应用时，先安装本地应用。
+- 本机没有对应应用时，先安装本地应用；凡是需要安装到本机的依赖、SDK、CLI、运行时、模型、缓存、构建工具或其他外部工具，任务单必须要求优先安装或配置到 `D:` 盘。
+- 任务单涉及安装、依赖下载或大缓存时，必须写明安装位置、缓存位置、是否会触碰 `C:` 盘；如果工具强制写入 `C:` 盘，必须要求 CC 先暂停并等待用户确认。
 - 不得默认使用 Docker，除非 CI service container 或用户明确批准 Docker fallback。
 - 新增或修改代码注释时，要求 CC 使用中文注释；第三方协议、外部 API 固定术语、错误码和英文专有名词除外。
 
@@ -142,6 +143,7 @@ Codex 起草或更新 `tasks/current-task.md` 时，必须把用户目标写成 
 | Credit / Payment | 扣费逻辑、额度计算、定价、账本 |
 | Tauri 权限 | 文件系统、网络、sidecar 声明 |
 | 依赖变更 | `pyproject.toml`、`package.json`、lockfiles |
+| 本地安装位置 | 新增依赖、SDK、CLI、运行时、模型、缓存或构建工具默认必须安装/配置到 `D:` 盘；强制写入 `C:` 盘需用户确认 |
 | 本地 Python 服务启动方式 | sidecar 配置、CLI 调用路径、进程管理 |
 | CI / 部署 | workflow、Dockerfile、环境变量约定 |
 | 文件/目录破坏性变更 | 删除文件、重命名目录、大规模重构 |
