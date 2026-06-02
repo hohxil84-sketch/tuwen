@@ -208,18 +208,89 @@ def verify_feature(user: User, feature: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Admin auth (Sprint-04 Task-04)
+# RBAC — Role-Based Access Control (S05-R03)
 # ---------------------------------------------------------------------------
+
+# Role → permission mapping.  Unknown roles default to empty set (deny all).
+ROLE_PERMISSIONS: dict[str, set[str]] = {
+    "admin": {
+        "users:read",
+        "orders:read",
+        "credits:grant",
+        "provider_logs:read",
+        "usage_events:read",
+    },
+    "operator": {
+        "users:read",
+        "orders:read",
+        "provider_logs:read",
+        "usage_events:read",
+    },
+    # "user" has no admin permissions — default deny
+}
+
+
+class PermissionChecker:
+    """FastAPI dependency — require a specific admin permission.
+
+    Checks the authenticated user's ``role`` against ``ROLE_PERMISSIONS``.
+    Falls back to ``ADMIN_USER_IDS`` for bootstrap when no role grants the
+    permission yet (allows seeding the first admin without direct DB access).
+
+    Usage::
+
+        @router.get("/users")
+        async def admin_list_users(
+            admin: Annotated[User, Depends(PermissionChecker("users:read"))],
+            ...
+        ):
+    """
+
+    def __init__(self, permission: str) -> None:
+        self.permission = permission
+
+    async def __call__(
+        self,
+        user: Annotated[User, Depends(get_current_user)],
+    ) -> User:
+        # 1) Role-based check (primary)
+        allowed = ROLE_PERMISSIONS.get(user.role, set())
+        if self.permission in allowed:
+            return user
+
+        # 2) Bootstrap fallback — ADMIN_USER_IDS whitelist
+        admin_ids: set[str] = set(settings.ADMIN_USER_IDS)
+        if str(user.id) in admin_ids:
+            return user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FORBIDDEN",
+                "message": "Admin access required",
+            },
+        )
 
 
 async def get_admin_user(
     user: Annotated[User, Depends(get_current_user)],
 ) -> User:
-    """Admin-only dependency — checks user ID against ADMIN_USER_IDS config.
+    """Admin-only dependency — checks user role **or** ADMIN_USER_IDS fallback.
 
-    Raises 403 if the user is not in the admin whitelist.
+    .. deprecated::
+        Prefer ``PermissionChecker("...")`` for new endpoints.  This generic
+        check is kept for backward compatibility only.
     """
+    # Role-based check (primary)
+    allowed = ROLE_PERMISSIONS.get(user.role, set())
+    if allowed:  # any admin permission qualifies as "admin"
+        return user
+
+    # Bootstrap fallback
     admin_ids: set[str] = set(settings.ADMIN_USER_IDS)
+    if str(user.id) in admin_ids:
+        return user
+
     if not admin_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -228,12 +299,10 @@ async def get_admin_user(
                 "message": "Admin access is not configured",
             },
         )
-    if str(user.id) not in admin_ids:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "code": "FORBIDDEN",
-                "message": "Admin access required",
-            },
-        )
-    return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "code": "FORBIDDEN",
+            "message": "Admin access required",
+        },
+    )

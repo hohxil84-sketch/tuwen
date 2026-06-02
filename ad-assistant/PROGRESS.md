@@ -4,6 +4,45 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R03: RBAC 角色权限最小体系
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-03-rbac`
+
+### 范围
+
+- 目标：将管理员权限模型从硬编码 `ADMIN_USER_IDS` 白名单迁移到角色-权限映射（RBAC）。
+- 已实现：
+  - User 模型新增 `role` 列（VARCHAR(20)，默认 `"user"`）
+  - `ROLE_PERMISSIONS` 映射 + `PermissionChecker` 依赖类（在 deps.py）
+  - 6 个 admin 端点全部替换为细粒度权限：`users:read` / `orders:read` / `credits:grant` / `provider_logs:read` / `usage_events:read`
+  - 角色：admin（全部）、operator（只读，不可授权）、user（无权限）
+  - `ADMIN_USER_IDS` 保留为 bootstrap 回退
+  - `AdminUserItem` schema 新增 `role` 字段
+  - 迁移 SQL（001_add_user_role.sql）+ 回滚 SQL（001_rollback.sql）
+  - 23 个 admin 测试：admin role / operator role / forbidden / bootstrap fallback
+- 未实现：角色编辑 UI、角色变更审计日志、多租户、用户组层级继承
+
+### 主要改动
+
+- 后端修改 3 文件：models/user.py（+role）、api/deps.py（+PermissionChecker + ROLE_PERMISSIONS）、api/v1/admin.py（替换 6 处 Depends）
+- schemas 修改 1 文件：admin.py（AdminUserItem + role）
+- tests 重写 1 文件：test_admin.py（12 → 23 tests）
+- 新增 3 文件：migrations/001_add_user_role.sql、migrations/001_rollback.sql、模块上下文
+- 文档更新：docs/08-security-and-anti-crack.md（+RBAC 章节）
+
+### 测试结果
+
+- `python -m pytest tests/ -v`：316 passed, 74 skipped
+- `tests/test_admin.py`：23 passed（含 operator 权限隔离 + bootstrap fallback）
+
+### 风险
+
+- `users.role` 是单值字符串，不支持多角色（当前不需要）
+- 角色变更无审计日志（后续可通过 risk_log 补齐）
+- 桌面端 AdminPage 不感知角色（403 时显示无权限，与 S05-R02 一致）
+
 ## 2026-06-02 — S05-R02: 基础后台最小可用管理台
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED

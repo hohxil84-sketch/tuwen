@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_admin_user
+from app.api.deps import PermissionChecker
 from app.database import get_db
 from app.models.user import User
 from app.schemas.admin import (
@@ -73,13 +73,14 @@ def _build_paginated(
     status_code=status.HTTP_200_OK,
 )
 async def admin_grant_credits(
-    admin: Annotated[User, Depends(get_admin_user)],
+    admin: Annotated[User, Depends(PermissionChecker("credits:grant"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     body: AdminGrantRequest,
 ):
     """Admin grants credits to a specified user.
 
-    Requires admin authentication (user ID in ADMIN_USER_IDS config).
+    Requires ``credits:grant`` permission (admin role, or operator with
+    explicit grant — currently admin-only).
     """
     # Validate target user_id format
     try:
@@ -143,12 +144,12 @@ async def admin_grant_credits(
 
 @router.get("/users")
 async def admin_list_users(
-    admin: Annotated[User, Depends(get_admin_user)],
+    admin: Annotated[User, Depends(PermissionChecker("users:read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ):
-    """List all users (admin only).  Never returns password_hash."""
+    """List all users (requires ``users:read`` permission). Never returns password_hash."""
     items, total = await admin_service.list_users(db, limit=limit, offset=offset)
     data = _build_paginated(items, total, limit, offset, AdminUserItem)
     return success_response(data=data.model_dump())
@@ -161,12 +162,12 @@ async def admin_list_users(
 
 @router.get("/orders")
 async def admin_list_orders(
-    admin: Annotated[User, Depends(get_admin_user)],
+    admin: Annotated[User, Depends(PermissionChecker("orders:read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ):
-    """List all recharge orders (admin only)."""
+    """List all recharge orders (requires ``orders:read`` permission)."""
     items, total = await admin_service.list_orders(db, limit=limit, offset=offset)
     data = _build_paginated(items, total, limit, offset, AdminOrderItem)
     return success_response(data=data.model_dump())
@@ -179,12 +180,12 @@ async def admin_list_orders(
 
 @router.get("/credit-accounts")
 async def admin_list_credit_accounts(
-    admin: Annotated[User, Depends(get_admin_user)],
+    admin: Annotated[User, Depends(PermissionChecker("users:read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ):
-    """List all credit accounts (admin only)."""
+    """List all credit accounts (requires ``users:read`` permission)."""
     items, total = await admin_service.list_credit_accounts(
         db, limit=limit, offset=offset
     )
@@ -199,12 +200,12 @@ async def admin_list_credit_accounts(
 
 @router.get("/provider-logs")
 async def admin_list_provider_logs(
-    admin: Annotated[User, Depends(get_admin_user)],
+    admin: Annotated[User, Depends(PermissionChecker("provider_logs:read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ):
-    """List all provider call logs (admin only).  Never returns raw payload."""
+    """List all provider call logs (requires ``provider_logs:read`` permission). Never returns raw payload."""
     items, total = await admin_service.list_provider_logs(
         db, limit=limit, offset=offset
     )
@@ -219,12 +220,12 @@ async def admin_list_provider_logs(
 
 @router.get("/usage-events")
 async def admin_list_usage_events(
-    admin: Annotated[User, Depends(get_admin_user)],
+    admin: Annotated[User, Depends(PermissionChecker("usage_events:read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ):
-    """List all usage events (admin only).  Never returns metadata_json."""
+    """List all usage events (requires ``usage_events:read`` permission). Never returns metadata_json."""
     items, total = await admin_service.list_usage_events(
         db, limit=limit, offset=offset
     )
