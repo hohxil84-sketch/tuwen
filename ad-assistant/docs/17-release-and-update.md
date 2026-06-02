@@ -41,7 +41,7 @@ npm run tauri build
 
 - **productName 仅支持 ASCII**：当前 `tauri.conf.json` 的 `productName` 为 `"AdAssistant"`（ASCII）。WiX v3（MSI 打包工具）不兼容中文产品名称（codepage 1252 限制）。如需中文产品名出现在 Windows 安装程序中，需升级到 WiX v4（支持 UTF-8）或仅使用 NSIS 安装包。
 - **内测图标已替换**：S04-T09 已将 Tauri 默认占位图标替换为内测品牌图标（暗色背景 + 几何 "A" 字标识）。正式品牌图标仍待确认。
-- **frameless 窗口无原生阴影**：已知 S04-T07 残余风险，打包后窗口仍无系统级阴影和菜单。
+- **frameless 窗口无原生阴影**：已知 S04-T07 残余风险，打包后窗口仍无系统级阴影和菜单。S04-T10 已通过 CSS 内描边 + 内阴影提供最小视觉边界（不等同于 Windows 原生窗口阴影，正式方案需 DWM API 或 Tauri 插件）。
 - **不包含自动更新**：当前 bundle 未配置 updater endpoint 和签名私钥。
 - **未经代码签名**：打包产物未签名，Windows SmartScreen 可能弹出警告。
 
