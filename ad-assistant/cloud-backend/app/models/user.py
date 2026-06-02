@@ -20,6 +20,7 @@ class User(Base):
     account: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     plan_code: Mapped[str] = mapped_column(String(50), default="standard", server_default="'standard'")
+    role: Mapped[str] = mapped_column(String(20), default="user", server_default="'user'")
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="'active'")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

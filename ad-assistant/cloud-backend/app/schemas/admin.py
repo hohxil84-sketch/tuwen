@@ -54,6 +54,7 @@ class AdminUserItem(BaseModel):
     id: str
     account: str
     plan_code: str
+    role: str
     status: str
     created_at: datetime | None
 

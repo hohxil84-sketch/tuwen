@@ -1,4 +1,4 @@
-# S05-R02: 基础后台最小可用管理台
+# S05-R03: RBAC 角色权限最小体系
 
 ## 状态
 
@@ -6,175 +6,156 @@
 
 ## 分支
 
-`feature/sprint-05-risk-02-basic-admin`
+`feature/sprint-05-risk-03-rbac`
 
 ## 完成摘要
 
-- 后端新增 5 个只读 GET endpoint：`/api/v1/admin/users|orders|credit-accounts|provider-logs|usage-events`
-- 复用 `get_admin_user` 依赖，非管理员 403；敏感字段排除（password_hash/raw_usage/raw_response/metadata_json）
-- `admin_service.py`（NEW）：5 个查询方法 + _paginate helper
-- `test_admin.py`（NEW）：12 tests（权限隔离 5 + admin 访问 5 + 分页 2）
-- AdminPage.vue（NEW）：5 tab 页签 + 表格 + 分页 + 4 状态处理
-- Sidebar 新增"管理后台"入口（始终可见，权限服务端判断）
-- 后端回归：305 passed, 74 skipped；前端构建：77 modules, 0 errors
-- 未修改 DDL、models、Provider、Credit、Payment、config、CI、依赖
+- User 模型新增 `role` 列（VARCHAR(20)，默认 `"user"`）
+- 新增 `ROLE_PERMISSIONS` 角色权限映射 + `PermissionChecker` 依赖类（`deps.py`）
+- 6 个 admin 端点全部从 `Depends(get_admin_user)` 替换为 `Depends(PermissionChecker("..."))` 细粒度权限
+- 角色体系：admin（全部 5 权限）、operator（4 读权限，不可授权积分）、user（无权限）
+- `ADMIN_USER_IDS` 保留为 bootstrap 回退机制
+- `AdminUserItem` schema 新增 `role` 字段
+- 迁移 SQL（001_add_user_role.sql）+ 回滚 SQL（001_rollback.sql）
+- test_admin.py 从 12 扩展到 23 tests：admin role / operator role / forbidden / bootstrap fallback
+- 全量测试：316 passed, 74 skipped
+- 未修改桌面端、services、config、第三方依赖
 
 ## 背景
 
-P0 MVP 包含"基础后台"。当前已有：
-- `ADMIN_USER_IDS` 白名单配置
-- `get_admin_user()` 依赖注入（检查 user_id ∈ ADMIN_USER_IDS，否则 403）
-- `POST /api/v1/admin/credits/grant`（积分赠送，已有）
+当前管理员能力依赖 `ADMIN_USER_IDS` 硬编码白名单（[config.py](ad-assistant/cloud-backend/app/core/config.py) `ADMIN_USER_IDS: list[str] = []`），[deps.py](ad-assistant/cloud-backend/app/api/deps.py) 的 `get_admin_user` 只检查 `str(user.id) in settings.ADMIN_USER_IDS`。该方式可用于 MVP 早期，但无法表达角色、权限层级、审计或后续后台管理扩展。
 
-但缺少可用的管理界面。用户、订单、积分账户、Provider 调用日志、使用事件仍只能靠数据库或 API 直接排查。S05-R02 补齐最小只读管理台。
+User 模型当前字段：`id`, `account`, `password_hash`, `plan_code`, `status`, `created_at`, `updated_at` — 无角色字段。
 
 ## 用户目标
 
-管理员登录桌面端后，可进入管理后台，查看用户、充值订单、积分账户、Provider 调用日志和使用事件的只读列表。
+建立最小 RBAC，使后台和管理员能力从硬编码白名单过渡到可审计、可扩展的角色权限模型。
 
 ## What To Build
 
-### 后端 — 5 个只读 Admin Query Endpoint
+### 1. User 模型 — 新增 role 列
 
-所有端点统一前缀 `/api/v1/admin`，复用 `get_admin_user` 依赖，非管理员返回 403。
+- `User` 表新增 `role` 列：`Mapped[str]`, default `"user"`, server_default `"'user'"`, `String(20)`
+- 合法角色值：`"admin"`, `"operator"`, `"user"`
+- 向后兼容：现有用户 role 默认为 `"user"`，首次启动后可通过 SQL 手动提升角色
 
-| # | 端点 | 说明 | 数据来源 |
-|---|------|------|---------|
-| 1 | `GET /api/v1/admin/users` | 用户列表（id, account, plan_code, created_at），支持 limit/offset | users 表 |
-| 2 | `GET /api/v1/admin/orders` | 充值订单列表（id, user_id, plan_code, amount_cny, credits, status, created_at），支持 limit/offset | recharge_orders 表 |
-| 3 | `GET /api/v1/admin/credit-accounts` | 积分账户列表（user_id, balance, plan_code, created_at），支持 limit/offset | credit_accounts 表 |
-| 4 | `GET /api/v1/admin/provider-logs` | Provider 调用日志（id, user_id, feature, provider, model, status, credits_charged, created_at），支持 limit/offset | provider_call_log 表 |
-| 5 | `GET /api/v1/admin/usage-events` | 使用事件列表（id, user_id, feature, created_at），支持 limit/offset | usage_events 表 |
+### 2. 权限定义与 PermissionChecker
 
-响应格式：统一 `{success, data: {items: [...], total, limit, offset}, error, request_id}`。
+新增 `PermissionChecker` 类（在 `deps.py` 中）：
 
-### 后端 — Schema + Service + Router
+```python
+ROLE_PERMISSIONS: dict[str, set[str]] = {
+    "admin": {"users:read", "orders:read", "credits:grant", "provider_logs:read", "usage_events:read"},
+    "operator": {"users:read", "orders:read", "provider_logs:read", "usage_events:read"},
+    # "user" has no admin permissions (default deny)
+}
 
-- `app/schemas/admin.py`：新增 5 个响应 schema + 通用分页 schema
-- `app/services/admin_service.py`（NEW）：5 个只读查询方法
-- `app/api/v1/admin.py`：新增 5 个 GET endpoint
-- 不新增 SQLAlchemy model，不修改 DDL
+class PermissionChecker:
+    def __init__(self, permission: str):
+        self.permission = permission
 
-### 桌面端 — AdminPage
+    async def __call__(self, user: Annotated[User, Depends(get_current_user)]) -> User:
+        ...
+```
 
-- `desktop-app/src/pages/AdminPage.vue`（NEW）：
-  - 5 个 tab 页签：用户 / 订单 / 积分账户 / Provider 日志 / 使用事件
-  - 每个 tab 内：表格展示（关键列）+ 加载状态 + 错误提示 + 空状态
-  - 通用分页：上一页/下一页 + 当前页信息
-- `desktop-app/src/services/cloudApi.ts`：新增 5 个 admin API 函数 + DTO 类型
-- `desktop-app/src/router.ts`：新增 `/admin` 路由
-- `desktop-app/src/components/dashboard/AppSidebar.vue`：新增"管理后台"导航项（仅管理员可见）
-- `desktop-app/src/stores/authStore.ts`：新增 `isAdmin` computed + admin API 调用方法
+- 检查 `user.role` → `ROLE_PERMISSIONS` 映射
+- 向后兼容：如果 role 无权限但 `str(user.id) in settings.ADMIN_USER_IDS`，仍允许（bootstrap 回退）
+- 未定义权限 → 默认拒绝
+- `get_admin_user` 保留内部实现，改为调用 `PermissionChecker("admin")` 等效逻辑
 
-### 管理员可见性
+### 3. 迁移 admin 端点权限
 
-- `authStore` 新增 `isAdmin` computed：检查当前用户 `user.id` 是否在后端返回的管理员列表中
-- 由于前端不知道 ADMIN_USER_IDS 配置，采用"调用 admin API 试探"方式：首次进入 admin 页面或 sidebar 渲染时尝试调用 admin users 端点，若返回 200 则可见，若返回 403 则隐藏
-- 或更简单：在 sidebar 始终显示管理后台入口，点击进入后若 403 则显示"无权限"
+将 [admin.py](ad-assistant/cloud-backend/app/api/v1/admin.py) 中所有 `Depends(get_admin_user)` 替换为细粒度权限：
 
-**决策**: 采用简易方案 — sidebar 始终显示"管理后台"（方便后续 RBAC 迁移），admin API 403 时页面显示"无管理权限"而非白屏。这样不依赖前端预知管理员身份。
+| 端点 | 新权限 |
+|------|--------|
+| `GET /users` | `users:read` |
+| `GET /orders` | `orders:read` |
+| `GET /credit-accounts` | `users:read` |
+| `GET /provider-logs` | `provider_logs:read` |
+| `GET /usage-events` | `usage_events:read` |
+| `POST /credits/grant` | `credits:grant` |
 
-### 文档
+### 4. AdminUserItem schema
 
-- `docs/module-context/sprint-05-risk-02-basic-admin/context.md`（NEW）：记录端点列表、权限模型、UI 结构、限制和扩展点
-- 不需要更新 `docs/09-desktop-app-guide.md`（admin 不在桌面端面向普通用户的功能范围内）
+- `AdminUserItem` 新增 `role: str` 字段，管理员可查看用户角色
 
-### 进度记录
+### 5. 数据库迁移
+
+- 新建 `cloud-backend/migrations/001_add_user_role.sql`：`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';`
+- 新建 `cloud-backend/migrations/001_rollback.sql`：`ALTER TABLE users DROP COLUMN IF EXISTS role;`
+
+### 6. 测试
+
+- 更新现有 `test_admin.py`：用 `user.role = "admin"` 替代 `ADMIN_USER_IDS` monkeypatch
+- 新增参数化测试：
+  - `operator` 可访问 4 个读端点但 POST `/credits/grant` 返回 403
+  - `user` 角色所有 6 个端点返回 403
+  - bootstrap 回退：`ADMIN_USER_IDS` 中包含 user_id 但 role 为 `"user"` 仍可访问
+  - 未知权限代码默认拒绝
+
+### 7. 文档
+
+- 更新 `docs/08-security-and-anti-crack.md`：补充 RBAC 角色权限说明
+- 新建 `docs/module-context/sprint-05-risk-03-rbac/context.md`
+
+### 8. 进度记录
 
 - 追加更新 `PROGRESS.md`
-- 更新 `tasks/current-task.md` 完成后状态
 
 ## What Not To Build
 
-- 不做 RBAC 角色体系（那是 S05-R03）
-- 不做增删改操作（只读列表），不修改用户、不封禁设备、不退款
-- 不做复杂筛选、搜索、排序（只做分页）
-- 不做数据导出（CSV/Excel）
-- 不做统计图表或 dashboard 摘要
-- 不新增数据库表或修改 DDL
-- 不修改 Provider 路由、真实 AI 调用、扣费逻辑或套餐规则
-- 不接入真实支付或修改充值逻辑
-- 不做 official-website 后台
+- 不做完整企业级组织架构（用户组、层级继承）
+- 不做多租户
+- 不做后台角色编辑 UI（管理端界面另起任务）
+- 不改真实支付或 Provider 路由
+- 不在桌面端做角色显示/编辑
+- 不新增 SQLAlchemy 关联表（roles / user_roles / role_permissions 表）
+- 不新增 FastAPI 依赖或第三方库
 
 ## Allowed Files
 
-### 后端
-
+- `cloud-backend/app/models/user.py`
+- `cloud-backend/app/api/deps.py`
 - `cloud-backend/app/api/v1/admin.py`
 - `cloud-backend/app/schemas/admin.py`
-- `cloud-backend/app/services/admin_service.py`（NEW）
-- `cloud-backend/app/main.py`（仅当需要新增 router 注册，已有 admin router）
-- `cloud-backend/tests/test_admin.py`（NEW 或扩展现有 admin 测试）
-
-### 桌面端
-
-- `desktop-app/src/pages/AdminPage.vue`（NEW）
-- `desktop-app/src/services/cloudApi.ts`
-- `desktop-app/src/router.ts`
-- `desktop-app/src/components/dashboard/AppSidebar.vue`
-- `desktop-app/src/stores/authStore.ts`
-
-### 文档
-
-- `docs/module-context/sprint-05-risk-02-basic-admin/context.md`
+- `cloud-backend/app/core/config.py`（如需补充注释）
+- `cloud-backend/tests/test_admin.py`
+- `cloud-backend/migrations/001_add_user_role.sql`（NEW）
+- `cloud-backend/migrations/001_rollback.sql`（NEW）
+- `docs/08-security-and-anti-crack.md`
+- `docs/module-context/sprint-05-risk-03-rbac/context.md`（NEW）
 - `PROGRESS.md`
 - `tasks/current-task.md`
 
 ## Forbidden Files
 
-- 数据库 DDL / migrations
-- `cloud-backend/app/models/**`
-- `cloud-backend/app/providers/**`
-- `cloud-backend/app/services/provider_service.py`
-- `cloud-backend/app/services/credit_service.py`
-- `cloud-backend/app/services/recharge_service.py`
-- `cloud-backend/app/core/config.py`
-- `desktop-app/src-tauri/**`
-- `desktop-app/package.json` / `package-lock.json`
-- `shared/**`
+- `desktop-app/**`（桌面端本次不涉及）
 - `official-website/**`
+- `shared/**`
+- `cloud-backend/app/services/**`（服务层不变）
+- `cloud-backend/app/models/` 除 `user.py` 外的所有 model
+- `cloud-backend/app/providers/**`
 - `.github/**`
-- 任何真实密钥、证书、签名私钥、生产连接串
-
-## Dependency Permission
-
-不允许新增依赖。
-
-## Major Change Status
-
-`MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
-
-原因：涉及 admin API 新增、后台权限边界和桌面端新页面。
-
-必须暂停确认的情况：
-- 需要新增或修改数据库 DDL / migrations
-- 需要修改 Provider、Credit、Payment、Billing 模型或服务
-- 需要在 allowed files 之外修改文件
-- 需要新增依赖
-- 发现 admin 查询可能泄露敏感数据（raw provider payload、用户密码 hash 等）
-
-## Security Requirements
-
-- 所有 `/api/v1/admin/*` 端点必须通过 `get_admin_user` 鉴权
-- 非管理员请求返回 403（与现有 admin grant 端点一致）
-- 不返回用户密码 hash、token、API key、raw provider response body
-- 分页默认 limit ≤ 100，防止全量导出
-- provider_call_log 不暴露 `raw_usage` 或 `raw_response`
-- 管理员身份判断仅在服务端进行，不信任客户端角色声明
+- Payment / Credit / Provider 服务实现
+- Tauri permissions
+- CI / deployment
 
 ## Acceptance Criteria
 
-- [ ] 5 个 admin 端点均可返回分页只读列表
-- [ ] 非管理员调用任意 admin 端点返回 403
-- [ ] 桌面端 AdminPage 可通过 `/admin` 路由访问
-- [ ] AdminPage 5 个 tab 分别展示对应数据
-- [ ] Sidebar 有"管理后台"入口
-- [ ] 无权限时 AdminPage 显示"无管理权限"而非白屏
-- [ ] 后端 admin focused tests 覆盖权限隔离 + 分页 + 数据正确性
-- [ ] `npm run build` 通过
-- [ ] `pytest tests/ -v` 通过
+- [ ] User 表新增 `role` 列，默认 `"user"`，合法值 admin/operator/user
+- [ ] 管理员接口不再只依赖硬编码 `ADMIN_USER_IDS` 白名单
+- [ ] `operator` 角色可查看用户/订单/日志但不可授权积分（`credits:grant` 返回 403）
+- [ ] 普通用户（`user` 角色）所有管理端点返回 403
+- [ ] `ADMIN_USER_IDS` 作为 bootstrap 回退机制仍有效
+- [ ] 未定义权限默认拒绝（security-first）
+- [ ] 权限检查完全在服务端执行
+- [ ] `AdminUserItem` schema 包含 `role` 字段
+- [ ] 迁移和回滚 SQL 脚本已提供
+- [ ] 现有 12 个 admin 测试 + 新增测试全部通过
+- [ ] `python -m pytest tests/ -v` 通过
 - [ ] `git diff --check` 通过
-- [ ] `PROGRESS.md` 已追加记录
+- [ ] `PROGRESS.md` 已追加本任务记录
 
 ## Test Method
 
@@ -183,11 +164,6 @@ P0 MVP 包含"基础后台"。当前已有：
 ```powershell
 cd ad-assistant/cloud-backend
 python -m pytest tests/ -v
-```
-
-```powershell
-cd ad-assistant/desktop-app
-npm run build
 ```
 
 ```powershell
@@ -200,23 +176,47 @@ git diff --check
 git status --short --branch
 ```
 
+## Dependency Permission
+
+不允许新增依赖。
+
+## Major Change Status
+
+`MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
+
+原因：涉及 auth/permission 模型重构和数据库 schema 变更（User 表新增 role 列）。权限模型从硬编码白名单迁移到角色-权限映射。
+
+必须暂停确认的情况：
+- 需要新增第三方依赖
+- 需要修改 forbidden files
+- 需要新增/删除 API 端点（非权限替换）
+- 测试失败无法在任务范围内修复
+- 需要修改桌面端或前端代码
+
+## Security Requirements
+
+- 默认拒绝：未知权限代码、未知角色一律返回 403
+- 权限检查必须在服务端执行
+- 不信任客户端传入的角色字段
+- `operator` 角色不可授权积分（最小权限原则）
+- 迁移脚本只添加列不删除数据
+
 ## Rollback Plan
 
-- revert 本任务 commit 移除 admin 端点和 AdminPage
-- 如果只回退后端：移除 admin.py 中新增的 5 个 GET endpoint 路由注册
-- 如果只回退前端：删除 AdminPage.vue 和路由/sidebar 注册
-- 不涉及数据库迁移、用户数据或 Provider 状态
+1. Revert 本任务 commit
+2. 执行 `cloud-backend/migrations/001_rollback.sql` 删除 `role` 列
+3. 恢复 `admin.py` 中所有 `Depends(get_admin_user)` 依赖
+4. 恢复 `AdminUserItem` 删除 `role` 字段
+5. 不影响用户数据、积分、订单或 Provider
 
 ## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- 后端新增端点列表
-- 桌面端 AdminPage 结构
-- 权限模型说明
-- 测试结果
-- 安全自查（是否暴露敏感字段）
+- 权限模型设计说明
+- 迁移策略和影响范围
+- 测试命令和结果
 - 未实现内容
 - 自审结论
 - reviewer-mode 自查结论
