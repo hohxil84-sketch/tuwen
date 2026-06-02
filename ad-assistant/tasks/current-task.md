@@ -1,4 +1,4 @@
-# S05-R02: 基础后台最小可用管理台
+# S05-R03: RBAC 角色权限最小体系
 
 ## 状态
 
@@ -6,73 +6,83 @@
 
 ## 分支
 
-`feature/sprint-05-risk-02-basic-admin`
+`feature/sprint-05-risk-03-rbac`
 
 ## 背景
 
-P0 MVP 包含基础后台。当前已有 admin API（8 端点）、admin service、AdminPage.vue（5 tab）和 30 个测试。本任务对已有系统进行审计、补充列展示、文档和 formal signoff。
+当前 RBAC 基础设施已完整：`ROLE_PERMISSIONS` dict、`PermissionChecker` class、User.role 字段、admin 端点全部使用 PermissionChecker。30 个 RBAC 测试通过。
+
+残留问题：
+- 废弃的 `get_admin_user` 函数仍存在于 deps.py（未被任何端点引用）
+- `admin_service.py` 注释仍引用 `get_admin_user`
+- 缺少角色越权防护测试（auth 端点不应允许客户端设置 role）
+- 安全文档未覆盖 RBAC
 
 ## 用户目标
 
-确认管理员可访问只读数据面板，所有关键实体可查看，非管理员被拒绝。
+清理 RBAC 遗留代码、加固角色越权防护、补充安全文档，完成 RBAC 体系 formal signoff。
 
 ## What To Build
 
-### 1. 审计已有 Admin 系统
+### 1. 清理废弃代码
 
-- Backend: `admin.py` API（8 端点）、`admin_service.py`、`admin.py` schemas → 已完整
-- Frontend: `AdminPage.vue`（5 tab + 分页）、`cloudApi.ts`（5 admin 函数）→ 基本完整
-- Auth: `PermissionChecker`（role-based + ADMIN_USER_IDS fallback）→ 已完整
-- Tests: `test_admin.py` + `test_admin_grant.py`（30 tests）→ 已完整
+- 移除 `deps.py` 中未使用的 `get_admin_user` 函数
+- 修正 `admin_service.py` 注释（`get_admin_user` → `PermissionChecker`）
 
-### 2. 补充缺失列
+### 2. 角色越权防护
 
-- AdminPage.vue users tab 已有 `account, plan_code, status, created_at`，但 API 返回的 `role` 未展示
-- 在 users tab 的 columns 中添加 `role` 列
+- Auth 端点（login/refresh）不返回 `role` 字段（当前已不返回，验证并补充测试）
+- 测试确认普通用户无法通过任何 API 提升角色
 
-### 3. 文档
+### 3. 测试
 
-- 新增模块上下文 `docs/module-context/sprint-05-risk-02-basic-admin/context.md`
-- 更新 `PROGRESS.md`
+- 新增 `TestDefaultDeny` class：无角色用户 → 403
+- 新增 `TestRoleNotLeaked` test：auth 响应不含 role
+
+### 4. 安全文档
+
+- 更新 `docs/08-security-and-anti-crack.md`：新增 RBAC 小节
 
 ## What Not To Build
 
-- 不做复杂 RBAC（S05-R03 专项）
-- 不做增删改操作（仅只读展示）
-- 不修改数据库
-- 不新增 API 端点
+- 不做完整企业级组织架构
+- 不做多租户
+- 不做后台角色编辑 UI（S05-R02 已有 admin page）
+- 不改真实支付或 Provider 路由
 
 ## Allowed Files
 
-- `desktop-app/src/pages/AdminPage.vue`
-- `docs/module-context/sprint-05-risk-02-basic-admin/context.md`
+- `cloud-backend/app/api/deps.py`
+- `cloud-backend/app/services/admin_service.py`
+- `cloud-backend/tests/test_admin.py`
+- `docs/08-security-and-anti-crack.md`
+- `docs/module-context/sprint-05-risk-03-rbac/context.md`
 - `PROGRESS.md`
 - `tasks/current-task.md`
 
 ## Forbidden Files
 
-- `cloud-backend/**`（已有代码不需要修改）
-- 数据库 DDL / migrations
-- Provider 路由和真实 AI 调用代码
+- desktop UI
+- Provider 实现和路由
+- Payment/真实支付代码
 - Tauri permissions
 - CI / deployment
 
 ## Acceptance Criteria
 
-- [ ] AdminPage users tab 展示 `role` 列
-- [ ] `npm run build` 通过
-- [ ] `python -m pytest tests/test_admin.py tests/test_admin_grant.py -v` 通过
+- [ ] `get_admin_user` 废弃函数已移除
+- [ ] 所有 admin 端点仅通过 PermissionChecker 鉴权
+- [ ] Auth 端点不泄露 role 字段
+- [ ] 测试覆盖 default-deny + role 未泄露
+- [ ] `python -m pytest tests/ -v` 通过
 - [ ] `git diff --check` 通过
 
 ## Test Method
 
 ```bash
 cd ad-assistant/cloud-backend
-python -m pytest tests/test_admin.py tests/test_admin_grant.py -v
-
-cd ad-assistant/desktop-app
-npm run build
-
+python -m pytest tests/test_admin.py -v
+python -m pytest tests/ -v
 git diff --check
 ```
 
@@ -84,18 +94,14 @@ git diff --check
 
 `MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-原因：涉及 admin API 和后台权限边界。
+原因：涉及 auth/permission 模型。
 
 ## Security Requirements
 
-- 不修改鉴权逻辑
-- 不暴露 password_hash
-- 不暴露 token、密钥
+- 默认拒绝
+- 权限检查在服务端执行
+- 不信任客户端角色字段
 
 ## Rollback Plan
 
 - revert commit
-
-## Completion Output Required
-
-- 后台范围、权限模型、接口列表、测试结果、安全自查、风险、中文 commit message、PR 摘要
