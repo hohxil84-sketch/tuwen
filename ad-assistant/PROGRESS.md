@@ -4,6 +4,40 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S05-R04: 月度积分发放调度器
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-04-monthly-credit-grant`
+
+### 范围
+
+- 目标：让套餐用户按月获得约定积分额度（`plan.monthly_credits`），保证发放可追踪、可幂等。
+- 已实现：
+  - `monthly_grant_service.py`：幂等检查 + 单用户发放 + 批量编排
+  - 幂等键：`source_type="system"` + `source_id="{user_id}:{YYYY-MM}"`
+  - CLI 脚本 `scripts/run_monthly_grant.py`：支持 `--year` / `--month` / `--dry-run`
+  - Admin 端点 `POST /api/v1/admin/monthly-grant/run`（需 `credits:grant`）
+  - 16 tests：幂等性、跨月、跳过规则、dry-run、权限隔离
+- 未实现：cron 部署、发放失败自动重试、大批量用户分批处理
+
+### 主要改动
+
+- 新增 3 文件：monthly_grant_service.py、run_monthly_grant.py、test_monthly_grant.py
+- 修改 2 文件：admin.py（+POST endpoint）、schemas/admin.py（+2 schema）
+- 复用 credit_service.grant_credits()，不修改 credit_service 或 models
+
+### 测试结果
+
+- `python -m pytest tests/test_monthly_grant.py -v`：16 passed
+- `python -m pytest tests/ -v`：332 passed, 74 skipped
+
+### 风险
+
+- 无 cron 调度部署（运维自行配置）
+- 大量用户时可能超时（MVP 阶段用户量少）
+- 跨年跨月边界依赖服务器时钟
+
 ## 2026-06-02 — S05-R03: RBAC 角色权限最小体系
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED

@@ -1,6 +1,7 @@
 """Admin API routes — 管理员操作（查询、赠送积分等）."""
 
 import uuid
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,11 +19,14 @@ from app.schemas.admin import (
     AdminProviderLogItem,
     AdminUsageEventItem,
     AdminUserItem,
+    MonthlyGrantRequest,
+    MonthlyGrantResponse,
     PaginatedItems,
 )
 from app.schemas.common import success_response
 from app.services import admin_service
 from app.services.credit_service import grant_credits
+from app.services.monthly_grant_service import process_monthly_grants
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 
@@ -231,3 +235,33 @@ async def admin_list_usage_events(
     )
     data = _build_paginated(items, total, limit, offset, AdminUsageEventItem)
     return success_response(data=data.model_dump())
+
+
+# ---------------------------------------------------------------------------
+# POST /monthly-grant/run (S05-R04 — new)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/monthly-grant/run")
+async def admin_run_monthly_grant(
+    admin: Annotated[User, Depends(PermissionChecker("credits:grant"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: MonthlyGrantRequest = MonthlyGrantRequest(),
+):
+    """Manually trigger the monthly credit grant (requires ``credits:grant``).
+
+    Defaults to the **current UTC year/month** when no target is specified.
+    """
+    now = datetime.now(timezone.utc)
+    year = body.year or now.year
+    month = body.month or now.month
+
+    summary = await process_monthly_grants(db, year=year, month=month)
+    return success_response(
+        data=MonthlyGrantResponse(
+            granted=summary.granted,
+            skipped=summary.skipped,
+            failed=summary.failed,
+            errors=summary.errors,
+        ).model_dump()
+    )
