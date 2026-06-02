@@ -2,7 +2,7 @@
 
 ## 状态
 
-`IN_PROGRESS`
+`COMPLETED`
 
 ## 分支
 
