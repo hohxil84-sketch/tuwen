@@ -113,7 +113,7 @@ const tabs: TabDef[] = [
   {
     key: "users",
     label: "用户",
-    columns: ["account", "plan_code", "status", "created_at"],
+    columns: ["account", "role", "plan_code", "status", "created_at"],
   },
   {
     key: "orders",

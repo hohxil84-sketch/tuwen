@@ -2,7 +2,34 @@
 
 本文件用于记录 AI 图文广告助手项目的模块级进度。
 
-Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
+## 2026-06-02 — S05-R02: 基础后台最小可用管理台
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-02-basic-admin`
+
+### 范围
+
+- 目标：审计已有 admin 系统（API/service/schemas/permissions/frontend），补充 users tab role 列，formal signoff。
+- 已有基础设施（此前已实现）：
+  - 后端：8 admin API 端点 + PermissionChecker（role-based + ADMIN_USER_IDS fallback）
+  - 前端：AdminPage.vue 5 tab + 分页 + cloudApi.ts
+  - 测试：30 tests（权限隔离、分页、operator 只读、grant 校验）
+- 本次变更：users tab 新增 `role` 列
+- 未实现：搜索/筛选/排序、provider-health UI、monthly-grant UI
+
+### 主要改动
+
+- 修改 1 文件：AdminPage.vue（+1 column）
+- 新增 1 文件：module context
+- 修改 2 文件：PROGRESS.md + current-task.md
+- 不影响后端代码
+
+### 测试
+
+- `python -m pytest tests/test_admin.py tests/test_admin_grant.py -v`：30 passed
+- `npm run build`：77 modules, 0 errors
+- `git diff --check`：通过
 
 ## 2026-06-02 — S05-R08: Windows 原生窗口阴影专项
 

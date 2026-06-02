@@ -1,4 +1,4 @@
-# S05-R08: Windows 原生窗口阴影专项
+# S05-R02: 基础后台最小可用管理台
 
 ## 状态
 
@@ -6,123 +6,96 @@
 
 ## 分支
 
-`feature/sprint-05-risk-08-native-window-shadow`
+`feature/sprint-05-risk-02-basic-admin`
 
 ## 背景
 
-S04-T10 通过 CSS 内描边和内阴影缓解 frameless 窗口边界感，但不等同于 Windows DWM 原生外部阴影。正式体验需要 native window shadow 方案。
-
-S04-Sprint E2E 残余风险 #4 标记此问题。
+P0 MVP 包含基础后台。当前已有 admin API（8 端点）、admin service、AdminPage.vue（5 tab）和 30 个测试。本任务对已有系统进行审计、补充列展示、文档和 formal signoff。
 
 ## 用户目标
 
-接入 Windows 原生窗口阴影方案，提升 frameless 窗口桌面层次，使窗口具有系统级外部阴影。
+确认管理员可访问只读数据面板，所有关键实体可查看，非管理员被拒绝。
 
 ## What To Build
 
-### 1. 方案调研与选择
+### 1. 审计已有 Admin 系统
 
-三方案对比：
-- `window-shadows` crate：调用 Windows DWM API（`DwmExtendFrameIntoClientArea` + `DWMWA_USE_IMMERSIVE_DARK_MODE`），Tauri 社区常用
-- 手动 DWM API 调用（`windows` crate）：不新增独立依赖，但需手写 unsafe 代码
-- Tauri plugin `tauri-plugin-window`：Tauri 2 官方窗口插件，但无直接 shadow API
+- Backend: `admin.py` API（8 端点）、`admin_service.py`、`admin.py` schemas → 已完整
+- Frontend: `AdminPage.vue`（5 tab + 分页）、`cloudApi.ts`（5 admin 函数）→ 基本完整
+- Auth: `PermissionChecker`（role-based + ADMIN_USER_IDS fallback）→ 已完整
+- Tests: `test_admin.py` + `test_admin_grant.py`（30 tests）→ 已完整
 
-**选择 `window-shadows` crate**：Tauri 2 生态标准方案，API 最简，仅 1 行调用，支持 Windows/macOS/Linux（各平台自动 fallback）。
+### 2. 补充缺失列
 
-### 2. 最小 PoC
+- AdminPage.vue users tab 已有 `account, plan_code, status, created_at`，但 API 返回的 `role` 未展示
+- 在 users tab 的 columns 中添加 `role` 列
 
-- `Cargo.toml`：新增 `window-shadows = "0.2"`
-- `lib.rs`：在 `setup` hook 中调用 `window_shadows::set_shadow(&window, true)`
-- 仅在 Windows 平台启用（条件编译）
+### 3. 文档
 
-### 3. 兼容性
-
-- 最大化时自动无阴影（DWM 行为）
-- macOS/Linux 自动 fallback（无操作）
-- 不修改 `tauri.conf.json` 权限
+- 新增模块上下文 `docs/module-context/sprint-05-risk-02-basic-admin/context.md`
+- 更新 `PROGRESS.md`
 
 ## What Not To Build
 
-- 不改业务页面（`App.vue` 内容不变）
-- 不接入透明窗口、Mica、Acrylic
-- 不扩大文件系统、shell、http 权限
-- 不修改 Tauri permissions / capabilities
+- 不做复杂 RBAC（S05-R03 专项）
+- 不做增删改操作（仅只读展示）
+- 不修改数据库
+- 不新增 API 端点
 
 ## Allowed Files
 
-- `desktop-app/src-tauri/src/lib.rs`
-- `desktop-app/src-tauri/Cargo.toml`
-- `desktop-app/src-tauri/Cargo.lock`
-- `docs/17-release-and-update.md`
-- `docs/module-context/sprint-05-risk-08-native-window-shadow/context.md`
+- `desktop-app/src/pages/AdminPage.vue`
+- `docs/module-context/sprint-05-risk-02-basic-admin/context.md`
 - `PROGRESS.md`
 - `tasks/current-task.md`
 
 ## Forbidden Files
 
-- `desktop-app/src/**`（业务页面不变）
-- `desktop-app/src-tauri/tauri.conf.json`
-- backend/shared/payment/provider/auth/credit
-- CI/deployment
-- 证书/发布凭据
+- `cloud-backend/**`（已有代码不需要修改）
+- 数据库 DDL / migrations
+- Provider 路由和真实 AI 调用代码
+- Tauri permissions
+- CI / deployment
 
 ## Acceptance Criteria
 
-- [ ] 普通窗口尺寸下可见原生或等价外部阴影
-- [ ] 最大化时无边距/裁切异常（要求 GUI 验证）
-- [ ] `cargo build` / `cargo check` 通过
-- [ ] 文档说明兼容性和 fallback
+- [ ] AdminPage users tab 展示 `role` 列
+- [ ] `npm run build` 通过
+- [ ] `python -m pytest tests/test_admin.py tests/test_admin_grant.py -v` 通过
+- [ ] `git diff --check` 通过
 
 ## Test Method
 
 ```bash
-cd ad-assistant/desktop-app/src-tauri
-cargo check
-cargo build --release
-```
+cd ad-assistant/cloud-backend
+python -m pytest tests/test_admin.py tests/test_admin_grant.py -v
 
-```bash
+cd ad-assistant/desktop-app
+npm run build
+
 git diff --check
 ```
 
-GUI 验证（需用户执行）：
-- `npm run tauri dev` 启动后观察窗口阴影
-- 最大化后确认无异常
-
 ## Dependency Permission
 
-新增 1 个 Rust crate：`window-shadows = "0.2"`
-
-理由：Tauri 2 生态标准方案，调用 Windows DWM API 实现原生窗口阴影。代码量极小（~200 行），无额外间接依赖链（仅依赖 `windows` crate，Tauri 自身已依赖）。
+不允许新增依赖。
 
 ## Major Change Status
 
 `MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-原因：涉及 Tauri Rust 源码、窗口系统 API 和 1 个新依赖。
-
-必须暂停确认的情况：
-- 需要新增 `window-shadows` 以外的依赖
-- 需要修改 Tauri 权限或 capabilities
-- 需要接入 Mica/Acrylic/透明窗口
+原因：涉及 admin API 和后台权限边界。
 
 ## Security Requirements
 
-- 不新增 shell/fs/http/updater 权限
-- 不引入来源不明 native 代码
-- `window-shadows` 仅调用公开 Windows DWM API
+- 不修改鉴权逻辑
+- 不暴露 password_hash
+- 不暴露 token、密钥
 
 ## Rollback Plan
 
-- revert commit；恢复 S04-T10 CSS 视觉边界方案（无代码修改，仅移除 `set_shadow` 调用和 `window-shadows` 依赖）
+- revert commit
 
 ## Completion Output Required
 
-- 方案选择理由
-- 依赖/权限影响
-- 测试结果
-- 兼容性说明
-- 风险
-- 回滚方式
-- 中文 commit message
-- PR 摘要
+- 后台范围、权限模型、接口列表、测试结果、安全自查、风险、中文 commit message、PR 摘要
