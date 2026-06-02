@@ -4,6 +4,41 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — Sprint-04 Closeout
+
+状态：MERGED（所有 S04 任务已合并到 `main`）
+
+### 范围
+
+- 目标：编写 Sprint-04 收尾总结，汇总已完成模块、当前能力、测试证据、残余风险、Sprint-05 候选方向。
+- 已实现：`docs/sprint-04-summary.md`（完整 sprint summary），覆盖 S04-T01 至 S04-T10 + 4 个规则/工作流增强。
+- 未实现：无代码变更；Sprint-05 候选仅为建议方向，未启动。
+
+### 主要改动
+
+- `docs/sprint-04-summary.md`（NEW）：Sprint-04 完整收尾文档
+- `PROGRESS.md`：本条记录
+- `tasks/current-task.md`：状态 → COMPLETED
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是（仅 docs + tasks）
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用（收尾任务）
+
+### 测试结果
+
+- `git diff --check`：通过
+- `git status --short --branch`：仅预期文件
+
+### 风险和后续
+
+- 残余风险：无
+- 后续任务：用户从 Sprint-05 候选中选择下一任务。
+- 回滚方式：revert 对应提交。
+
 ## 2026-06-02 — S04-T10: Tauri frameless 窗口边界与阴影最小优化
 
 ### 范围

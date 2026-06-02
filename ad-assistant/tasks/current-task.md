@@ -1,4 +1,4 @@
-# S04-T10: Tauri frameless 窗口边界与阴影最小优化
+# S04-Closeout: Sprint-04 收尾总结与 Sprint-05 候选规划
 
 ## 状态
 
@@ -6,51 +6,67 @@
 
 ## 分支
 
-`feature/sprint-04-task-10-tauri-window-depth`
+`docs/sprint-04-closeout`
 
 ## 完成摘要
 
-已为 frameless 窗口增加最小 CSS 视觉边界：`App.vue` `#app-shell` 新增 1px 内描边 + 40px 柔和内阴影。纯 CSS 方案，未新增依赖，未修改 tauri.conf.json/Rust/capabilities。前端构建通过（74 modules, 0 errors）。此方案不等同于 Windows 原生窗口阴影，正式方案需 DWM API 或 Tauri 插件专项处理。详细记录见 PROGRESS.md 和模块上下文。
+- 新增 `docs/sprint-04-summary.md`，按 Sprint-01/02/03 风格完整覆盖 S04-T01 至 S04-T10 + 4 个规则增强
+- 汇总当前能力（Provider 可靠性、Dashboard 数据集成、OCR 隐私清理、会员/套餐/充值、快捷入口接线、Tauri 桌面端）
+- 记录 12 项残余风险（未签名、NSIS 网络、品牌 VI、CSS 阴影≠原生、模拟支付无风控、无 RBAC、后台不足等）
+- 列出 Sprint-05 5 组候选方向（内测分发准备→基础后台→商业链路→E2E 验证→P1 功能探索）
+- 未修改业务代码、后端、数据库、shared DTO、Tauri 权限、依赖或 CI
+- `PROGRESS.md` 已追加 closeout 记录
 
 ## 背景
 
-S04-T07 已采用 `decorations: false` 的 frameless 窗口方案，解决了 Windows 系统标题栏与深色工作台不一致的问题。该方案的残余风险是：部分 Windows 版本下 frameless 窗口缺少原生系统阴影，窗口边界与桌面背景区分不够明显。
+Sprint-04 已完成多个核心收口任务：Provider 可靠性、Dashboard 数据集成、OCR 历史清理、会员/套餐/充值、快捷入口接线、Tauri 工程恢复、深色 frameless 标题栏、本地打包 smoke、内测品牌图标、窗口边界视觉优化。
 
-S04-T08 已验证本地打包链路，S04-T09 已替换内测图标。下一步适合做一个低风险桌面体验收口任务：在不引入新依赖、不扩大 Tauri 权限、不接入系统级插件的前提下，为当前 frameless 窗口补齐最小的视觉边界、内阴影或外观层次，并记录原生阴影仍需后续专项处理的边界。
+当前还没有 `docs/sprint-04-summary.md`。在启动 Sprint-05 前，需要先把 Sprint-04 的已完成能力、测试证据、残余风险和下一阶段候选整理成权威 summary，避免后续任务从零散 `PROGRESS.md` 条目里猜测项目状态。
 
 ## 用户目标
 
-让内测桌面应用在 frameless 模式下更容易看出窗口边界，减少“窗口贴在桌面上没有层次”的观感问题。本任务只做最小 UI/CSS 级优化和验证，不做 Windows 原生阴影插件或系统 API 接入。
+明确 Sprint-04 到底完成了什么、还剩哪些风险、Sprint-05 可以从哪些方向开始。本文档任务只做收尾和规划，不开发新功能，不启动 Sprint-05 实现。
 
 ## What To Build
 
-- 审查当前 `App.vue`、`AppTopbar.vue` 和 Tauri 窗口配置，确认 frameless 窗口边界感的主要来源。
-- 在最小范围内增加窗口外壳的视觉边界，例如内描边、顶部/侧边分隔、柔和内阴影、最大化状态下的边界降级处理。
-- 保持 Dashboard、OCR、会员中心、AI 文案页等现有页面布局不被压缩、遮挡或重新缩放。
-- 浏览器开发模式和 Tauri 模式都应保持可用；浏览器模式不应出现多余窗口控制按钮。
-- 更新 `docs/17-release-and-update.md`，说明当前采用的是 CSS/视觉层级缓解方案，不等同于 Windows 原生窗口阴影。
-- 新增 `docs/module-context/sprint-04-task-10-tauri-window-depth/context.md`，记录方案、验证结果、限制和回滚方式。
-- 追加更新 `PROGRESS.md`。
+- 新增 `docs/sprint-04-summary.md`，按 Sprint-01/02/03 summary 风格整理 Sprint-04。
+- 汇总 Sprint-04 已完成模块，至少覆盖：
+  - S04-T01 Provider Reliability / 预扣检查 + fallback/retry
+  - S04-T02 Dashboard 数据集成 + AI 文案生成入口
+  - S04-T03 Local OCR History Cleanup
+  - S04-T04 会员/套餐/充值/管理员赠送额度
+  - S04-T05 桌面端快捷入口接入已有真实功能
+  - S04-T06 Tauri 深色标题栏审计
+  - S04-T07 Tauri 工程源配置初始化与深色标题栏恢复
+  - S04-T08 Tauri 打包与 EXE Smoke 验证
+  - S04-T09 Tauri 内测品牌图标替换
+  - S04-T10 Tauri frameless 窗口边界与阴影最小优化
+- 汇总当前能力：云端 AI/扣费、会员充值、桌面 Dashboard、OCR、本地历史、Tauri 打包、内测桌面外观。
+- 汇总残余风险：未签名安装包、NSIS 下载/网络不稳定、正式品牌 VI 未确认、原生窗口阴影未接入、模拟支付无风控、管理员白名单无 RBAC、后台管理能力不足、人工 GUI/E2E 验证缺口。
+- 列出 Sprint-05 候选方向，并按建议优先级分组：
+  - 内测分发准备
+  - 基础后台 / 管理端
+  - 商业链路加固
+  - 端到端 smoke / 回归验证
+  - P1 功能探索（需用户确认）
+- 更新 `tasks/current-task.md` 完成后状态。
+- 追加更新 `PROGRESS.md`，记录本次 closeout 文档任务。
 
 ## What Not To Build
 
-- 不接入 Windows 原生阴影插件、DWM API、native window shadow crate 或自定义 Rust 命令。
-- 不新增 Tauri 插件或扩大 capabilities。
-- 不开启透明窗口、毛玻璃、acrylic、mica 或系统级窗口特效。
-- 不恢复系统标题栏，不改变 `decorations: false` 的当前方案。
-- 不重做 Dashboard UI、导航、页面布局或主题系统。
-- 不修改后端 API、数据库、shared DTO、Provider、Auth、Credit、Payment、Billing 或 CI。
-- 不做正式发布、上传、分发、代码签名或 updater。
-- 不提交 `desktop-app/src-tauri/target/**`、`desktop-app/dist/**`、EXE、MSI、NSIS 安装包或构建日志。
+- 不开发任何业务功能。
+- 不启动 Sprint-05 具体实现。
+- 不修改桌面端、后端、shared DTO、数据库、Provider、Auth、Credit、Payment 或 CI。
+- 不新增依赖。
+- 不创建后台页面、管理接口、支付接口或真实发布能力。
+- 不做代码签名、updater、发布上传、安装包分发或 Docker/CI 变更。
+- 不修改 S04 已完成任务的业务代码或测试代码。
+- 不把未验证的内容写成已完成事实；不确定项必须标为残余风险或待验证。
 
 ## Allowed Files
 
-- `desktop-app/src/App.vue`
-- `desktop-app/src/components/dashboard/AppTopbar.vue`（仅当标题栏边界或拖拽区视觉需要同步）
-- `desktop-app/src-tauri/tauri.conf.json`（仅允许读取；若需要修改，必须先暂停并更新任务单）
-- `docs/17-release-and-update.md`
-- `docs/09-desktop-app-guide.md`（仅当需要补充窗口外观验证说明）
-- `docs/module-context/sprint-04-task-10-tauri-window-depth/context.md`
+- `docs/sprint-04-summary.md`
+- `docs/13-module-roadmap.md`（仅当需要补充 Sprint-05 候选说明，且不得把 P1/BACKLOG 改成已启动）
 - `PROGRESS.md`
 - `tasks/current-task.md`（完成后仅允许状态、分支、简短完成摘要、commit/PR 信息）
 
@@ -58,70 +74,57 @@ S04-T08 已验证本地打包链路，S04-T09 已替换内测图标。下一步�
 
 ## Forbidden Files
 
-- `desktop-app/src-tauri/target/**`
-- `desktop-app/dist/**`
-- `desktop-app/src-tauri/capabilities/**`
-- `desktop-app/src-tauri/src/**`
-- `desktop-app/src-tauri/Cargo.toml`
-- `desktop-app/src-tauri/Cargo.lock`
-- `desktop-app/package.json`
-- `desktop-app/package-lock.json`
-- `desktop-app/src-tauri/gen/schemas/**`
-- `desktop-app/local-service/**`
+- `desktop-app/**`
 - `cloud-backend/**`
 - `shared/**`
 - `official-website/**`
 - `.github/**`
-- 根目录 `package.json`
-- 根目录 `package-lock.json`
+- `docs/module-context/**`（除非用户要求补某个模块上下文）
+- `docs/sprint-01-summary.md`
+- `docs/sprint-02-summary.md`
+- `docs/sprint-03-summary.md`
 - 数据库 DDL / migrations
-- Provider、Auth、Credit、Payment、Billing 相关文件
+- Provider、Auth、Credit、Payment、Billing 相关代码
 - 任何真实密钥、证书、签名私钥、生产连接串或发布凭据
 
 ## Dependency Permission
 
 不允许新增依赖。
 
-不得安装、下载或引入新的 npm、Rust、Python、系统级窗口工具、Tauri 插件或图片处理库。只能使用现有前端 CSS、Vue 组件和现有 Tauri 配置进行验证。
+本任务是纯文档任务，不允许安装、下载或引入任何 npm、Python、Rust、系统工具或外部资产。
 
 ## Major Change Status
 
 `NO_MAJOR_CHANGE_EXPECTED`
 
-原因：本任务预期只做桌面前端 CSS/视觉层级调整和文档记录，不修改 Tauri 权限、Rust 源码、依赖、后端、数据库、Provider、Auth、Credit、Payment、CI 或发布链路。
+原因：本任务只新增/更新规划文档和进度记录，不修改代码、依赖、API、数据库、Tauri 权限、CI 或发布链路。
 
 必须暂停确认的情况：
 
-- 需要修改 `tauri.conf.json` 的 `transparent`、`decorations`、窗口尺寸、权限或安全配置。
-- 需要新增 Tauri plugin、Rust crate、npm 依赖或系统级窗口阴影工具。
-- 需要修改 `desktop-app/src-tauri/src/**`、capabilities、Cargo 文件或 lockfile。
-- 需要接入 Windows DWM API、Mica、Acrylic、透明窗口或 native shadow 方案。
-- 需要大规模改动 Dashboard 结构、路由、页面组件或主题变量。
-- 需要修改后端、数据库、shared DTO、Provider、Auth、Credit 或 Payment。
-- 需要删除文件、重命名目录或清理用户数据。
+- 需要修改代码、数据库、API contract、shared DTO、Provider、Auth、Credit、Payment 或 CI。
+- 需要把 P1/BACKLOG/FUTURE 功能改为已启动。
+- 需要创建 Sprint-05 的具体业务实现任务而不是 closeout summary。
+- 发现 Sprint-04 某项完成状态与 `PROGRESS.md`、任务单或模块上下文冲突，且无法从本地文档判断。
+- 需要删除文件、重命名目录或改动历史 summary。
 
 ## Security Requirements
 
 - 不写入真实 API Key、Token、密码、生产连接串、证书或签名私钥。
-- 不新增 updater endpoint、远程下载执行逻辑或发布凭据。
-- 不扩大 Tauri capabilities。
-- 不新增本地文件系统、shell、http、clipboard、notification、global-shortcut 或 updater 权限。
-- 不修改客户端 token 存储策略、授权流程、Provider 调用或扣费逻辑。
-- 不提交构建产物、安装包、EXE、日志或本地缓存。
+- 不复制构建产物、安装包、日志或本地缓存内容。
+- 不把未脱敏的用户数据、OCR 内容、支付数据或设备标识写入文档。
+- 不把未验证的发布、安全或支付能力描述为已完成。
+- Sprint-05 候选必须保持边界：P1 功能需用户确认，BACKLOG/FUTURE 仍禁止。
 
 ## Acceptance Criteria
 
-- [ ] frameless 窗口在普通窗口尺寸下有清晰边界感，视觉上不再完全贴合桌面背景。
-- [ ] 最大化状态下不出现不合理的外边距、裁切、滚动条或内容错位。
-- [ ] 自定义标题栏拖拽区、最小化、最大化/还原、关闭按钮仍正常。
-- [ ] Dashboard、OCR、History、Membership、AI 文案生成等主要页面不出现明显布局回归。
-- [ ] 浏览器开发模式下布局仍正常，窗口控制按钮仍按现有逻辑隐藏。
-- [ ] 未新增依赖、未修改 Tauri capabilities、未修改 Rust 源码、未修改 `package*.json` 或 `Cargo*`。
-- [ ] 未修改后端、数据库、shared DTO、Provider、Auth、Credit、Payment 或 CI。
-- [ ] 文档已说明本任务是 CSS/视觉层级缓解，不是 Windows 原生阴影接入。
-- [ ] 模块上下文已更新。
-- [ ] `PROGRESS.md` 已追加记录。
-- [ ] `npm run build` 通过。
+- [ ] `docs/sprint-04-summary.md` 已新增，结构清晰并能独立说明 Sprint-04 状态。
+- [ ] Sprint-04 已完成模块覆盖 S04-T01 至 S04-T10。
+- [ ] 当前能力、测试证据、安全边界和残余风险均有记录。
+- [ ] Sprint-05 候选方向已列出，且未把候选误写为已启动任务。
+- [ ] P1/BACKLOG/FUTURE 边界未被放宽。
+- [ ] 未修改业务代码、后端、数据库、shared DTO、Tauri 权限、依赖或 CI。
+- [ ] `PROGRESS.md` 已追加 closeout 记录。
+- [ ] `tasks/current-task.md` 完成后只做状态类最小更新。
 - [ ] `git diff --check` 通过。
 
 ## Test Method
@@ -129,53 +132,41 @@ S04-T08 已验证本地打包链路，S04-T09 已替换内测图标。下一步�
 必须运行：
 
 ```powershell
-cd ad-assistant/desktop-app
-npm run build
-```
-
-必须运行：
-
-```powershell
 git diff --check
 ```
 
-建议运行：
+必须检查：
 
 ```powershell
-cd ad-assistant/desktop-app
-npm run tauri dev
+git status --short --branch
 ```
 
-人工验证建议：
+建议检查：
 
-- 普通窗口尺寸：观察窗口四边、顶部标题栏和桌面背景之间是否有清晰层次。
-- 最大化状态：确认没有多余外边距、内容裁切或滚动条异常。
-- 标题栏：确认拖拽、最小化、最大化/还原、关闭按钮可用。
-- 主要页面：快速切换 Dashboard、OCR、History、Membership、AI 文案生成，确认无明显布局回归。
+```powershell
+rg -n "S04-T|Sprint-05|BACKLOG|FUTURE|MVP_OPTIONAL" docs/sprint-04-summary.md docs/13-module-roadmap.md PROGRESS.md tasks/current-task.md
+```
 
-如 `npm run tauri dev` 因环境或人工 GUI 限制无法完成，执行者必须记录原因，并至少完成 `npm run build`、静态 diff 审查和文档说明。
+本任务不需要运行前端、后端或 Tauri 构建测试，因为不修改代码。
 
 ## Rollback Plan
 
-- revert 本任务 commit 可恢复窗口外观和文档记录。
-- 如只需回退视觉优化，恢复 `desktop-app/src/App.vue` 与 `AppTopbar.vue` 中本任务新增的样式。
-- 本任务不涉及数据库迁移、远端发布、Tauri 权限、依赖或用户数据变更，无数据回滚步骤。
-- 本地生成的 `dist/**`、`target/**` 或 Tauri 开发产物不得提交。
+- revert 本任务 commit 可移除 Sprint-04 closeout 文档和进度记录。
+- 如只需回退 summary，删除 `docs/sprint-04-summary.md` 并恢复 `PROGRESS.md` 与 `tasks/current-task.md` 的本任务记录。
+- 本任务不涉及数据库迁移、依赖、发布、构建产物或用户数据变更，无数据回滚步骤。
 
 ## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- 窗口边界/阴影视觉方案说明
-- 是否修改 `tauri.conf.json`
-- 未实现内容，特别是是否仍未接入 Windows 原生阴影
+- Sprint-04 summary 覆盖范围
+- Sprint-05 候选方向
+- 明确未启动的内容
 - 测试命令和结果
-- 人工验证结果（如已执行）
 - 自审结论
 - reviewer-mode 自查结论
 - 是否触发高风险暂停规则
-- 是否更新模块上下文
 - 是否更新 `PROGRESS.md`
 - 风险和回滚方式
 - 中文 commit message
