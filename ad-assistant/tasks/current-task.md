@@ -1,4 +1,4 @@
-# S04-T05: 桌面端快捷入口接入已有真实功能
+# S04-T07: Tauri 工程源配置初始化与深色标题栏恢复
 
 ## 状态
 
@@ -6,138 +6,138 @@
 
 ## 分支
 
-`feature/sprint-04-task-05-shortcut-entry-wiring`
+`feature/sprint-04-task-07-tauri-source-init`
 
 ## 完成摘要
 
-S04-T05 已由 CC 实现并自审通过。详细实现记录、测试结果、风险和回滚方式见 `PROGRESS.md` 与 `docs/module-context/sprint-04-task-05-shortcut-entry-wiring/context.md`。
+S04-T07 已完成：手动创建 Tauri 2 源配置 10 个文件，frameless 窗口 + AppTopbar 自定义深色标题栏（拖拽区 + 窗口控制按钮），capabilities 最小化 7 项权限。npm run build 74 modules 0 errors，tauri dev exit 0，Cargo 355 crates 编译通过，desktop-app.exe 成功启动。vite.config.ts 额外修改（忽略 target/）属 Tauri 运行必要配置。
 
 ## 背景
 
-Sprint-03 已完成桌面端 Dashboard UI 壳，Sprint-04 Task-02 已完成 Dashboard summary API 接入和 AI 文案生成页面，Sprint-04 Task-03 已完成 OCR 历史删除/清空，Sprint-04 Task-04 已完成会员中心、套餐、充值和订单记录。
+S04-T06 已审计 `desktop-app/src-tauri/`，确认当前仅有 `.gitkeep` 和 `target/` 构建产物，不存在可提交的 Tauri 源配置文件：
 
-当前 Dashboard 和 Sidebar 里仍有部分入口处于 disabled 或占位状态。按 `PROGRESS.md` 最新记录，S04-T04 后续任务是 `S04-T05（快捷入口接入真实功能）`。
+- `desktop-app/src-tauri/tauri.conf.json` 或 `tauri.conf.json5`
+- `desktop-app/src-tauri/Cargo.toml`
+- `desktop-app/src-tauri/src/main.rs`
+- `desktop-app/src-tauri/src/lib.rs`
+- `desktop-app/src-tauri/capabilities/*.json`
 
-本任务只把已经存在的页面和已有功能接到桌面端快捷入口与侧边栏，不开发新的业务能力。
+因此 S04-T06 已标记为 `BLOCKED_NEEDS_TAURI_SOURCE`，未能处理 Windows / Tauri 原生白色标题栏与深色桌面 UI 不一致的问题。
+
+本任务目标是补齐最小可维护的 Tauri 2 源配置，让桌面端重新具备可运行的 Tauri 工程基础，并在该基础上实现深色标题栏或等效的深色窗口 chrome 最小修复。
 
 ## 用户目标
 
-按当前项目进度，把桌面端首页和侧边栏里已经具备后端或页面基础的功能入口接起来，让 CC 能从工作台直接进入已有真实功能；暂未实现的功能继续明确显示“即将开放”，不能误导用户。
+恢复桌面端 Tauri 工程源配置，使 `desktop-app` 能以 Tauri 桌面应用方式运行；同时解决或最小化顶部白色系统标题栏破坏深色 UI 观感的问题。
 
-Codex 保守拆解结论：
+## What To Build
 
-- 本次只做前端入口接线和状态文案。
-- 可接入的已有功能：AI 文案生成、OCR 文字识别、会员中心、OCR 历史/使用日志。
-- 不接入尚未实现的 AI 效果图生成、图片改尺寸、图片转 SVG、印刷检查、智能抠图、证件照、批量处理、拼版、素材库、模板中心、客户管理、软件设置、更新检查。
+- 初始化或恢复 `desktop-app/src-tauri/` 下可提交的 Tauri 2 源配置文件。
+- 补齐 Tauri 运行所需的最小 Rust 入口、配置文件和 capabilities。
+- 在不扩大权限的前提下配置窗口外观，使标题栏 / 系统 chrome 与现有深色工作台尽量一致。
+- 如采用 `decorations: false`、frameless 或自定义标题栏，必须同时提供可用的拖拽区域和窗口控制能力，且不破坏现有页面布局。
+- 补齐或修正 `desktop-app/package.json` 中 Tauri 开发脚本和官方依赖。
+- 更新 `docs/module-context/sprint-04-task-07-tauri-source-init/context.md`，记录初始化方式、关键配置、权限边界、验证结果、风险和回滚方式。
+- 追加更新 `PROGRESS.md`。
 
-## 本次只开发什么
+## What Not To Build
 
-- 修正 Sidebar 核心功能入口：
-  - `AI 文案生成` 必须可点击并跳转 `/ai-ad-copy`。
-  - `OCR 文字识别` 保持可点击并跳转 `/ocr`。
-  - `会员中心` 保持可点击并跳转 `/membership`。
-  - `使用日志` 保持可点击并跳转 `/history`。
-  - 未实现功能继续 disabled，并显示“即将开放”。
-- 修正 Dashboard 快捷入口：
-  - `AI 文案生成` 必须可点击并跳转 `/ai-ad-copy`。
-  - `OCR` 必须可点击并跳转 `/ocr`。
-  - 如果新增 `会员中心` 快捷入口，必须跳转 `/membership`，且不能破坏现有 6 宫格整体视觉；如不新增，则至少保证 Sidebar 入口可用。
-  - 未实现快捷入口必须保持 disabled，并通过视觉和文案明确“即将开放”。
-- 修正入口文案：
-  - 已可用入口不要显示“即将开放”。
-  - 未实现入口不要显示成已可用、在线、已接入或真实生成能力。
-- 必要时调整 `QuickEntryCard.vue` 的 disabled 展示，让禁用入口有清晰不可点击状态。
-- 必要时更新 `docs/module-context/sprint-04-task-05-shortcut-entry-wiring/context.md`，记录本任务入口映射、未实现功能和后续扩展点。
-- 完成后追加更新 `PROGRESS.md`，记录实现范围、测试、风险和回滚方式。
+- 不做 EXE packaging。
+- 不生成安装包。
+- 不新增自动更新能力。
+- 不发布版本。
+- 不接入真实 Provider。
+- 不修改后端 API、数据库、shared DTO、Auth、Credit、Payment 或 Provider 逻辑。
+- 不修改本地 OCR 服务启动方式。
+- 不改 Dashboard 业务布局、业务卡片、路由功能或页面数据逻辑，除非自定义标题栏必须做最小壳层适配。
+- 不修改或提交 `desktop-app/src-tauri/target/**`。
 
-## 本次不开发什么
+## Allowed Files
 
-- 不开发 AI 效果图生成。
-- 不开发图片改尺寸、DPI、裁切。
-- 不开发图片转 SVG、印刷检查、智能抠图、证件照、批量处理、拼版、素材库、模板中心、客户管理、软件设置或更新检查。
-- 不新增后端 API。
-- 不修改数据库、DDL、migration、模型、credit、payment、provider、auth、Tauri 权限或本地 OCR 服务。
-- 不接入真实 AI 图片 Provider。
-- 不接入真实支付。
-- 不新增依赖。
-- 不改 package/lockfile。
-- 不重构 Dashboard 布局和视觉系统。
-
-## 允许修改哪些文件
-
-- `desktop-app/src/components/dashboard/AppSidebar.vue`
-- `desktop-app/src/components/dashboard/QuickEntryCard.vue`
-- `desktop-app/src/pages/dashboardMock.ts`
-- `desktop-app/src/pages/DashboardPage.vue`
-- `docs/module-context/sprint-04-task-05-shortcut-entry-wiring/context.md`（可新增）
-- `PROGRESS.md`
-- `tasks/current-task.md`
-
-## 禁止修改哪些文件
-
-- `cloud-backend/**`
-- `shared/**`
-- `desktop-app/src-tauri/**`
-- `desktop-app/local-service/**`
+- `desktop-app/src-tauri/tauri.conf.json`
+- `desktop-app/src-tauri/tauri.conf.json5`
+- `desktop-app/src-tauri/Cargo.toml`
+- `desktop-app/src-tauri/Cargo.lock`
+- `desktop-app/src-tauri/src/main.rs`
+- `desktop-app/src-tauri/src/lib.rs`
+- `desktop-app/src-tauri/capabilities/*.json`
+- `desktop-app/src-tauri/icons/**`（仅 Tauri 默认图标或项目已有图标的必要接入）
 - `desktop-app/package.json`
 - `desktop-app/package-lock.json`
-- `package.json`
-- `package-lock.json`
-- `desktop-app/src/router.ts`，除非发现现有路由缺失且必须补齐；如需修改，先在交付说明中说明原因
-- 数据库文件、日志、构建产物、本地缓存和生成物
+- `desktop-app/src/App.vue`（仅当窗口拖拽区或自定义标题栏需要最小适配）
+- `desktop-app/src/components/dashboard/AppTopbar.vue`（仅当与页面顶部栏整合自定义标题栏时）
+- `desktop-app/src/styles/**`（仅当已有样式体系需要最小标题栏样式补充）
+- `docs/09-desktop-app-guide.md`
+- `docs/26-desktop-dashboard-ui-redesign.md`
+- `docs/module-context/sprint-04-task-07-tauri-source-init/context.md`
+- `PROGRESS.md`
+- `tasks/current-task.md`（完成后仅允许状态、分支、简短完成摘要、commit/PR 信息）
 
-## 本地环境和服务规则
+如执行过程中确认必须修改上述范围外文件，且属于 Tauri 初始化的必要文件，必须先暂停并请求用户或 Codex 更新任务单。
 
-- 本任务是前端入口接线，默认不需要启动数据库、Redis、Docker 或本地 OCR 服务。
-- 如需本地启动前端，只运行本机 Node/npm。
-- 不默认使用 Docker；只有用户明确批准 Docker fallback 时才允许。
+## Forbidden Files
 
-## 注释语言要求
+- `desktop-app/src-tauri/target/**`
+- `cloud-backend/**`
+- `shared/**`
+- `desktop-app/local-service/**`
+- `official-website/**`
+- `.github/**`
+- 根目录 `package.json`
+- 根目录 `package-lock.json`
+- 数据库 DDL / migrations
+- Provider、Auth、Credit、Payment、Billing 相关文件
+- 与 Tauri 初始化和标题栏无关的 Dashboard 业务逻辑
 
-- CC 新增或修改代码注释时必须使用中文。
-- 第三方协议、外部 API 固定术语、错误码、英文专有名词和工具原始输出除外。
+## Dependency Permission
 
-## 是否允许新增依赖
+本任务允许新增或恢复 Tauri 官方必要依赖，但仅限以下范围：
 
-不允许。
+- `@tauri-apps/api`
+- `@tauri-apps/cli`
+- Rust 侧 Tauri 2 官方 crate 及其初始化所需依赖
 
-## 是否涉及重大变更
+禁止新增非 Tauri 官方依赖。禁止升级与本任务无关的前端、后端或根目录依赖。若 npm 或 Cargo 自动改动超出 Tauri 初始化必要范围，必须暂停说明原因并请求确认。
 
-否。
+## Major Change Status
 
-本任务只修改桌面端已有入口映射和文档记录，不涉及数据库、API contract、Provider、Auth、Credit、Payment、Tauri 权限、CI 或依赖。
+`MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-## 高风险边界
+原因：本任务会恢复 Tauri 工程源配置，并可能修改桌面窗口 chrome、Tauri capabilities、依赖和 lockfile。这些属于高风险边界，但本任务单已明确限定允许范围和验收要求。
 
-本任务不得触碰以下高风险边界：
+仍需暂停确认的情况：
 
-- 数据库 schema / DDL / migration
-- API / OpenAPI / shared DTO
-- Auth / Token / 权限
-- Provider / credit / payment / provider cost
-- Tauri permissions
-- dependencies / lockfiles
-- CI / workflows / deployment
-- filesystem permissions
-- 删除文件、重命名目录、大规模重构
+- 需要扩大 Tauri capabilities 权限到文件系统、shell、网络白名单或远程执行。
+- 需要修改本地 Python 服务启动、sidecar、打包配置或 updater。
+- 需要修改 CI、Docker、部署或环境变量契约。
+- 需要删除文件、重命名目录或大规模重构。
+- 需要修改后端、数据库、shared DTO、Provider、Auth、Credit 或 Payment。
 
-如果实现过程中发现必须触碰以上任一边界，CC 必须暂停并请求 Codex/用户更新任务单。
+## Security Requirements
 
-## 验收标准
+- 不写入真实 API Key、Token、密码、生产连接串或用户隐私数据。
+- 不把 Provider API Key 放入客户端。
+- 不绕过云端授权、设备绑定、套餐权限或扣费链路。
+- Tauri capabilities 必须最小化，只允许应用当前运行所需权限。
+- 不新增 shell、filesystem、remote execution、全局网络访问等高风险能力，除非用户另行确认。
+- 不修改 `target/**` 构建产物。
 
-- [ ] Sidebar 中 `AI 文案生成` 可点击，并跳转 `/ai-ad-copy`。
-- [ ] Sidebar 中 `OCR 文字识别` 可点击，并跳转 `/ocr`。
-- [ ] Sidebar 中 `会员中心` 可点击，并跳转 `/membership`。
-- [ ] Sidebar 中 `使用日志` 可点击，并跳转 `/history`。
-- [ ] Dashboard 快捷入口中 `AI 文案生成` 可点击，并跳转 `/ai-ad-copy`。
-- [ ] Dashboard 快捷入口中 `OCR` 可点击，并跳转 `/ocr`。
-- [ ] 未实现功能仍然 disabled，不会跳转到错误页面，也不会显示成已接入真实功能。
-- [ ] 禁用入口视觉上明确不可点击，并显示“即将开放”或等价中文说明。
-- [ ] 不破坏 Dashboard 当前大窗口/小窗口布局，不引入横向滚动条或整体缩放回归。
-- [ ] 登录、OCR、历史、AI 文案、会员中心页面仍可通过路由访问。
-- [ ] 没有修改后端、数据库、shared DTO、Tauri、依赖或 lockfile。
+## Acceptance Criteria
 
-## 测试方式
+- [ ] `desktop-app/src-tauri/` 下存在可提交的 Tauri 2 源配置文件，而不只是 `.gitkeep` 和 `target/**`。
+- [ ] `desktop-app/package.json` 包含可运行的 Tauri 开发脚本和必要官方依赖。
+- [ ] `npm run build` 在 `desktop-app` 下通过。
+- [ ] 如果本机 Rust / Tauri 环境可用，`npm run tauri dev` 能启动桌面应用。
+- [ ] 如果 `npm run tauri dev` 因本机环境不可用失败，必须记录缺失环境、失败原因和替代验证。
+- [ ] 标题栏 / 系统 chrome 已采用深色或等效方案；若平台限制导致不能完全深色化，必须记录原因和可接受降级。
+- [ ] 如采用 frameless / 自定义标题栏，窗口拖拽、关闭、最小化、最大化仍可用。
+- [ ] 未修改或提交 `desktop-app/src-tauri/target/**`。
+- [ ] 未修改后端、数据库、shared DTO、Provider、Auth、Credit、Payment、CI 或根目录依赖。
+- [ ] 模块上下文已更新。
+- [ ] `PROGRESS.md` 已追加记录。
+- [ ] `git diff --check` 通过。
+
+## Test Method
 
 必须运行：
 
@@ -152,59 +152,44 @@ npm run build
 git diff --check
 ```
 
-建议人工验证：
+如果 Tauri 环境可用，必须运行：
 
-- 打开桌面端开发页面或构建后的前端页面。
-- 点击 Sidebar：AI 文案生成、OCR 文字识别、会员中心、使用日志。
-- 点击 Dashboard 快捷入口：AI 文案生成、OCR。
-- 确认未实现入口不可点击或点击无跳转，并显示“即将开放”。
-- 缩小窗口，确认 Dashboard 没有出现不可接受的滚动条或布局错位。
+```powershell
+cd ad-assistant/desktop-app
+npm run tauri dev
+```
 
-如果无法启动前端页面，CC 必须说明原因，并至少提供 `npm run build` 和代码级路由映射检查结果。
+如果 `npm run tauri dev` 不可用，执行者必须提供：
 
-## 安全检查
+- 本机缺失的具体工具或错误信息。
+- `desktop-app/src-tauri/` 源文件清单。
+- `package.json` Tauri 脚本和依赖检查结果。
+- `npm run build` 结果。
+- 未修改 `target/**` 的说明。
 
-- 不下发 API Key 到客户端。
-- 不由客户端扣点。
-- 不由客户端决定套餐。
-- 不绕过云端授权。
-- 不明文保存 Token。
-- 不新增真实 AI Provider 调用。
-- 不新增支付、充值到账或管理员赠送逻辑。
-- 不记录用户隐私数据。
+## Rollback Plan
 
-## 回滚方案
+- revert 本任务 commit 可移除 Tauri 源配置、依赖和标题栏适配。
+- 如果只需要回滚标题栏方案，可恢复 `tauri.conf.*` 的窗口配置和相关 Vue/CSS 最小适配。
+- 本任务不涉及数据库迁移或远端数据变更，无数据回滚步骤。
 
-- revert 本任务 commit 即可恢复入口映射和文档记录。
-- 如果只改了前端入口配置，可恢复 `AppSidebar.vue`、`dashboardMock.ts`、`QuickEntryCard.vue`、`DashboardPage.vue` 到任务前版本。
-- 本任务不涉及数据库迁移和数据回滚。
-
-## CC 必须暂停的情况
-
-- 需要修改 `Allowed Files` 之外的文件，且不是现有路由缺失导致的必要补齐。
-- 需要改后端 API、数据库、shared DTO、Provider、Auth、Credit、Payment、Tauri 权限、依赖或 CI。
-- 发现 `/ai-ad-copy`、`/ocr`、`/membership`、`/history` 任一路由不存在且无法在当前允许范围内确认。
-- 需要删除文件、重命名目录或做大规模重构。
-- `npm run build` 失败且修复超出当前入口接线范围。
-- 发现 secrets、真实密钥、生产连接串或用户敏感数据泄露风险。
-- 需要 Docker 但未获用户明确批准。
-
-## 完成输出要求
+## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- 实现内容
+- Tauri 源配置初始化方式
+- 标题栏 / 窗口 chrome 方案
+- capabilities 权限清单和是否最小化
+- 新增或恢复的依赖
 - 未实现内容
 - 测试命令和结果
-- 人工验证结果或未验证原因
+- `npm run tauri dev` 人工验证结果或未验证原因
 - 自审结论
-- reviewer-mode 自查结果
-- 风险点
-- 回滚方式
-- 是否触发重大变更
+- reviewer-mode 自查结论
+- 是否触发高风险暂停规则
 - 是否更新模块上下文
 - 是否更新 `PROGRESS.md`
+- 风险和回滚方式
 - 中文 commit message
 - PR title/body 中文摘要
-- 合并后的中文交付说明，包括用户确认来源、PR 编号、合并方式和合并结果

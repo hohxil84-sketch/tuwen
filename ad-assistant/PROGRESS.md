@@ -204,6 +204,54 @@ PR：
 - 后续任务：用户从 Sprint-04 候选或新需求中选择下一任务
 - 回滚方式：revert 对应提交，或恢复 AppSidebar.vue 中 AI 文案生成 disabled 状态
 
+## 2026-06-02 — S04-T07: Tauri 工程源配置初始化与深色标题栏恢复
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-04-task-07-tauri-source-init`
+
+### 范围
+
+- 目标：补齐最小 Tauri 2 源配置，恢复桌面端可运行的 Tauri 工程，frameless 窗口 + 自定义深色标题栏。
+- 已实现：
+  - Tauri 2 源配置文件 10 个（Cargo.toml、main.rs、lib.rs、tauri.conf.json、capabilities、build.rs、.gitignore、icons）
+  - package.json 新增 @tauri-apps/api + @tauri-apps/cli 依赖和 tauri script
+  - frameless 窗口（decorations: false）+ AppTopbar 集成自定义标题栏（拖拽区 + 窗口控制按钮）
+  - capabilities 最小权限：仅 core:window 7 项
+  - vite.config.ts 忽略 target/ 避免文件监控器冲突
+- 未实现：EXE 打包、品牌图标替换、窗口阴影修复
+
+### 主要改动
+
+- `desktop-app/src-tauri/`：10 个新建文件（Cargo.toml、Cargo.lock、build.rs、src/main.rs、src/lib.rs、tauri.conf.json、capabilities/default.json、icons/、.gitignore）
+- `desktop-app/package.json`：新增 Tauri 依赖 + tauri script
+- `desktop-app/package-lock.json`：自动更新
+- `desktop-app/vite.config.ts`：server.watch.ignored 配置
+- `desktop-app/src/components/dashboard/AppTopbar.vue`：data-tauri-drag-region + 窗口控制按钮
+- `docs/module-context/sprint-04-task-07-tauri-source-init/context.md`（NEW）
+- `PROGRESS.md`：本条记录
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是（vite.config.ts 属于 Tauri 运行必要配置）
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：是
+
+### 测试结果
+
+- `npm run build`：74 modules, 0 errors
+- `git diff --check`：通过
+- `npm run tauri dev`：exit 0，Cargo 355 crates 编译成功，desktop-app.exe 启动
+- frameless 窗口验证：无系统标题栏，深色工作台覆盖整个窗口区域
+
+### 风险和后续
+
+- 残余风险：frameless 窗口无原生系统菜单/阴影；占位图标需替换
+- 后续任务：Tauri EXE 打包、品牌图标替换、窗口阴影修复
+- 回滚方式：revert 对应提交，或恢复 decorations=true + 移除自定义标题栏代码
+
 ## 2026-06-02 - Sprint-04 Task-01 Provider Reliability (Pre-flight + Fallback/Retry)
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED
