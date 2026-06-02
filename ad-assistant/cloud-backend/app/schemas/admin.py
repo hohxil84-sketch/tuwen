@@ -122,3 +122,24 @@ class AdminUsageEventItem(BaseModel):
     created_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Monthly grant (S05-R04)
+# ---------------------------------------------------------------------------
+
+
+class MonthlyGrantRequest(BaseModel):
+    """Optional target year/month for manual monthly grant trigger."""
+
+    year: int | None = Field(default=None, ge=2024, le=2100)
+    month: int | None = Field(default=None, ge=1, le=12)
+
+
+class MonthlyGrantResponse(BaseModel):
+    """Summary after a monthly grant run."""
+
+    granted: int
+    skipped: int
+    failed: int
+    errors: list[dict]
