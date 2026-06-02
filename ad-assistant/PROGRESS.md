@@ -4,6 +4,49 @@
 
 Claude Code / DeepSeek 每完成一个模块或任务后，必须追加一条记录。记录要基于事实，保持简洁；不得写入真实密钥、Token、生产数据库连接串或用户隐私数据。
 
+## 2026-06-02 — S04-T09: Tauri 内测品牌图标替换
+
+### 范围
+
+- 目标：替换 Tauri 默认占位图标为内测品牌图标，提升打包产物和 Windows 应用图标的项目识别度。
+- 已实现：
+  - 用 Pillow 生成内测图标：暗色圆角背景 + 几何 "A" 字标识 + 双色渐变（青→蓝）
+  - `icon.ico`（7 尺寸：16–256 px）+ `icon.png`（128×128 RGBA）
+  - `tauri.conf.json` 图标引用未变（`icons/icon.ico` + `icons/icon.png`），与文件一致
+  - `npm run build`：74 modules, 0 errors
+  - `npm run tauri build`：EXE (8.2 MB) + MSI (2.7 MB) 生成成功
+- 未实现：
+  - NSIS 安装包：GitHub 下载 NSIS 3.11 二进制超时（网络问题，与本任务无关）
+  - 正式品牌 VI / logo 体系 / 版权注册
+  - 人工验证图标在 Windows 任务栏/窗口中的显示效果
+
+### 主要改动
+
+- 替换 2 文件：`desktop-app/src-tauri/icons/icon.ico`、`icon.png`（从 Tauri 默认占位 → 内测品牌图标）
+- 新增 1 文件：`desktop-app/src-tauri/icons/generate_icon.py`（临时生成脚本）
+- 修改 1 文件：`docs/17-release-and-update.md`（占位图标 → 内测图标已替换）
+- 新增 1 文件：`docs/module-context/sprint-04-task-09-tauri-brand-icon/context.md`
+
+### 自检结果
+
+- 任务单完整：是（Codex 起草）
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是
+- 未加入密钥或生产凭据：是
+- 未新增依赖：是（仅使用本机已有 Pillow）
+
+### 测试结果
+
+- 前端构建（npm run build）：74 modules, 0 errors
+- Tauri 打包（npm run tauri build）：EXE + MSI 生成成功，NSIS 网络超时（无关）
+- git diff --check：通过
+
+### 风险和后续
+
+- 残余风险：正式品牌图标仍待确认；NSIS 下载偶发超时；人工图标验证建议执行
+- 后续任务：无直接后续，正式品牌图标可独立任务
+- 回滚方式：revert 本任务 commit 恢复 Tauri 默认图标
+
 ## 2026-06-02 — S04-T04: 会员/套餐/充值流程 (Membership / Package / Recharge)
 
 ### 范围
