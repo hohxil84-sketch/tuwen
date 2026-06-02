@@ -48,6 +48,8 @@ export interface CloudAPIErrorDetail {
   code: string;
   message: string;
   details?: Record<string, unknown>;
+  /** Backend-assigned request_id, preserved on error for troubleshooting. */
+  request_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,10 +184,14 @@ async function request<T>(
   }
 
   if (!response.ok || !body.success) {
-    const err = body.error || {
+    const err: CloudAPIErrorDetail = body.error || {
       code: "UNKNOWN_ERROR",
       message: `请求失败 (HTTP ${response.status})`,
     };
+    // Preserve request_id on the error object for caller troubleshooting
+    if (body.request_id) {
+      err.request_id = body.request_id;
+    }
     throw err;
   }
 
@@ -384,6 +390,7 @@ export function sanitizeApiError(err: CloudAPIErrorDetail): string {
     PLAN_EXPIRED: "套餐已过期，请续费。",
     FEATURE_DISABLED: "当前套餐不支持此功能。",
     VALIDATION_ERROR: "输入格式不正确，请检查后重试。",
+    INSUFFICIENT_BALANCE: "积分余额不足，请充值后再试。",
     RATE_LIMITED: "请求过于频繁，请稍后再试。",
     NETWORK_ERROR: "网络连接失败，请检查网络后重试。",
     REQUEST_TIMEOUT: "请求超时，请检查网络后重试。",

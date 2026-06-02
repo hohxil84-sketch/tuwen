@@ -59,6 +59,7 @@ Sprint-02 Task-05 新增：
   - Token 仅存 JavaScript 内存，不落盘
   - 提供 login/logout/callMockAdCopy 方法
   - 错误消息自动脱敏为中文用户友好提示
+  - 402/INSUFFICIENT_BALANCE 错误：AI 文案页面展示"去充值"按钮 + request_id，引导用户跳转会员中心（S05-R01）
 
 ## UI MVP 页面
 
