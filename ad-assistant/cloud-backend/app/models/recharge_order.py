@@ -1,4 +1,12 @@
-"""RechargeOrder model — 用户充值/购买套餐订单记录."""
+"""RechargeOrder model — 用户充值/购买套餐订单记录.
+
+Order status lifecycle::
+
+    PENDING ──▶ COMPLETED   (payment succeeds, credits granted)
+    PENDING ──▶ FAILED      (processing error or validation failure)
+
+Transitions from COMPLETED or FAILED are forbidden.
+"""
 
 import uuid
 from datetime import datetime, timezone
@@ -7,6 +15,26 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
+
+# ---------------------------------------------------------------------------
+# Order status constants — single source of truth
+# ---------------------------------------------------------------------------
+
+ORDER_STATUS_PENDING = "pending"
+ORDER_STATUS_COMPLETED = "completed"
+ORDER_STATUS_FAILED = "failed"
+
+_VALID_ORDER_STATUSES: frozenset[str] = frozenset({
+    ORDER_STATUS_PENDING,
+    ORDER_STATUS_COMPLETED,
+    ORDER_STATUS_FAILED,
+})
+
+_ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
+    ORDER_STATUS_PENDING: frozenset({ORDER_STATUS_COMPLETED, ORDER_STATUS_FAILED}),
+    ORDER_STATUS_COMPLETED: frozenset(),
+    ORDER_STATUS_FAILED: frozenset(),
+}
 
 
 class RechargeOrder(Base):
@@ -33,7 +61,11 @@ class RechargeOrder(Base):
         String(50), default="simulated", server_default="'simulated'"
     )
     status: Mapped[str] = mapped_column(
-        String(20), default="pending", server_default="'pending'"
+        String(20), default=ORDER_STATUS_PENDING,
+        server_default=f"'{ORDER_STATUS_PENDING}'",
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, default=None,
     )
     description: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
@@ -42,5 +74,8 @@ class RechargeOrder(Base):
         server_default=func.now(),
     )
     completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    failed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )

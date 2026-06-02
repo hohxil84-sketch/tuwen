@@ -18,6 +18,11 @@ class RechargeRequest(BaseModel):
         gt=0,
         description="Custom recharge amount in CNY",
     )
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Client-generated idempotency key for duplicate detection",
+    )
 
 
 class RechargeResponse(BaseModel):
@@ -31,6 +36,7 @@ class RechargeResponse(BaseModel):
     status: str
     payment_method: str
     plan_changed: bool = False
+    idempotent_replay: bool = False
 
 
 class OrderItem(BaseModel):

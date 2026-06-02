@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # ---- Simulated payment ---------------------------------------------------
     ENABLE_SIMULATED_PAYMENT: bool = False  # dev/test only — must be False in production
 
+    # ---- Recharge risk control -----------------------------------------------
+    MAX_RECHARGE_AMOUNT_CNY: int = 99999        # per-order cap
+    MIN_RECHARGE_AMOUNT_CNY: int = 1            # per-order floor
+    RECHARGE_RATE_LIMIT_COUNT: int = 10         # max orders per window
+    RECHARGE_RATE_LIMIT_WINDOW_SECONDS: int = 3600  # 1 hour sliding window
+
     # ---- Pre-flight balance check -------------------------------------------
     MIN_CREDIT_BALANCE_FOR_PROVIDER_CALL: int = 1  # absolute floor
     FEATURE_MIN_CREDITS: dict = {

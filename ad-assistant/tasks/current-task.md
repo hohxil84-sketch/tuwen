@@ -1,152 +1,131 @@
-# S05-R05: Provider 健康检查与熔断器
+# S05-R06: 模拟充值风控与订单状态加固
 
 ## 状态
 
-`COMPLETED`
+`IN_PROGRESS`
 
 ## 分支
 
-`feature/sprint-05-risk-05-provider-health-circuit`
-
-## 完成摘要
-
-- `circuit_breaker.py`（NEW）：CLOSED → OPEN → HALF_OPEN 三态熔断器（阈值 3 次失败，冷却 60s）
-- `route_and_execute_provider_call` 集成熔断器：调用前 CB 检查，成功/失败报告
-- `GET /api/v1/admin/provider-health`：管理员/operator 查看所有 Provider 熔断状态
-- `ProviderHealthItem` + `ProviderHealthResponse` schema
-- 18 tests：状态机全生命周期（9）+ 注册表（5）+ admin 端点权限（3）+ 异常（1）
-- 全量：350 passed, 74 skipped
-- 未实现：DB 持久化、动态参数、HALF_OPEN 并发控制
+`feature/sprint-05-risk-06-recharge-risk-control`
 
 ## 背景
 
-S04-T01 已实现 `FALLBACK_RULES` 降级链和 `_call_with_retry` 重试机制。当前 `route_and_execute_provider_call` 在 primary provider 失败后会尝试 fallback，但缺少熔断器（circuit breaker）——连续失败后仍会反复尝试同一个 Provider，浪费资源和用户等待时间。
+当前充值是 simulated 即时到账（`ENABLE_SIMULATED_PAYMENT=True` 时），适合 MVP 演示，但缺少防重复提交、订单状态机、金额校验和频率限制。真实支付前应先把订单状态和风控基础打牢。
 
-Provider 故障时仍缺少：
-- 熔断保护：连续失败后快速失败，不再尝试
-- 冷却恢复：一段时间后允许半开探测
-- 可观测性：管理员可查询各 Provider 健康状态
+S04-T04 已实现 `RechargeOrder` 模型和 `create_recharge_order()`，但：
+- 订单状态仅有 `pending` / `completed`，无显式状态机守卫
+- 无幂等键，重复提交会创建多个订单
+- 无充值金额上下限校验（只校验了 `> 0`）
+- 无频率限制
 
 ## 用户目标
 
-在真实 Provider 不稳定时减少连续失败，提供最小健康状态和熔断保护，并允许管理员查看 Provider 状态。
+在不接入真实支付的前提下，提升模拟充值的安全边界：订单状态清晰、重复提交可控、异常金额/频率可拦截。
 
 ## What To Build
 
-### 1. 熔断器（NEW: `circuit_breaker.py`）
+### 1. 订单状态机（`recharge_service.py`）
 
-在 `app/providers/circuit_breaker.py` 中实现：
+定义状态常量与合法转移：
 
-- `CircuitState` 枚举：`CLOSED`（正常）→ `OPEN`（熔断）→ `HALF_OPEN`（探测恢复）→ `CLOSED`
-- `CircuitBreaker` 类：
-  - 配置：`failure_threshold`（默认 3 次连续失败）、`cooldown_seconds`（默认 60s）
-  - `before_call() -> bool`：调用前检查 — OPEN 且未冷却完成 → False；OPEN 且冷却完成 → 转 HALF_OPEN → True；CLOSED/HALF_OPEN → True
-  - `on_success()`：成功 → 重置回 CLOSED
-  - `on_failure()`：失败 → CLOSED/HALF_OPEN 下递增计数，达到阈值 → OPEN
-  - `state` / `consecutive_failures` / `opened_at` 属性（用于健康检查展示）
-- `CircuitBreakerRegistry`：`dict[provider_name, CircuitBreaker]` + 模块级单例
-- `CircuitBreakerOpenError` 异常
+```
+PENDING → COMPLETED  (simulated payment 成功)
+PENDING → FAILED     (处理异常)
+```
 
-### 2. 集成到 provider_service.py
+- 不允许从 `completed` / `failed` 回退
+- `complete_order(db, order_id)` / `fail_order(db, order_id)` 守卫函数
+- `RechargeOrder.status` 使用 module-level 常量而非裸字符串
 
-修改 `route_and_execute_provider_call`：
+### 2. 幂等键防重复提交
 
-- 在尝试每个 Provider 之前，检查其熔断器状态
-- 熔断打开 → 记录日志 + 跳过该 Provider（若为 primary 则尝试 fallback；若 fallback 也熔断则抛出 `CircuitBreakerOpenError`）
-- Provider 调用成功 → `cb.on_success()`
-- Provider 调用失败（所有可捕获异常，除 `InsufficientBalanceError` 外）→ `cb.on_failure()`
-- 熔断跳过时在 `provider_call_log` 中记录 `error_code="CIRCUIT_OPEN"`
+- `RechargeOrder` 模型新增 `idempotency_key: str | None` 列（String(64)）
+- `RechargeRequest` schema 新增 `idempotency_key: str | None`
+- 创建订单前查询：同一 user 下相同 idempotency_key 的已有订单
+  - 已完成 → 返回已有订单结果（幂等返回）
+  - 待处理 → 409 Conflict
+  - 不存在 → 正常创建
+- idempotency_key 为 None 时跳过幂等检查
 
-### 3. 健康检查 Admin 端点
+### 3. 充值金额校验
 
-在 `admin.py` 中新增 `GET /api/v1/admin/provider-health`：
+- 最小金额：1 CNY（已有 `> 0` 检查，补充明确常量）
+- 最大金额：`MAX_RECHARGE_AMOUNT_CNY`（默认 99999 CNY，可配置）
+- `settings` 新增配置项
 
-- 权限：`provider_logs:read`
-- 返回每个已注册 Provider 的熔断器状态：
-  ```json
-  {
-    "providers": {
-      "deepseek": {"state": "CLOSED", "consecutive_failures": 0, "opened_at": null},
-      "mock": {"state": "CLOSED", "consecutive_failures": 0, "opened_at": null}
-    }
-  }
-  ```
+### 4. 频率限制
 
-### 4. Schema
+- 同一用户 N 秒内最多 M 笔充值请求
+- 配置：`RECHARGE_RATE_LIMIT_COUNT`（默认 10）、`RECHARGE_RATE_LIMIT_WINDOW_SECONDS`（默认 3600）
+- 统计近期订单数基于 `RechargeOrder.created_at`
+- 超限返回 429 Too Many Requests
 
-在 `admin.py` schemas 中新增 `ProviderHealthItem` + `ProviderHealthResponse`。
+### 5. 数据库迁移
 
-### 5. 测试（NEW: `tests/test_circuit_breaker.py`）
+- `migrations/002_add_recharge_risk_control.sql`：添加 `idempotency_key` 列
+- `migrations/002_rollback.sql`：回滚 SQL
 
-- CLOSED → OPEN 转换：连续失败达到阈值后熔断
-- OPEN 期间拒绝调用：`before_call()` 返回 False
-- 冷却后转 HALF_OPEN：冷却时间到后允许一次探测
-- HALF_OPEN 成功恢复：探测成功 → CLOSED
-- HALF_OPEN 失败再熔断：探测失败 → 立即 OPEN
-- 单次成功重置计数
-- 模块级单例注册表
-- Admin 端点返回 Provider 健康状态
-- Provider 集成：连续失败后 primary 被熔断 → 走 fallback
+### 6. 测试（`test_recharge.py` 扩展）
 
-### 6. 文档
+- 幂等：相同 key 返回已有订单、重复 pending 返回 409、无 key 正常
+- 金额：小于最小值拒绝、超过最大值拒绝、合法金额通过
+- 频率：超限拒绝、窗口外允许
+- 状态机：complete 后不可再 complete、failed 后不可 complete
+- API 集成：幂等返回、429 响应
 
-- 新增 `docs/module-context/sprint-05-risk-05-provider-health-circuit/context.md`
-- 更新 `docs/06-provider-architecture.md`（如需要）
+### 7. 文档
 
-### 7. 进度记录
-
-- 追加更新 `PROGRESS.md`
+- 新增 `docs/module-context/sprint-05-risk-06-recharge-risk-control/context.md`
+- 更新 `PROGRESS.md`
 
 ## What Not To Build
 
-- 不做复杂运维后台
-- 不做数据库持久化熔断状态（内存即可，重启重置）
-- 不做动态路由规则（规则已在 router.py）
-- 不接入新 Provider
-- 不修改价格模型或计费逻辑
-- 不在桌面端展示 Provider 健康状态
-- 不新增依赖（包括 resilience4j、pybreaker 等）
+- 不接入微信支付/支付宝
+- 不处理真实回调验签
+- 不做退款 / 取消订单 API
+- 不做完整反欺诈系统
+- 不修改 `credit_service.py`
+- 不做 IP 级别风控
 
 ## Allowed Files
 
-- `cloud-backend/app/providers/circuit_breaker.py`（NEW）
-- `cloud-backend/app/services/provider_service.py`
-- `cloud-backend/app/api/v1/admin.py`
-- `cloud-backend/app/schemas/admin.py`
-- `cloud-backend/tests/test_circuit_breaker.py`（NEW）
-- `docs/06-provider-architecture.md`
-- `docs/module-context/sprint-05-risk-05-provider-health-circuit/context.md`（NEW）
+- `cloud-backend/app/models/recharge_order.py`
+- `cloud-backend/app/services/recharge_service.py`
+- `cloud-backend/app/api/v1/credits.py`
+- `cloud-backend/app/schemas/recharge.py`
+- `cloud-backend/app/core/config.py`
+- `cloud-backend/migrations/002_add_recharge_risk_control.sql`（NEW）
+- `cloud-backend/migrations/002_rollback.sql`（NEW）
+- `cloud-backend/tests/test_recharge.py`
+- `docs/19-pricing-and-credit-system.md`
+- `docs/module-context/sprint-05-risk-06-recharge-risk-control/context.md`（NEW）
 - `PROGRESS.md`
 - `tasks/current-task.md`
 
 ## Forbidden Files
 
-- Payment/Credit 计费规则
-- `credit_service.py`
+- 真实支付 SDK / Provider
 - desktop UI
 - Tauri permissions
 - CI/deployment
-- `app/models/**`（无新模型）
-- `app/core/config.py`（熔断参数硬编码在 circuit_breaker.py 中）
+- `credit_service.py`
 
 ## Acceptance Criteria
 
-- [ ] 连续失败后 Provider 被短暂熔断（默认 3 次失败，60s 冷却）
-- [ ] 熔断期间走 fallback 或返回明确 CIRCUIT_OPEN 错误
-- [ ] 冷却后允许半开探测恢复
-- [ ] 单次成功重置计数
-- [ ] 管理员可通过 `GET /api/v1/admin/provider-health` 查看所有 Provider 熔断状态
-- [ ] 测试覆盖：CLOSED→OPEN→HALF_OPEN→CLOSED 状态转换
+- [ ] 重复充值请求不会重复入账（幂等键）
+- [ ] 异常金额（≤0 或 >MAX）被拒绝
+- [ ] 高频请求被拒绝（429）
+- [ ] 订单状态变更受状态机守卫
+- [ ] 测试覆盖：幂等、异常金额、高频、状态机、正常成功路径
+- [ ] `python -m pytest tests/test_recharge.py -v` 通过
 - [ ] `python -m pytest tests/ -v` 通过
 - [ ] `git diff --check` 通过
 
 ## Test Method
 
-必须运行：
-
 ```powershell
 cd ad-assistant/cloud-backend
-python -m pytest tests/test_circuit_breaker.py -v
+python -m pytest tests/test_recharge.py -v
 python -m pytest tests/ -v
 ```
 
@@ -162,32 +141,33 @@ git diff --check
 
 `MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-原因：涉及 Provider 路由和调用可靠性，可能影响生产 AI 调用路径。
+原因：涉及充值、积分和风控逻辑，以及数据库 schema 变更（新增 idempotency_key 列）。
 
 必须暂停确认的情况：
-- 需要修改 Provider 接口（AsyncProvider base class）
-- 需要修改 Payment/Credit 计费逻辑
+- 需要接入真实支付 SDK
+- 需要修改 credit_service.py 或 credit_ledger 结构
 - 需要新增第三方依赖
 
 ## Security Requirements
 
-- 不泄露 API Key 或 raw provider payload
-- 熔断状态不允许由客户端篡改（仅服务端内存）
-- 健康检查端点受 `PermissionChecker("provider_logs:read")` 保护
+- 积分只能由服务端授予
+- 不信任客户端金额、套餐或订单状态
+- 不写入真实支付凭据
+- 幂等键不暴露其他用户订单信息
 
 ## Rollback Plan
 
 - revert 本任务 commit
-- Provider 调用恢复现有 retry/fallback 行为（无熔断器）
-- 熔断状态仅在内存，无数据库回滚需求
+- 运行 `migrations/002_rollback.sql` 删除 idempotency_key 列
+- 如已产生测试数据，通过 ledger 反向记录纠正
 
 ## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- 熔断规则说明
-- 健康检查范围
+- 状态机说明
+- 风控规则说明
 - 测试命令和结果
 - 未实现内容
 - 自审结论
