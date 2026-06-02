@@ -2,6 +2,35 @@
 
 本文件用于记录 AI 图文广告助手项目的模块级进度。
 
+## 2026-06-02 — S05-R03: RBAC 角色权限最小体系
+
+状态：IMPLEMENTED_SELF_REVIEW_PASSED
+
+分支：`feature/sprint-05-risk-03-rbac`
+
+### 范围
+
+- 目标：清理 RBAC 遗留代码、加固角色越权防护、formal signoff。
+- RBAC 基础设施此前已实现（ROLE_PERMISSIONS + PermissionChecker + 30 tests）。
+- 本次变更：
+  - 移除废弃 `get_admin_user` 函数（未被任何端点引用）
+  - 修正 `admin_service.py` 注释
+  - 新增 4 tests：default-deny（未知角色/user 角色 → 403）+ auth 不泄露 role
+- 未实现：角色编辑 UI、审计日志
+
+### 主要改动
+
+- 修改 3 文件：deps.py（-35 lines）、admin_service.py（注释）、test_admin.py（+4 tests）
+- 新增 1 文件：module context
+- 权限模型无变化、无新增依赖、无 DDL
+
+### 测试
+
+- `python -m pytest tests/test_admin.py -v`：27 passed
+- `python -m pytest tests/ -v`：385 passed, 74 skipped
+- `git diff --check`：通过
+
+
 ## 2026-06-02 — S05-R02: 基础后台最小可用管理台
 
 状态：IMPLEMENTED_SELF_REVIEW_PASSED

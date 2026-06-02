@@ -1,7 +1,8 @@
 """Admin query service — read-only aggregation for the admin dashboard (S05-R02).
 
 All methods require an authenticated admin user; authorisation is enforced
-by the `get_admin_user` dependency in the API layer, not in this service.
+by the ``PermissionChecker`` dependency in the API layer, not in this service.
+(S05-R03: migrated from deprecated ``get_admin_user`` to ``PermissionChecker``.)
 """
 
 import uuid

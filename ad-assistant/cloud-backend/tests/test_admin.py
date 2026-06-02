@@ -303,3 +303,99 @@ class TestBootstrapFallback:
         headers = await _auth_headers(test_user, test_device, test_session)
         resp = await client.get("/api/v1/admin/users", headers=headers)
         assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# TestDefaultDeny — unknown / empty roles get no permissions (S05-R03)
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultDeny:
+    """Verify that unknown or empty roles default to deny all."""
+
+    async def test_unknown_role_implicit_deny(
+        self, client, db_session, test_user, test_device, test_session, monkeypatch
+    ):
+        """A user whose role is not in ROLE_PERMISSIONS gets 403."""
+        from app.api.deps import ROLE_PERMISSIONS
+
+        monkeypatch.setattr(settings, "ADMIN_USER_IDS", [])
+        test_user.role = "nonexistent_role_xyz"
+        db_session.add(test_user)
+        await db_session.flush()
+
+        headers = await _auth_headers(test_user, test_device, test_session)
+        resp = await client.get("/api/v1/admin/users", headers=headers)
+        assert resp.status_code == 403
+        assert "nonexistent_role_xyz" not in ROLE_PERMISSIONS
+
+    async def test_default_user_role_denied(
+        self, client, db_session, test_user, test_device, test_session, monkeypatch
+    ):
+        """The default role='user' has no admin permissions → 403."""
+        monkeypatch.setattr(settings, "ADMIN_USER_IDS", [])
+        assert test_user.role == "user"
+
+        headers = await _auth_headers(test_user, test_device, test_session)
+        for endpoint, _perm in READ_ENDPOINTS:
+            resp = await client.get(endpoint, headers=headers)
+            assert resp.status_code == 403, f"{endpoint} should deny user role"
+
+        # grant (write) — also denied
+        resp = await client.post(
+            "/api/v1/admin/credits/grant",
+            headers=headers,
+            json={"user_id": str(test_user.id), "amount": 1, "description": "test"},
+        )
+        assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# TestRoleNotLeaked — auth endpoints must not expose role (S05-R03)
+# ---------------------------------------------------------------------------
+
+
+class TestRoleNotLeaked:
+    """Verify that authentication responses do not leak the user's role."""
+
+    async def test_login_response_excludes_role(
+        self, client, db_session, test_user
+    ):
+        """Login: UserInfo has id, account, plan_code — NOT role."""
+        from tests.conftest import FINGERPRINT
+
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "account": test_user.account,
+                "password": "correct-password",
+                "device_fingerprint": FINGERPRINT,
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["success"] is True
+        user_info = body["data"]["user"]
+        assert "role" not in user_info, "login must not expose role"
+        assert set(user_info.keys()) == {"id", "account", "plan_code"}
+
+    async def test_refresh_response_excludes_role(
+        self, client, db_session, test_user, test_device, test_session
+    ):
+        """Refresh: response data has no user object → no role leak."""
+        from tests.conftest import FINGERPRINT
+
+        _session, plain_token = test_session
+        resp = await client.post(
+            "/api/v1/auth/refresh",
+            json={
+                "refresh_token": plain_token,
+                "device_fingerprint": FINGERPRINT,
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        data = body["data"]
+        # RefreshData: access_token, refresh_token, token_type, expires_in
+        assert "role" not in data, "refresh must not expose role"
+        assert "user" not in data, "refresh must not include user object"
