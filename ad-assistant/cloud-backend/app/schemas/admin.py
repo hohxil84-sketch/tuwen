@@ -1,6 +1,13 @@
 """Admin schemas — request/response DTOs for admin operations."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
+
+
+# ---------------------------------------------------------------------------
+# Admin Grant (S04-T04 — existing)
+# ---------------------------------------------------------------------------
 
 
 class AdminGrantRequest(BaseModel):
@@ -20,3 +27,97 @@ class AdminGrantResponse(BaseModel):
     amount: int
     new_balance: int
     description: str | None
+
+
+# ---------------------------------------------------------------------------
+# Pagination (S05-R02)
+# ---------------------------------------------------------------------------
+
+
+class PaginatedItems(BaseModel):
+    """Shared pagination wrapper for admin list endpoints."""
+
+    items: list
+    total: int
+    limit: int
+    offset: int
+
+
+# ---------------------------------------------------------------------------
+# Admin list item schemas (S05-R02)
+# ---------------------------------------------------------------------------
+
+
+class AdminUserItem(BaseModel):
+    """Public-safe user row for admin listing."""
+
+    id: str
+    account: str
+    plan_code: str
+    status: str
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class AdminOrderItem(BaseModel):
+    """Recharge order row for admin listing."""
+
+    id: str
+    user_id: str
+    plan_code: str | None
+    amount_cny: int
+    credits: int
+    payment_method: str
+    status: str
+    description: str | None
+    created_at: datetime | None
+    completed_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class AdminCreditAccountItem(BaseModel):
+    """Credit account row for admin listing."""
+
+    id: str
+    user_id: str
+    plan_code: str
+    balance: int
+    monthly_grant: int
+    status: str
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class AdminProviderLogItem(BaseModel):
+    """Provider call log row for admin listing (no raw payload)."""
+
+    id: str
+    request_id: str | None
+    user_id: str | None
+    provider: str
+    model: str
+    feature: str
+    status: str
+    error_code: str | None
+    total_tokens: int
+    credits_charged: int | None
+    latency_ms: int | None
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class AdminUsageEventItem(BaseModel):
+    """Usage event row for admin listing (no metadata_json)."""
+
+    id: str
+    user_id: str | None
+    event_type: str
+    feature: str
+    request_id: str | None
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}

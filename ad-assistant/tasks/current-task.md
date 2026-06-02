@@ -1,4 +1,4 @@
-# S05-R01: 余额不足 402 桌面端充值引导
+# S05-R02: 基础后台最小可用管理台
 
 ## 状态
 
@@ -6,120 +6,135 @@
 
 ## 分支
 
-`feature/sprint-05-risk-01-insufficient-balance-ux`
+`feature/sprint-05-risk-02-basic-admin`
 
 ## 完成摘要
 
-- `cloudApi.ts`：`CloudAPIErrorDetail` 新增 `request_id?` 字段；`request()` 抛错时附加 `body.request_id`；`sanitizeApiError` codeMap 新增 `INSUFFICIENT_BALANCE`
-- `AdCopyPage.vue`：检测 `INSUFFICIENT_BALANCE` → 展示中文错误消息 + "去充值 →"按钮（跳转 `/membership`）+ request_id（小字等宽）；非 402 错误保持原有纯文本展示
-- 模块上下文 `docs/module-context/sprint-05-risk-01-insufficient-balance-ux/context.md` 已创建
-- `docs/09-desktop-app-guide.md` 已补充 402 UX 说明
-- `npm run build`：74 modules, 0 errors（含 vue-tsc 类型检查）
-- `git diff --check`：通过
-- `PROGRESS.md` 已追加记录
+- 后端新增 5 个只读 GET endpoint：`/api/v1/admin/users|orders|credit-accounts|provider-logs|usage-events`
+- 复用 `get_admin_user` 依赖，非管理员 403；敏感字段排除（password_hash/raw_usage/raw_response/metadata_json）
+- `admin_service.py`（NEW）：5 个查询方法 + _paginate helper
+- `test_admin.py`（NEW）：12 tests（权限隔离 5 + admin 访问 5 + 分页 2）
+- AdminPage.vue（NEW）：5 tab 页签 + 表格 + 分页 + 4 状态处理
+- Sidebar 新增"管理后台"入口（始终可见，权限服务端判断）
+- 后端回归：305 passed, 74 skipped；前端构建：77 modules, 0 errors
+- 未修改 DDL、models、Provider、Credit、Payment、config、CI、依赖
 
 ## 背景
 
-S04-T01 已实现 Provider 调用前余额检查，余额不足时后端返回 402 + `INSUFFICIENT_BALANCE` 错误码 + 中文提示。当前桌面端 `sanitizeApiError` 的 `codeMap` 缺少 `INSUFFICIENT_BALANCE` 映射，且 AI 文案页面只有纯文本错误提示，没有"去充值"入口和 `request_id` 展示。用户看到错误后不知道如何恢复。
+P0 MVP 包含"基础后台"。当前已有：
+- `ADMIN_USER_IDS` 白名单配置
+- `get_admin_user()` 依赖注入（检查 user_id ∈ ADMIN_USER_IDS，否则 403）
+- `POST /api/v1/admin/credits/grant`（积分赠送，已有）
 
-后端 402 响应格式（已有）：
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "INSUFFICIENT_BALANCE",
-    "message": "积分余额不足，当前余额 0 积分，至少需要 100 积分...",
-    "details": { "balance": 0, "required": 100 }
-  },
-  "request_id": "req_xxx"
-}
-```
-
-当前代码路径：
-1. `cloudApi.ts` `request()` → 检测 `!response.ok || !body.success` → 抛出 `body.error`（`{code, message, details}`），**丢失 `request_id` 和 HTTP status**
-2. `authStore.ts` `callMockAdCopy()` → 透传异常
-3. `AdCopyPage.vue` `handleSubmit()` → `catch` 中调用 `sanitizeApiError(apiErr)` → 仅得到中文字符串 → 纯文本展示
+但缺少可用的管理界面。用户、订单、积分账户、Provider 调用日志、使用事件仍只能靠数据库或 API 直接排查。S05-R02 补齐最小只读管理台。
 
 ## 用户目标
 
-当用户因余额不足（402 / `INSUFFICIENT_BALANCE`）无法生成 AI 文案时，桌面端能：
-- 清晰提示余额不足原因
-- 提供"去充值"按钮一键跳转会员中心
-- 保留 `request_id` 便于排查
+管理员登录桌面端后，可进入管理后台，查看用户、充值订单、积分账户、Provider 调用日志和使用事件的只读列表。
 
 ## What To Build
 
-### 1. `cloudApi.ts` — 错误对象补全（必要联动）
+### 后端 — 5 个只读 Admin Query Endpoint
 
-- `CloudAPIErrorDetail` 新增可选字段 `request_id?: string`
-- `request()` 函数在抛出错误时，将 `body.request_id` 附加到错误对象上，使调用方可追溯
-- `sanitizeApiError` 的 `codeMap` 新增：
-  ```
-  INSUFFICIENT_BALANCE: "积分余额不足，请充值后再试。"
-  ```
-- 不修改 `request()` 的成功路径和已有错误分支行为
+所有端点统一前缀 `/api/v1/admin`，复用 `get_admin_user` 依赖，非管理员返回 403。
 
-### 2. `AdCopyPage.vue` — 402 差异化 UX
+| # | 端点 | 说明 | 数据来源 |
+|---|------|------|---------|
+| 1 | `GET /api/v1/admin/users` | 用户列表（id, account, plan_code, created_at），支持 limit/offset | users 表 |
+| 2 | `GET /api/v1/admin/orders` | 充值订单列表（id, user_id, plan_code, amount_cny, credits, status, created_at），支持 limit/offset | recharge_orders 表 |
+| 3 | `GET /api/v1/admin/credit-accounts` | 积分账户列表（user_id, balance, plan_code, created_at），支持 limit/offset | credit_accounts 表 |
+| 4 | `GET /api/v1/admin/provider-logs` | Provider 调用日志（id, user_id, feature, provider, model, status, credits_charged, created_at），支持 limit/offset | provider_call_log 表 |
+| 5 | `GET /api/v1/admin/usage-events` | 使用事件列表（id, user_id, feature, created_at），支持 limit/offset | usage_events 表 |
 
-- 新增 `insufficientBalance` 响应式状态（`ref<boolean>(false)`）
-- 新增 `errorRequestId` 响应式状态（`ref<string | null>(null)`）
-- 在 `handleSubmit` 的 `catch` 块中：
-  - 检查 `apiErr.code === "INSUFFICIENT_BALANCE"`
-  - 若是，设置 `insufficientBalance = true` + `errorRequestId = apiErr.request_id`
-  - 若否，`insufficientBalance = false`
-  - 错误消息仍通过 `sanitizeApiError` 获取
-- 模板中当 `insufficientBalance` 为 `true` 时：
-  - 在错误提示区域展示：
-    - 错误消息（现有 `.error-msg` 样式）
-    - "去充值" 按钮 → 调用 `router.push("/membership")`
-    - `request_id` 展示（小字、等宽字体、可选复制）
-  - 非 402 错误保持现有纯文本错误展示逻辑不变
-- 提交成功后（生成文案成功不再显示 402）重置 `insufficientBalance` 和 `errorRequestId`
+响应格式：统一 `{success, data: {items: [...], total, limit, offset}, error, request_id}`。
 
-### 3. 文档
+### 后端 — Schema + Service + Router
 
-- 更新 `docs/09-desktop-app-guide.md`：补充 402/余额不足 UX 说明
-- 新增 `docs/module-context/sprint-05-risk-01-insufficient-balance-ux/context.md`
+- `app/schemas/admin.py`：新增 5 个响应 schema + 通用分页 schema
+- `app/services/admin_service.py`（NEW）：5 个只读查询方法
+- `app/api/v1/admin.py`：新增 5 个 GET endpoint
+- 不新增 SQLAlchemy model，不修改 DDL
 
-### 4. 进度记录
+### 桌面端 — AdminPage
+
+- `desktop-app/src/pages/AdminPage.vue`（NEW）：
+  - 5 个 tab 页签：用户 / 订单 / 积分账户 / Provider 日志 / 使用事件
+  - 每个 tab 内：表格展示（关键列）+ 加载状态 + 错误提示 + 空状态
+  - 通用分页：上一页/下一页 + 当前页信息
+- `desktop-app/src/services/cloudApi.ts`：新增 5 个 admin API 函数 + DTO 类型
+- `desktop-app/src/router.ts`：新增 `/admin` 路由
+- `desktop-app/src/components/dashboard/AppSidebar.vue`：新增"管理后台"导航项（仅管理员可见）
+- `desktop-app/src/stores/authStore.ts`：新增 `isAdmin` computed + admin API 调用方法
+
+### 管理员可见性
+
+- `authStore` 新增 `isAdmin` computed：检查当前用户 `user.id` 是否在后端返回的管理员列表中
+- 由于前端不知道 ADMIN_USER_IDS 配置，采用"调用 admin API 试探"方式：首次进入 admin 页面或 sidebar 渲染时尝试调用 admin users 端点，若返回 200 则可见，若返回 403 则隐藏
+- 或更简单：在 sidebar 始终显示管理后台入口，点击进入后若 403 则显示"无权限"
+
+**决策**: 采用简易方案 — sidebar 始终显示"管理后台"（方便后续 RBAC 迁移），admin API 403 时页面显示"无管理权限"而非白屏。这样不依赖前端预知管理员身份。
+
+### 文档
+
+- `docs/module-context/sprint-05-risk-02-basic-admin/context.md`（NEW）：记录端点列表、权限模型、UI 结构、限制和扩展点
+- 不需要更新 `docs/09-desktop-app-guide.md`（admin 不在桌面端面向普通用户的功能范围内）
+
+### 进度记录
 
 - 追加更新 `PROGRESS.md`
 - 更新 `tasks/current-task.md` 完成后状态
 
 ## What Not To Build
 
-- 不修改后端扣费、余额检查、Provider 路由或套餐规则
-- 不接入真实支付
-- 不新增 API contract 或 shared DTO
-- 不修改 `cloudApi.ts` 的请求/响应核心逻辑（仅扩展错误对象）
-- 不新增依赖
-- 不在其他页面（OcrPage 等）添加类似 402 处理（范围仅 AdCopyPage）
-- 不修改 `authStore.ts`
+- 不做 RBAC 角色体系（那是 S05-R03）
+- 不做增删改操作（只读列表），不修改用户、不封禁设备、不退款
+- 不做复杂筛选、搜索、排序（只做分页）
+- 不做数据导出（CSV/Excel）
+- 不做统计图表或 dashboard 摘要
+- 不新增数据库表或修改 DDL
+- 不修改 Provider 路由、真实 AI 调用、扣费逻辑或套餐规则
+- 不接入真实支付或修改充值逻辑
+- 不做 official-website 后台
 
 ## Allowed Files
 
-- `desktop-app/src/pages/AdCopyPage.vue`
-- `desktop-app/src/services/cloudApi.ts`（仅错误对象补全，不改变请求/响应核心逻辑）
-- `docs/09-desktop-app-guide.md`
-- `docs/module-context/sprint-05-risk-01-insufficient-balance-ux/context.md`
+### 后端
+
+- `cloud-backend/app/api/v1/admin.py`
+- `cloud-backend/app/schemas/admin.py`
+- `cloud-backend/app/services/admin_service.py`（NEW）
+- `cloud-backend/app/main.py`（仅当需要新增 router 注册，已有 admin router）
+- `cloud-backend/tests/test_admin.py`（NEW 或扩展现有 admin 测试）
+
+### 桌面端
+
+- `desktop-app/src/pages/AdminPage.vue`（NEW）
+- `desktop-app/src/services/cloudApi.ts`
+- `desktop-app/src/router.ts`
+- `desktop-app/src/components/dashboard/AppSidebar.vue`
+- `desktop-app/src/stores/authStore.ts`
+
+### 文档
+
+- `docs/module-context/sprint-05-risk-02-basic-admin/context.md`
 - `PROGRESS.md`
-- `tasks/current-task.md`（完成后仅允许状态、分支、简短完成摘要、commit/PR 信息）
+- `tasks/current-task.md`
 
 ## Forbidden Files
 
-- `cloud-backend/**`
+- 数据库 DDL / migrations
+- `cloud-backend/app/models/**`
+- `cloud-backend/app/providers/**`
+- `cloud-backend/app/services/provider_service.py`
+- `cloud-backend/app/services/credit_service.py`
+- `cloud-backend/app/services/recharge_service.py`
+- `cloud-backend/app/core/config.py`
 - `desktop-app/src-tauri/**`
-- `desktop-app/src/stores/**`
-- `desktop-app/src/components/**`
-- `desktop-app/src/pages/`（除 AdCopyPage.vue 外）
-- `desktop-app/package.json`
-- `desktop-app/package-lock.json`
+- `desktop-app/package.json` / `package-lock.json`
 - `shared/**`
 - `official-website/**`
 - `.github/**`
-- 数据库 DDL / migrations
-- Provider、Credit、Payment、Billing 相关代码
+- 任何真实密钥、证书、签名私钥、生产连接串
 
 ## Dependency Permission
 
@@ -127,39 +142,48 @@ S04-T01 已实现 Provider 调用前余额检查，余额不足时后端返回 4
 
 ## Major Change Status
 
-`NO_MAJOR_CHANGE_EXPECTED`
+`MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-原因：仅修改桌面端错误展示和入口引导，不改变后端逻辑、API contract、Provider 路由、扣费算法或 Tauri 权限。
+原因：涉及 admin API 新增、后台权限边界和桌面端新页面。
 
 必须暂停确认的情况：
-- 需要修改后端、shared、数据库、Provider、Credit、Payment 或 Tauri 权限
-- 需要新增 API 端点或修改 API contract
-- 需要在 AdCopyPage.vue 和 cloudApi.ts 之外修改文件
+- 需要新增或修改数据库 DDL / migrations
+- 需要修改 Provider、Credit、Payment、Billing 模型或服务
+- 需要在 allowed files 之外修改文件
 - 需要新增依赖
+- 发现 admin 查询可能泄露敏感数据（raw provider payload、用户密码 hash 等）
 
 ## Security Requirements
 
-- 不绕过后端授权、余额检查或扣费逻辑
-- 不在客户端决定套餐、余额或扣费结果
-- 不修改 token 存储策略
-- 不提交 `dist/**`、构建产物或日志
+- 所有 `/api/v1/admin/*` 端点必须通过 `get_admin_user` 鉴权
+- 非管理员请求返回 403（与现有 admin grant 端点一致）
+- 不返回用户密码 hash、token、API key、raw provider response body
+- 分页默认 limit ≤ 100，防止全量导出
+- provider_call_log 不暴露 `raw_usage` 或 `raw_response`
+- 管理员身份判断仅在服务端进行，不信任客户端角色声明
 
 ## Acceptance Criteria
 
-- [ ] 余额不足时 AI 文案页面显示中文提示 + "去充值"按钮 + request_id
-- [ ] 点击"去充值"按钮跳转到 `/membership` 会员中心页面
-- [ ] 非 402 错误（网络超时、未登录、服务异常等）仍按原有纯文本错误逻辑显示
-- [ ] 成功生成文案后，之前的 402 状态和 request_id 自动清除
-- [ ] `CloudAPIErrorDetail` 新增 `request_id?` 字段，错误路径不丢失 request_id
-- [ ] `sanitizeApiError` 的 `codeMap` 包含 `INSUFFICIENT_BALANCE`
-- [ ] 不修改后端、shared、数据库、Tauri 权限、依赖或 CI
+- [ ] 5 个 admin 端点均可返回分页只读列表
+- [ ] 非管理员调用任意 admin 端点返回 403
+- [ ] 桌面端 AdminPage 可通过 `/admin` 路由访问
+- [ ] AdminPage 5 个 tab 分别展示对应数据
+- [ ] Sidebar 有"管理后台"入口
+- [ ] 无权限时 AdminPage 显示"无管理权限"而非白屏
+- [ ] 后端 admin focused tests 覆盖权限隔离 + 分页 + 数据正确性
 - [ ] `npm run build` 通过
+- [ ] `pytest tests/ -v` 通过
 - [ ] `git diff --check` 通过
-- [ ] `PROGRESS.md` 已追加本任务记录
+- [ ] `PROGRESS.md` 已追加记录
 
 ## Test Method
 
 必须运行：
+
+```powershell
+cd ad-assistant/cloud-backend
+python -m pytest tests/ -v
+```
 
 ```powershell
 cd ad-assistant/desktop-app
@@ -176,28 +200,23 @@ git diff --check
 git status --short --branch
 ```
 
-建议手动验证（需运行后端 + 低余额测试用户）：
-
-1. 用余额不足的测试用户登录
-2. 进入 AI 文案生成页面，提交表单
-3. 验证：显示余额不足提示 + "去充值"按钮 + request_id
-4. 点击"去充值" → 验证跳转到 `/membership`
-5. 用正常余额用户提交 → 验证正常生成文案
-
-如果后端/本地服务不可用，至少完成 `npm run build` + `git diff --check` + 静态代码审查。
-
 ## Rollback Plan
 
-- revert 本任务 commit，恢复 AI 文案页面纯文本错误逻辑
-- 不影响后端、数据库、API contract 或用户数据
+- revert 本任务 commit 移除 admin 端点和 AdminPage
+- 如果只回退后端：移除 admin.py 中新增的 5 个 GET endpoint 路由注册
+- 如果只回退前端：删除 AdminPage.vue 和路由/sidebar 注册
+- 不涉及数据库迁移、用户数据或 Provider 状态
 
 ## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- UX 行为变更说明
-- 测试命令和结果
+- 后端新增端点列表
+- 桌面端 AdminPage 结构
+- 权限模型说明
+- 测试结果
+- 安全自查（是否暴露敏感字段）
 - 未实现内容
 - 自审结论
 - reviewer-mode 自查结论

@@ -46,6 +46,11 @@ const router = createRouter({
       name: "membership",
       component: () => import("./pages/MembershipPage.vue"),
     },
+    {
+      path: "/admin",
+      name: "admin",
+      component: () => import("./pages/AdminPage.vue"),
+    },
   ],
 });
 
