@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PermissionChecker
 from app.database import get_db
+from app.providers.circuit_breaker import get_circuit_breaker_registry
 from app.models.user import User
 from app.schemas.admin import (
     AdminGrantRequest,
@@ -22,6 +23,8 @@ from app.schemas.admin import (
     MonthlyGrantRequest,
     MonthlyGrantResponse,
     PaginatedItems,
+    ProviderHealthItem,
+    ProviderHealthResponse,
 )
 from app.schemas.common import success_response
 from app.services import admin_service
@@ -264,4 +267,28 @@ async def admin_run_monthly_grant(
             failed=summary.failed,
             errors=summary.errors,
         ).model_dump()
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /provider-health (S05-R05 — new)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/provider-health")
+async def admin_provider_health(
+    admin: Annotated[User, Depends(PermissionChecker("provider_logs:read"))],
+):
+    """Return circuit breaker status for all registered providers.
+
+    Requires ``provider_logs:read`` permission (admin or operator).
+    """
+    cb_registry = get_circuit_breaker_registry()
+    status_all = cb_registry.status_all()
+    providers = {
+        name: ProviderHealthItem(**status)
+        for name, status in status_all.items()
+    }
+    return success_response(
+        data=ProviderHealthResponse(providers=providers).model_dump()
     )

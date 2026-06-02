@@ -1,4 +1,4 @@
-# S05-R04: 月度积分发放调度器
+# S05-R05: Provider 健康检查与熔断器
 
 ## 状态
 
@@ -6,76 +6,92 @@
 
 ## 分支
 
-`feature/sprint-05-risk-04-monthly-credit-grant`
+`feature/sprint-05-risk-05-provider-health-circuit`
 
 ## 完成摘要
 
-- `monthly_grant_service.py`（NEW）：幂等检查 + 单用户发放 + 批量编排，幂等键 `source_type="system"` + `source_id="{user_id}:{YYYY-MM}"`
-- `scripts/run_monthly_grant.py`（NEW）：CLI 脚本，支持 `--year`/`--month`/`--dry-run`
-- `POST /api/v1/admin/monthly-grant/run`：管理员手动触发端点（需 `credits:grant` 权限）
-- `MonthlyGrantRequest` + `MonthlyGrantResponse` schema
-- 复用 `grant_credits()`（`source_type="system"`），不修改 credit_service 或 models
-- 16 tests：幂等性、跨月、跳过规则、dry-run、admin 权限隔离
-- 全量测试：332 passed, 74 skipped
-- 未实现：cron 部署、自动重试、大批量分批
+- `circuit_breaker.py`（NEW）：CLOSED → OPEN → HALF_OPEN 三态熔断器（阈值 3 次失败，冷却 60s）
+- `route_and_execute_provider_call` 集成熔断器：调用前 CB 检查，成功/失败报告
+- `GET /api/v1/admin/provider-health`：管理员/operator 查看所有 Provider 熔断状态
+- `ProviderHealthItem` + `ProviderHealthResponse` schema
+- 18 tests：状态机全生命周期（9）+ 注册表（5）+ admin 端点权限（3）+ 异常（1）
+- 全量：350 passed, 74 skipped
+- 未实现：DB 持久化、动态参数、HALF_OPEN 并发控制
 
 ## 背景
 
-S04-T04 完成套餐和充值的最小商业链路：[plan.py](ad-assistant/cloud-backend/app/models/plan.py) 的 `monthly_credits` 字段已定义各套餐月度赠送额度（standard/expert/enterprise）。[credit_service.py](ad-assistant/cloud-backend/app/services/credit_service.py) 的 `grant_credits()` 已支持 `source_type="system"` 的积分授予操作。[CreditLedger](ad-assistant/cloud-backend/app/models/credit_ledger.py) 有 `source_type` 和 `source_id` 字段可承载幂等键。
+S04-T01 已实现 `FALLBACK_RULES` 降级链和 `_call_with_retry` 重试机制。当前 `route_and_execute_provider_call` 在 primary provider 失败后会尝试 fallback，但缺少熔断器（circuit breaker）——连续失败后仍会反复尝试同一个 Provider，浪费资源和用户等待时间。
 
-但套餐月度赠送积分尚未自动发放。当前购买后积分一次性到账（通过 `recharge_service`），后续月份需要单独的调度器来定期发放。
+Provider 故障时仍缺少：
+- 熔断保护：连续失败后快速失败，不再尝试
+- 冷却恢复：一段时间后允许半开探测
+- 可观测性：管理员可查询各 Provider 健康状态
 
 ## 用户目标
 
-让套餐用户按月获得约定积分额度（`plan.monthly_credits`），并保证发放记录可追踪、可幂等、可回滚、可通过管理员手动触发。
+在真实 Provider 不稳定时减少连续失败，提供最小健康状态和熔断保护，并允许管理员查看 Provider 状态。
 
 ## What To Build
 
-### 1. 月度发放服务（NEW: `monthly_grant_service.py`）
+### 1. 熔断器（NEW: `circuit_breaker.py`）
 
-- 函数 `process_monthly_grants(db, year, month)` — 主编排器
-- 函数 `grant_monthly_credits_for_user(db, user, year, month)` — 单用户发放
-- **幂等键设计**：`source_type = "monthly_grant"`，`source_id = f"{user_id}:{year}-{month:02d}"`
-- 发放前检查 `credit_ledger` 是否已存在相同 `source_type` + `source_id` + `user_id` 记录
-- 查询逻辑：
-  - 找出 `users.status = "active"` 且 `credit_accounts.status = "active"` 且 `plans.monthly_credits > 0` 的用户
-  - 跳过已发放当月积分的用户
-- 发放时调用已有的 `grant_credits(db, user_id, amount, source_type="monthly_grant", source_id=..., description=...)`
-- 返回汇总：`{granted: int, skipped: int, failed: int, errors: list[dict]}`
+在 `app/providers/circuit_breaker.py` 中实现：
 
-### 2. CLI 脚本（NEW: `scripts/run_monthly_grant.py`）
+- `CircuitState` 枚举：`CLOSED`（正常）→ `OPEN`（熔断）→ `HALF_OPEN`（探测恢复）→ `CLOSED`
+- `CircuitBreaker` 类：
+  - 配置：`failure_threshold`（默认 3 次连续失败）、`cooldown_seconds`（默认 60s）
+  - `before_call() -> bool`：调用前检查 — OPEN 且未冷却完成 → False；OPEN 且冷却完成 → 转 HALF_OPEN → True；CLOSED/HALF_OPEN → True
+  - `on_success()`：成功 → 重置回 CLOSED
+  - `on_failure()`：失败 → CLOSED/HALF_OPEN 下递增计数，达到阈值 → OPEN
+  - `state` / `consecutive_failures` / `opened_at` 属性（用于健康检查展示）
+- `CircuitBreakerRegistry`：`dict[provider_name, CircuitBreaker]` + 模块级单例
+- `CircuitBreakerOpenError` 异常
 
-- 用法：`python scripts/run_monthly_grant.py [--year YYYY] [--month MM] [--dry-run]`
-- 默认发放当前月份
-- `--dry-run` 模式：只统计哪些用户将被发放，不实际执行
-- 输出发放汇总到 stdout
+### 2. 集成到 provider_service.py
 
-### 3. Admin 手动触发端点（修改 `admin.py`）
+修改 `route_and_execute_provider_call`：
 
-- 新增 `POST /api/v1/admin/monthly-grant/run`
-- 权限：`credits:grant`（与积分授权一致）
-- 请求体可选：`{year: int, month: int}`，默认当前月份
-- 返回发放汇总
+- 在尝试每个 Provider 之前，检查其熔断器状态
+- 熔断打开 → 记录日志 + 跳过该 Provider（若为 primary 则尝试 fallback；若 fallback 也熔断则抛出 `CircuitBreakerOpenError`）
+- Provider 调用成功 → `cb.on_success()`
+- Provider 调用失败（所有可捕获异常，除 `InsufficientBalanceError` 外）→ `cb.on_failure()`
+- 熔断跳过时在 `provider_call_log` 中记录 `error_code="CIRCUIT_OPEN"`
 
-### 4. Schema（修改 `admin.py` schemas）
+### 3. 健康检查 Admin 端点
 
-- 新增 `MonthlyGrantRequest`：`year: int | None`, `month: int | None`
-- 新增 `MonthlyGrantResponse`：`granted: int`, `skipped: int`, `failed: int`, `errors: list`
+在 `admin.py` 中新增 `GET /api/v1/admin/provider-health`：
 
-### 5. 测试（NEW: `tests/test_monthly_grant.py`）
+- 权限：`provider_logs:read`
+- 返回每个已注册 Provider 的熔断器状态：
+  ```json
+  {
+    "providers": {
+      "deepseek": {"state": "CLOSED", "consecutive_failures": 0, "opened_at": null},
+      "mock": {"state": "CLOSED", "consecutive_failures": 0, "opened_at": null}
+    }
+  }
+  ```
 
-- 幂等性：同一用户同一月不会重复发放
-- 余额验证：发放后 balance 正确增加
-- 跨月验证：同一用户可以收到不同月份的发放
-- 跳过规则：无 monthly_credits 的用户被跳过
-- 跳过规则：inactive 用户被跳过
-- 错误路径：grant_credits 失败时记录错误但不中断其他用户
-- 空数据集：无符合条件的用户时返回空汇总
+### 4. Schema
+
+在 `admin.py` schemas 中新增 `ProviderHealthItem` + `ProviderHealthResponse`。
+
+### 5. 测试（NEW: `tests/test_circuit_breaker.py`）
+
+- CLOSED → OPEN 转换：连续失败达到阈值后熔断
+- OPEN 期间拒绝调用：`before_call()` 返回 False
+- 冷却后转 HALF_OPEN：冷却时间到后允许一次探测
+- HALF_OPEN 成功恢复：探测成功 → CLOSED
+- HALF_OPEN 失败再熔断：探测失败 → 立即 OPEN
+- 单次成功重置计数
+- 模块级单例注册表
+- Admin 端点返回 Provider 健康状态
+- Provider 集成：连续失败后 primary 被熔断 → 走 fallback
 
 ### 6. 文档
 
-- 新增 `docs/module-context/sprint-05-risk-04-monthly-credit-grant/context.md`
-- 更新 `docs/07-ai-cost-control.md`（如需要）
+- 新增 `docs/module-context/sprint-05-risk-05-provider-health-circuit/context.md`
+- 更新 `docs/06-provider-architecture.md`（如需要）
 
 ### 7. 进度记录
 
@@ -83,46 +99,45 @@ S04-T04 完成套餐和充值的最小商业链路：[plan.py](ad-assistant/clou
 
 ## What Not To Build
 
-- 不接入真实支付
-- 不做复杂订阅续费（自动续费、过期宽限期等）
-- 不做 cron 部署或 CI 调度配置（仅提供脚本，调度由运维自行配置）
-- 不修改 `recharge_service` 或充值流程
-- 不在桌面端添加月度发放 UI
-- 不新增依赖（包括 APScheduler、Celery 等调度框架）
+- 不做复杂运维后台
+- 不做数据库持久化熔断状态（内存即可，重启重置）
+- 不做动态路由规则（规则已在 router.py）
+- 不接入新 Provider
+- 不修改价格模型或计费逻辑
+- 不在桌面端展示 Provider 健康状态
+- 不新增依赖（包括 resilience4j、pybreaker 等）
 
 ## Allowed Files
 
-- `cloud-backend/app/services/monthly_grant_service.py`（NEW）
-- `cloud-backend/scripts/run_monthly_grant.py`（NEW）
+- `cloud-backend/app/providers/circuit_breaker.py`（NEW）
+- `cloud-backend/app/services/provider_service.py`
 - `cloud-backend/app/api/v1/admin.py`
 - `cloud-backend/app/schemas/admin.py`
-- `cloud-backend/tests/test_monthly_grant.py`（NEW）
-- `docs/07-ai-cost-control.md`
-- `docs/module-context/sprint-05-risk-04-monthly-credit-grant/context.md`（NEW）
+- `cloud-backend/tests/test_circuit_breaker.py`（NEW）
+- `docs/06-provider-architecture.md`
+- `docs/module-context/sprint-05-risk-05-provider-health-circuit/context.md`（NEW）
 - `PROGRESS.md`
 - `tasks/current-task.md`
 
 ## Forbidden Files
 
-- 真实支付接口
-- CI/deployment cron 配置
+- Payment/Credit 计费规则
+- `credit_service.py`
 - desktop UI
-- Provider 路由
 - Tauri permissions
-- `cloud-backend/app/models/**`（无新模型，复用现有 credit_ledger）
-- `cloud-backend/app/core/config.py`（不需新配置）
-- `cloud-backend/app/services/credit_service.py`（复用，不修改）
+- CI/deployment
+- `app/models/**`（无新模型）
+- `app/core/config.py`（熔断参数硬编码在 circuit_breaker.py 中）
 
 ## Acceptance Criteria
 
-- [ ] 同一用户同一月份不会重复发放（幂等）
-- [ ] 发放写入 `credit_ledger`（source_type="monthly_grant"，source_id 包含年月）
-- [ ] 失败用户记录错误但不中断其他用户的发放
-- [ ] 余额正确增加（通过已有的 `grant_credits` 原子更新）
-- [ ] `--dry-run` 模式只统计不执行
-- [ ] Admin 端点可手动触发发放
-- [ ] 测试覆盖：幂等性、跨月、跳过规则、错误路径
-- [ ] `python -m pytest tests/ -v` 通过（所有已有测试 + 新增）
+- [ ] 连续失败后 Provider 被短暂熔断（默认 3 次失败，60s 冷却）
+- [ ] 熔断期间走 fallback 或返回明确 CIRCUIT_OPEN 错误
+- [ ] 冷却后允许半开探测恢复
+- [ ] 单次成功重置计数
+- [ ] 管理员可通过 `GET /api/v1/admin/provider-health` 查看所有 Provider 熔断状态
+- [ ] 测试覆盖：CLOSED→OPEN→HALF_OPEN→CLOSED 状态转换
+- [ ] `python -m pytest tests/ -v` 通过
 - [ ] `git diff --check` 通过
 
 ## Test Method
@@ -131,6 +146,7 @@ S04-T04 完成套餐和充值的最小商业链路：[plan.py](ad-assistant/clou
 
 ```powershell
 cd ad-assistant/cloud-backend
+python -m pytest tests/test_circuit_breaker.py -v
 python -m pytest tests/ -v
 ```
 
@@ -146,36 +162,32 @@ git diff --check
 
 `MAJOR_CHANGE_CONFIRMED_BY_TASK_SCOPE`
 
-原因：涉及 credit ledger 写入和积分发放逻辑，直接影响用户余额。
+原因：涉及 Provider 路由和调用可靠性，可能影响生产 AI 调用路径。
 
 必须暂停确认的情况：
-- 需要修改 `credit_service.py` 核心逻辑
-- 需要修改数据库 DDL 或模型
+- 需要修改 Provider 接口（AsyncProvider base class）
+- 需要修改 Payment/Credit 计费逻辑
 - 需要新增第三方依赖
-- 测试失败无法在任务范围内修复
 
 ## Security Requirements
 
-- 只能服务端发放积分，客户端不可触发
-- 发放必须写入 ledger，可审计
-- Admin 手动触发端点受 `PermissionChecker("credits:grant")` 保护
-- 不允许客户端决定发放额度（额度来自 `plan.monthly_credits`）
-- `--dry-run` 不修改任何数据
+- 不泄露 API Key 或 raw provider payload
+- 熔断状态不允许由客户端篡改（仅服务端内存）
+- 健康检查端点受 `PermissionChecker("provider_logs:read")` 保护
 
 ## Rollback Plan
 
-1. Revert 本任务 commit
-2. 已发放的积分通过 `credit_ledger` 反向记录（冲正），不直接修改 balance
-3. 移除 admin 触发端点
-4. 不影响用户数据、订单或 Provider
+- revert 本任务 commit
+- Provider 调用恢复现有 retry/fallback 行为（无熔断器）
+- 熔断状态仅在内存，无数据库回滚需求
 
 ## Completion Output Required
 
 执行者完成后必须用中文输出：
 
 - 修改文件列表
-- 幂等方案说明
-- 发放规则说明
+- 熔断规则说明
+- 健康检查范围
 - 测试命令和结果
 - 未实现内容
 - 自审结论
