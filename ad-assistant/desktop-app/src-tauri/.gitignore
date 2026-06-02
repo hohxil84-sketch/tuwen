@@ -1,0 +1,6 @@
+# Tauri 构建产物（禁止提交）
+target/
+
+# IDE
+.vscode/
+.idea/

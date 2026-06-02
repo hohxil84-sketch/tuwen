@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-utils/schema/capability.json",
+  "identifier": "default",
+  "description": "S04-T07: 最小权限 — 仅核心窗口操作，不开放 shell/filesystem/remote",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-is-maximized",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-start-dragging"
+  ]
+}
