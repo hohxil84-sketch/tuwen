@@ -11,11 +11,12 @@
 ## 开始开发前
 
 1. 运行 `git status --short --branch`。
-2. 如果没有有效任务单，先由 Codex 根据用户目标起草或更新 `tasks/current-task.md`。
-3. CC 确认任务单有效，且没有自行扩大、重写或弱化 Codex/用户确认的范围。
-4. 从 `main` 创建或切换到任务分支。
-5. 确认没有未处理的无关改动。
-6. 判断是否触碰高风险边界；如果触碰，先等用户确认。
+2. 运行 `git fetch origin --prune` 读取最新远端状态；如果网络、认证或权限导致 fetch 失败，必须停止并报告，不能基于缓存的远端引用继续开发、提交或推送。
+3. 如果没有有效任务单，先由 Codex 根据用户目标起草或更新 `tasks/current-task.md`。
+4. CC 确认任务单有效，且没有自行扩大、重写或弱化 Codex/用户确认的范围。
+5. 新任务分支必须用 `git switch -c <task-branch> origin/main` 基于最新 `origin/main` 创建；已有任务分支必须先检查其远端跟踪分支，不能默认本地 `main` 或本地任务分支已经同步。
+6. 确认没有未处理的无关改动。
+7. 判断是否触碰高风险边界；如果触碰，先等用户确认。
 
 ## 提交前
 
@@ -26,9 +27,14 @@
 5. 如果 reviewer-mode 发现阻塞或高风险问题，必须先修复、补测、重新运行测试，并再次执行 reviewer-mode；不能把“已自审”当作通过依据。
 6. 高风险任务必须在 reviewer-mode 通过后再请求 Codex 复核；CC 自审和 reviewer-mode 不能替代 Codex 高风险复核。
 7. 更新模块上下文。
-8. 只 stage 当前任务相关文件。
-9. 如果工作区存在无关改动，必须运行并展示 `git status --short --branch` 和 `git diff --cached --name-status`。
-10. 用户或 Codex 确认 staged 文件列表前，不得提交。
+8. 再次运行 `git fetch origin --prune`；fetch 失败时不得提交。
+9. 如果当前分支已有 upstream，运行 `git rev-list --left-right --count "HEAD...@{upstream}"`。右侧计数大于 0 表示远端存在本地缺失提交，必须先停止并确定 rebase 或 merge 方案，不得直接提交或推送。
+10. 如果当前分支没有 upstream，必须确认远端不存在同名分支，或先建立并检查正确的 upstream。
+11. 只 stage 当前任务相关文件。
+12. 如果工作区存在无关改动，必须运行并展示 `git status --short --branch` 和 `git diff --cached --name-status`。
+13. 用户或 Codex 确认 staged 文件列表前，不得提交。
+
+不得在存在未提交改动时盲目执行 `git pull`。需要同步时，先保护并检查本地改动，再明确选择 rebase 或 merge；禁止依赖默认 pull 行为产生意外合并提交。
 
 ## 提交规则
 
@@ -42,6 +48,7 @@
 - 不 `git push origin main`。
 - 不 force push。
 - 提交目标只能是当前任务分支。
+- 推送前必须再次成功运行 `git fetch origin --prune` 并确认远端跟踪分支没有本地缺失提交。
 - 推送命令只能指向当前任务分支，例如 `git push -u origin <current-branch>`。
 
 ## PR 规则

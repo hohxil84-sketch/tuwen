@@ -115,13 +115,18 @@ Reviewer-mode 交付说明必须包含：实际审查范围、发现的问题和
 ## Git 规则
 
 - 开始前先运行 `git status --short --branch`。
-- 如果当前分支是 `main`，先切到任务分支再继续。
+- 开始任务、提交前和推送前都必须运行 `git fetch origin --prune`；如果网络、认证或权限导致 fetch 失败，立即停止并报告，不得使用缓存的远端引用继续。
+- 新任务分支必须基于最新 `origin/main` 创建，例如 `git switch -c <task-branch> origin/main`；不得默认本地 `main` 已同步。
+- 如果当前分支是 `main`，先基于 `origin/main` 创建或切到任务分支再继续。
+- 当前分支已有 upstream 时，提交前和推送前运行 `git rev-list --left-right --count "HEAD...@{upstream}"`；右侧计数大于 0 时，必须先确定 rebase 或 merge 方案，不得直接提交或推送。
+- 当前分支没有 upstream 时，必须确认远端不存在同名分支，或先建立并检查正确的 upstream。
+- 不得在存在未提交改动时盲目执行 `git pull`；同步前先保护并检查本地改动，明确选择 rebase 或 merge，禁止默认 pull 产生意外合并提交。
 - 只 stage 当前任务相关文件，不使用 `git add -A`。
 - 在存在任何 unrelated dirty files 时，提交前必须先运行并展示 `git status --short --branch` 和 `git diff --cached --name-status`。
 - 用户或 Codex 明确确认 staged 文件列表前，不得 `git commit`。
 - 如果 staged 文件中出现任务单 allowed files 之外的文件，必须停止并取消 stage；不得用“顺手修复”“本地生成”“构建需要”作为混入理由。
 - 如果需要修改 forbidden files 或高风险边界文件，必须先更新任务单并等待用户确认，不能在当前任务 commit 中夹带。
-- 自审和 reviewer-mode 自查均通过后，可以提交到当前任务分支并 push 当前任务分支。
+- 自审、reviewer-mode 自查和远端同步门禁均通过后，可以提交到当前任务分支并 push 当前任务分支。
 - 不直接 push `main`，不 force push。
 - 可以创建 PR 或 draft PR；未经用户明确确认，不能 self-merge。
 - 用户明确确认某个 PR 可以合并后，CC 可以通过 GitHub PR 合并该 PR，并在交付说明中记录确认来源和合并结果。

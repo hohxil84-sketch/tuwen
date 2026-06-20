@@ -1404,3 +1404,42 @@ PR：#27（已合并到 `main` @ `cb3abef`）
 - 残余风险：无
 - 后续任务：全面代码审查/文档整理（用户指定的下一阶段 C）；Sprint-03 规划（阶段 B）。
 - 回滚方式：revert 对应提交，恢复 `sprint-02-summary.md` 旧版。
+
+## 2026-06-20 - Git 远端同步提交护栏
+
+状态：COMPLETED
+
+分支：`codex/add-precommit-remote-sync`
+
+### 范围
+
+- 目标：避免 CC 在未读取 GitHub 最新状态时基于过期主线开发、提交或推送。
+- 已实现：开始任务、提交前和推送前强制执行 `git fetch origin --prune`；新分支基于 `origin/main`；upstream 远端领先时阻止提交和推送；禁止脏工作区盲目 `git pull`。
+- 未实现：不自动执行 rebase、merge 或 pull，不修改 CI、部署和业务代码。
+
+### 主要改动
+
+- `CLAUDE.md`：增加 CC 远端同步和失败阻断规则。
+- `docs/16-git-workflow.md`：补全开始开发、提交前和推送前的远端检查步骤。
+- `docs/20-agent-git-guardrails.md`：把远端不可达和远端领先列为必须暂停条件。
+- `tasks/current-task.md`：记录本任务范围、验收标准和完成状态。
+
+### 自检结果
+
+- 任务单完整：是
+- 修改范围符合 allowed files：是
+- 未触碰未确认高风险变更：是（仅协作文档）
+- 未加入密钥或生产凭据：是
+- 模块上下文已更新：不适用（Git 工作流规则）
+- reviewer-mode：未发现阻塞问题
+
+### 测试结果
+
+- 规则关键词一致性检索：通过
+- `git rev-list --left-right --count "HEAD...@{upstream}"`：`0 0`
+- `git diff --check`：通过
+
+### 风险和后续
+
+- 残余风险：规则依赖执行代理遵守；网络或 GitHub 认证失败会按设计阻断提交和推送。
+- 回滚方式：revert 本任务提交，恢复原 Git 流程规则。
